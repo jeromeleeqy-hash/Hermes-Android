@@ -69,7 +69,7 @@ fun ChatAssistantSheet(
             topStart = if (skin.glass) 24.dp else 16.dp,
             topEnd = if (skin.glass) 24.dp else 16.dp,
         ),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         dragHandle = {
             HermesMulticolorIcon(

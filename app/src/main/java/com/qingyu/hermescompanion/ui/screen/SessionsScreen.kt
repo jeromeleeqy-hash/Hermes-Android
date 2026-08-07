@@ -157,7 +157,7 @@ fun SessionsScreen(
                 bottomStart = if (skin.glass) 16.dp else 0.dp,
                 bottomEnd = if (skin.glass) 16.dp else 0.dp,
             ),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = skin.shadowElevation.dp,
             tonalElevation = 0.dp,
             border = if (skin.glass) BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant) else null,
@@ -292,7 +292,7 @@ fun SessionsScreen(
                 topStart = if (skin.glass) 20.dp else 14.dp,
                 topEnd = if (skin.glass) 20.dp else 14.dp,
             ),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+            containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
         ) {
             if (showProjectPicker) {
@@ -449,7 +449,7 @@ private fun Header(
                     expanded = profileMenuExpanded,
                     onDismissRequest = { profileMenuExpanded = false },
                     shape = RoundedCornerShape(10.dp),
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                    containerColor = MaterialTheme.colorScheme.surface,
                 ) {
                     if (isProfilesLoading && profiles.isEmpty()) {
                         DropdownMenuItem(
@@ -503,7 +503,7 @@ private fun Header(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
                 shape = RoundedCornerShape(10.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 shadowElevation = if (skin.glass) 6.dp else 2.dp,
                 border = BorderStroke(0.7.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
