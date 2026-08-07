@@ -149,13 +149,14 @@ fun SkillsToolsScreen(
                         if (state.selectedSkillContent.isNotBlank()) {
                             Text(state.selectedSkillContent, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                         }
+                        HorizontalDivider(modifier = Modifier.padding(top = 10.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                        TextButton(onClick = { onSkillToggle(skill) }) {
+                            Text(if (skill.enabled) "停用技能" else "启用技能")
+                        }
                     }
                 }
             },
             confirmButton = { TextButton(onClick = onCloseSkill) { Text("关闭") } },
-            dismissButton = {
-                TextButton(onClick = { onSkillToggle(skill) }) { Text(if (skill.enabled) "停用技能" else "启用技能") }
-            },
         )
     }
 }

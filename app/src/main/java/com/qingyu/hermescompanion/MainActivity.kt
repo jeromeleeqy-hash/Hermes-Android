@@ -15,6 +15,19 @@ import com.qingyu.hermescompanion.ui.HermesViewModel
 import com.qingyu.hermescompanion.ui.ThemeMode
 import com.qingyu.hermescompanion.ui.theme.HermesCompanionTheme
 
+private val SettingsDetailRoutes = setOf(
+    AppRoute.NOTIFICATIONS,
+    AppRoute.VOICE_SETTINGS,
+    AppRoute.PROFILE_SETTINGS,
+    AppRoute.ABOUT,
+    AppRoute.SKILLS_TOOLS,
+    AppRoute.MODEL_SETTINGS,
+    AppRoute.CONVERSATION_STYLE,
+    AppRoute.APPROVAL_SETTINGS,
+    AppRoute.MEMORY_CONTEXT,
+    AppRoute.ARCHIVED_SESSIONS,
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,35 +52,13 @@ class MainActivity : ComponentActivity() {
                 BackHandler(
                     enabled = state.route == AppRoute.CHAT ||
                         state.route == AppRoute.CRON_DETAIL ||
-                        state.route in setOf(
-                            AppRoute.NOTIFICATIONS,
-                            AppRoute.VOICE_SETTINGS,
-                            AppRoute.PROFILE_SETTINGS,
-                            AppRoute.ABOUT,
-                            AppRoute.SKILLS_TOOLS,
-                            AppRoute.MODEL_SETTINGS,
-                            AppRoute.CONVERSATION_STYLE,
-                            AppRoute.APPROVAL_SETTINGS,
-                            AppRoute.MEMORY_CONTEXT,
-                            AppRoute.ARCHIVED_SESSIONS,
-                        ) ||
+                        state.route in SettingsDetailRoutes ||
                         (state.route == AppRoute.SETUP && state.hasSavedConnection),
                 ) {
                     when {
                         state.route == AppRoute.CHAT -> viewModel.backToSessions()
                         state.route == AppRoute.CRON_DETAIL -> viewModel.closeCronJob()
-                        state.route in setOf(
-                            AppRoute.NOTIFICATIONS,
-                            AppRoute.VOICE_SETTINGS,
-                            AppRoute.PROFILE_SETTINGS,
-                            AppRoute.ABOUT,
-                            AppRoute.SKILLS_TOOLS,
-                            AppRoute.MODEL_SETTINGS,
-                            AppRoute.CONVERSATION_STYLE,
-                            AppRoute.APPROVAL_SETTINGS,
-                            AppRoute.MEMORY_CONTEXT,
-                            AppRoute.ARCHIVED_SESSIONS,
-                        ) -> viewModel.closeSettingsPage()
+                        state.route in SettingsDetailRoutes -> viewModel.closeSettingsPage()
                         else -> viewModel.closeConnectionSettings()
                     }
                 }

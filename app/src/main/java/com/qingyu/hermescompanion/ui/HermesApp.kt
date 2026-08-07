@@ -47,6 +47,8 @@ import com.qingyu.hermescompanion.ui.screen.WorkspaceScreen
 import com.qingyu.hermescompanion.ui.component.ImageLoadingDialog
 import com.qingyu.hermescompanion.ui.component.ImagePreviewDialog
 
+private val DockRoutes = setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE)
+
 @Composable
 fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -67,7 +69,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (state.route in setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE)) {
+            if (state.route in DockRoutes) {
                 HermesBottomDock(
                     selected = state.route,
                     hasUnreadConversations = state.unreadSessionIds.isNotEmpty(),

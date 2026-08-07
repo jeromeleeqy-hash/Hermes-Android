@@ -205,7 +205,11 @@ private fun CronActionIcon(
         else -> IconButtonDefaults.filledTonalIconButtonColors()
     }
     FilledTonalIconButton(onClick = onClick, enabled = enabled, colors = colors) {
-        HermesMulticolorIcon(icon, contentDescription = description)
+        HermesMulticolorIcon(
+            icon,
+            contentDescription = description,
+            tint = colors.contentColor,
+        )
     }
 }
 

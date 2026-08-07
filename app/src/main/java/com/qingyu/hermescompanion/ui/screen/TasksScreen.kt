@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -51,7 +50,6 @@ import com.qingyu.hermescompanion.ui.component.HermesSegmentedControl
 import com.qingyu.hermescompanion.ui.component.HermesMulticolorIcon
 import com.qingyu.hermescompanion.ui.component.HermesStatusIcon
 import com.qingyu.hermescompanion.ui.component.HermesStatusKind
-import com.qingyu.hermescompanion.ui.theme.HermesSkin
 import com.qingyu.hermescompanion.ui.theme.HermesSpacing
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -264,81 +262,6 @@ private fun CronHistoryCard(job: CronJob, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CronDetailDialog(
-    job: CronJob,
-    busy: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit,
-    onToggle: () -> Unit,
-    onTrigger: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    var editing by remember(job.id) { mutableStateOf(false) }
-    var name by remember(job.id) { mutableStateOf(job.name) }
-    var prompt by remember(job.id) { mutableStateOf(job.prompt) }
-    var schedule by remember(job.id) { mutableStateOf(job.schedule.expression) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(18.dp),
-        title = { Text(if (editing) "编辑定时任务" else "定时任务详情") },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 510.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
-            ) {
-                if (editing) {
-                    OutlinedTextField(name, { name = it }, label = { Text("任务名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(prompt, { prompt = it }, label = { Text("让 Hermes 做什么") }, minLines = 3, maxLines = 6, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(
-                        schedule,
-                        { schedule = it },
-                        label = { Text("Cron 表达式") },
-                        supportingText = { Text("示例：每天 9:00 = 0 9 * * *") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    DetailRow("状态", if (job.enabled) job.state.ifBlank { "已启用" } else "已暂停")
-                    DetailRow("执行计划", job.schedule.display.ifBlank { job.schedule.expression.ifBlank { "未设置" } })
-                    DetailRow("下次执行", job.nextRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: "等待服务器计算")
-                    DetailRow("上次执行", job.lastRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: "暂无")
-                    job.lastStatus.takeIf(String::isNotBlank)?.let { DetailRow("上次状态", it) }
-                    (job.model.ifBlank { job.provider }).takeIf(String::isNotBlank)?.let { DetailRow("运行模型", it) }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                    Text("执行内容", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(job.prompt.ifBlank { "未填写" }, style = MaterialTheme.typography.bodyMedium)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        TextButton(onClick = onTrigger, enabled = !busy) { Text("立即运行") }
-                        TextButton(onClick = onToggle, enabled = !busy) { Text(if (job.enabled) "暂停" else "启用") }
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDelete, enabled = !busy) { Text("删除", color = MaterialTheme.colorScheme.error) }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (editing) {
-                TextButton(
-                    enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(),
-                    onClick = { onSave(name, prompt, schedule) },
-                ) { Text("保存") }
-            } else {
-                TextButton(enabled = !busy, onClick = { editing = true }) { Text("编辑") }
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy, onClick = { if (editing) editing = false else onDismiss() }) {
-                Text(if (editing) "取消编辑" else "关闭")
-            }
-        },
-    )
-}
-
-@Composable
 private fun DetailRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.34f))
@@ -463,13 +386,12 @@ private fun TaskSummaryMetric(label: String, value: String, modifier: Modifier =
 
 @Composable
 private fun ToolRunCard(name: String, preview: String, status: ToolStatus) {
-    Surface(
+    GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         shape = RoundedCornerShape(15.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = HermesSkin.current.panelAlpha),
-        tonalElevation = 0.dp,
+        contentPadding = PaddingValues(9.dp),
     ) {
-        Row(modifier = Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(11.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                 Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
                     when (status) {
@@ -496,13 +418,12 @@ private fun ToolRunCard(name: String, preview: String, status: ToolStatus) {
 
 @Composable
 private fun TaskEmptyState(icon: HermesIconKind, title: String, description: String, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
-    Surface(
+    GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = HermesSkin.current.panelAlpha),
-        tonalElevation = 0.dp,
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                 Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { HermesMulticolorIcon(icon, contentDescription = null, iconSize = 29.dp) }
             }

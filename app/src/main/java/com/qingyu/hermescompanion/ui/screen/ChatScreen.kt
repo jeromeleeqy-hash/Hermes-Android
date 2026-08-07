@@ -212,16 +212,16 @@ fun ChatScreen(
                 }
             },
             actions = {
-                Box(
+                IconButton(
+                    onClick = { assistantSheetVisible = true },
                     modifier = Modifier.padding(end = 12.dp).size(40.dp).clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer).clickable { assistantSheetVisible = true },
-                    contentAlignment = Alignment.Center,
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
                 ) {
                     HermesMulticolorIcon(HermesIconKind.AI, contentDescription = "$hermesName 助理面板", iconSize = 20.dp)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                containerColor = MaterialTheme.colorScheme.surface,
             ),
         )
 
@@ -603,11 +603,19 @@ private fun ToolActivityPanel(activities: List<ToolActivity>, hermesName: String
         tonalElevation = 0.dp,
     ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.secondary)
+            if (running > 0) {
+                CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.secondary)
+            } else {
+                HermesMulticolorIcon(
+                    HermesIconKind.VERIFIED,
+                    contentDescription = null,
+                    iconSize = 18.dp,
+                )
+            }
             Text(
                 text = when {
                     running > 0 -> "$hermesName 正在处理 · $running 项进行中"
-                    completed > 0 -> "$hermesName 正在整理结果 · 已完成 $completed 项"
+                    completed > 0 -> "$hermesName 已完成 $completed 项，正在整理回复"
                     else -> "$hermesName 正在处理"
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -703,18 +711,18 @@ private fun Composer(
                     .fillMaxWidth()
                     .shadow(if (skin.glass) skin.shadowElevation.dp else 0.dp, RoundedCornerShape(22.dp)),
                 shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 border = BorderStroke(
                     if (skin.glass) 0.9.dp else 0.7.dp,
-                    if (skin.glass) Color.White.copy(alpha = 0.42f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = skin.borderAlpha),
                 ),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp)) {
                     BasicTextField(
                         value = draft,
                         onValueChange = onDraftChange,
-                        enabled = enabled && !isStreaming,
+                        enabled = enabled,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                         maxLines = 5,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp, max = 112.dp).padding(horizontal = 4.dp, vertical = 5.dp),
@@ -735,7 +743,7 @@ private fun Composer(
                             icon = HermesIconKind.ATTACHMENT,
                             description = "添加内容",
                             background = MaterialTheme.colorScheme.primaryContainer,
-                            enabled = enabled && !isStreaming,
+                            enabled = enabled,
                             onClick = onTools,
                         )
                         Spacer(Modifier.width(7.dp))
@@ -743,7 +751,7 @@ private fun Composer(
                             icon = HermesIconKind.MICROPHONE,
                             description = "语音输入",
                             background = HermesColors.extended.successContainer,
-                            enabled = enabled && !isStreaming,
+                            enabled = enabled,
                             onClick = onVoice,
                         )
                         Spacer(Modifier.weight(1f))
@@ -918,7 +926,7 @@ private fun EmptyConversation(
                 shape = RoundedCornerShape(13.dp),
                 color = if (HermesSkin.current.glass) MaterialTheme.colorScheme.surface.copy(alpha = 0.72f) else Color.Transparent,
                 tonalElevation = 0.dp,
-                border = if (HermesSkin.current.glass) BorderStroke(0.8.dp, Color.White.copy(alpha = 0.42f)) else null,
+                border = if (HermesSkin.current.glass) BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)) else null,
             ) {
                 Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(softColor), contentAlignment = Alignment.Center) {

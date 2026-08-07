@@ -18,8 +18,6 @@ import com.qingyu.hermescompanion.ui.ThemeMode
 data class HermesSkinTokens(
     val mode: SkinMode,
     val glass: Boolean,
-    val panelAlpha: Float,
-    val chromeAlpha: Float,
     val shadowElevation: Int,
     val borderAlpha: Float,
     val ambientStrength: Float,
@@ -28,8 +26,6 @@ data class HermesSkinTokens(
 private val CleanSkin = HermesSkinTokens(
     mode = SkinMode.CLEAN,
     glass = false,
-    panelAlpha = 1f,
-    chromeAlpha = 1f,
     shadowElevation = 0,
     borderAlpha = 0f,
     ambientStrength = 0f,
@@ -38,8 +34,6 @@ private val CleanSkin = HermesSkinTokens(
 private val GlassSkin = HermesSkinTokens(
     mode = SkinMode.GLASS,
     glass = true,
-    panelAlpha = 1f,
-    chromeAlpha = 1f,
     shadowElevation = 4,
     borderAlpha = 0.82f,
     ambientStrength = 0.45f,
