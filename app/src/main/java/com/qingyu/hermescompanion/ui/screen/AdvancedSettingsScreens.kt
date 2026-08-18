@@ -30,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,7 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +64,7 @@ import com.qingyu.hermescompanion.ui.component.GlassPanel
 import com.qingyu.hermescompanion.ui.component.HermesIconKind
 import com.qingyu.hermescompanion.ui.component.HermesMulticolorIcon
 import com.qingyu.hermescompanion.ui.component.HermesSegmentedControl
+import com.qingyu.hermescompanion.ui.component.HermesSwitch
 import com.qingyu.hermescompanion.ui.format.ellipsizeSessionTitle
 import com.qingyu.hermescompanion.ui.format.sessionTimeLabel
 import com.qingyu.hermescompanion.ui.theme.HermesSpacing
@@ -178,7 +178,7 @@ private fun CapabilityRow(
                 if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            else Switch(checked = checked, onCheckedChange = { onToggle() }, modifier = Modifier.scale(0.78f))
+            else HermesSwitch(checked = checked, onCheckedChange = { onToggle() })
         }
     }
 }
@@ -447,7 +447,7 @@ private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit, 
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, "返回") }
         Column(Modifier.weight(1f).padding(start = 3.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -471,14 +471,17 @@ private fun SettingsForm(title: String, subtitle: String, padding: PaddingValues
 
 @Composable
 private fun SettingsSection(content: @Composable ColumnScope.() -> Unit) {
-    GlassPanel(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 3.dp), content = content)
+    GlassPanel(Modifier.fillMaxWidth().padding(top = 7.dp), shape = RoundedCornerShape(15.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp), content = content)
     }
 }
 
 @Composable
 private fun SelectRow(label: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).clickable(onClick = onClick).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.42f), maxLines = 1)
         Text(
             value,
@@ -495,12 +498,14 @@ private fun SelectRow(label: String, value: String, onClick: () -> Unit) {
 
 @Composable
 private fun EditableModelRow(label: String, value: String, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).clickable(onClick = onEdit)) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable(onClick = onEdit).padding(vertical = 2.dp)) {
             Text(label, fontWeight = FontWeight.Medium)
             Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onDelete) { HermesMulticolorIcon(HermesIconKind.DELETE, "移除") }
+        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+            HermesMulticolorIcon(HermesIconKind.DELETE, "移除", iconSize = 18.dp, tint = MaterialTheme.colorScheme.error)
+        }
     }
 }
 
@@ -511,7 +516,7 @@ private fun ToggleSetting(title: String, subtitle: String, value: Boolean, onCha
             Text(title, fontWeight = FontWeight.Medium)
             if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Switch(checked = value, onCheckedChange = onChange, modifier = Modifier.scale(0.78f))
+        HermesSwitch(checked = value, onCheckedChange = onChange)
     }
 }
 
@@ -539,7 +544,7 @@ private fun CompactValueField(
     onChange: (String) -> Unit,
 ) {
     Surface(
-        modifier = Modifier.width(width).height(40.dp),
+        modifier = Modifier.width(width).height(36.dp),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
         tonalElevation = 0.dp,
@@ -548,7 +553,10 @@ private fun CompactValueField(
             value = value,
             onValueChange = onChange,
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.End),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.End,
+            ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxSize().padding(horizontal = 9.dp, vertical = 7.dp),
             decorationBox = { inner ->
@@ -601,7 +609,14 @@ private fun ChoiceDialog(title: String, values: List<String>, selected: String, 
 
 @Composable
 private fun ChoiceRow(label: String, onClick: () -> Unit) {
-    Text(label, modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 }
 

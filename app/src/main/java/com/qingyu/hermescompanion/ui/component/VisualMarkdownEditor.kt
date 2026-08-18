@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -118,6 +119,7 @@ private fun VisualEditorToolbar(onCommand: (String) -> Unit) {
             EditorTextAction("正文") { onCommand("p") }
             EditorTextAction("标题 1") { onCommand("h1") }
             EditorTextAction("标题 2") { onCommand("h2") }
+            EditorTextAction("标题 3") { onCommand("h3") }
             EditorIconAction(HermesIconKind.BOLD, "粗体") { onCommand("bold") }
             EditorIconAction(HermesIconKind.ITALIC, "斜体") { onCommand("italic") }
             EditorIconAction(HermesIconKind.BULLET_LIST, "项目列表") { onCommand("ul") }
@@ -133,9 +135,11 @@ private fun EditorTextAction(label: String, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = Color.Transparent,
-        modifier = Modifier.sizeIn(minHeight = 44.dp).clickable(onClick = onClick),
+        modifier = Modifier.sizeIn(minHeight = 36.dp).clickable(onClick = onClick),
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 11.dp))
+        Box(Modifier.padding(horizontal = 9.dp).sizeIn(minHeight = 36.dp), contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
@@ -144,9 +148,11 @@ private fun EditorIconAction(icon: HermesIconKind, description: String, onClick:
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = Color.Transparent,
-        modifier = Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp).clickable(onClick = onClick),
+        modifier = Modifier.size(36.dp).clickable(onClick = onClick),
     ) {
-        HermesMulticolorIcon(icon, description, modifier = Modifier.padding(11.dp), iconSize = 18.dp)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            HermesMulticolorIcon(icon, description, iconSize = 15.dp)
+        }
     }
 }
 

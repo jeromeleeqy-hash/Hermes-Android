@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
@@ -40,6 +41,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.ui.AppUiState
+import com.qingyu.hermescompanion.model.ConnectionDiagnosticItem
+import com.qingyu.hermescompanion.model.DiagnosticStatus
 import com.qingyu.hermescompanion.ui.component.GlassPanel
 import com.qingyu.hermescompanion.ui.component.HermesMark
 import com.qingyu.hermescompanion.ui.component.HermesIconKind
@@ -53,6 +56,9 @@ fun ConnectionScreen(
     state: AppUiState,
     contentPadding: PaddingValues,
     onConnect: (String, String, String, Boolean) -> Unit,
+    onDiagnose: () -> Unit,
+    onCheckAgentUpdate: () -> Unit,
+    onApplyAgentUpdate: () -> Unit,
     onBack: (() -> Unit)?,
     onDisconnect: (() -> Unit)?,
 ) {
@@ -61,10 +67,10 @@ fun ConnectionScreen(
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var allowInsecureHttp by remember { mutableStateOf(false) }
+    var confirmAgentUpdate by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.baseUrl) { if (baseUrl.isBlank()) baseUrl = state.baseUrl }
     LaunchedEffect(state.username) { if (username.isBlank()) username = state.username }
-
     Column(
         modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(contentPadding),
     ) {
@@ -75,7 +81,7 @@ fun ConnectionScreen(
             ) {
                 IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, "返回") }
                 Column(Modifier.padding(start = 4.dp)) {
-                    Text("远程网关", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("远程网关", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Text("连接服务器上的 Hermes Agent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -85,7 +91,7 @@ fun ConnectionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 HermesMark()
-                Text("Hermes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                Text("Hermes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
                 Text("连接你的远程个人助理", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
             }
         }
@@ -104,7 +110,13 @@ fun ConnectionScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                 HermesStatusIcon(if (state.hasSavedConnection) HermesStatusKind.CONNECTED else HermesStatusKind.BUSY)
                 Text(
-                    if (state.hasSavedConnection) "已保存远程网关，可重新验证或更新" else "使用与 Hermes Desktop 相同的账号连接",
+                    if (state.hasSavedConnection) {
+                        state.gatewayInfo.agentVersion.takeIf(String::isNotBlank)
+                            ?.let { "已连接 Hermes Agent $it" }
+                            ?: "已保存远程网关，可重新验证或更新"
+                    } else {
+                        "使用与 Hermes Desktop 相同的账号连接"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp),
@@ -167,22 +179,149 @@ fun ConnectionScreen(
                 ) {
                     if (state.isBusy) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                     else {
-                        HermesMulticolorIcon(HermesIconKind.CHECK_CIRCLE, null, iconSize = 19.dp)
-                        Text(if (state.hasSavedConnection) "验证并更新连接" else "验证并连接", modifier = Modifier.padding(start = 7.dp))
+                        Text(if (state.hasSavedConnection) "验证并更新连接" else "验证并连接")
+                    }
+                }
+                if (state.hasSavedConnection) {
+                    TextButton(
+                        onClick = onDiagnose,
+                        enabled = !state.isConnectionDiagnosing && !state.isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (state.isConnectionDiagnosing) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            HermesMulticolorIcon(HermesIconKind.STATUS_CONNECTED, null, iconSize = 18.dp)
+                        }
+                        Text(
+                            if (state.isConnectionDiagnosing) "正在诊断连接" else "诊断当前连接",
+                            modifier = Modifier.padding(start = 7.dp),
+                        )
                     }
                 }
             }
+        }
+
+        if (state.connectionDiagnostics.isNotEmpty()) {
+            GlassPanel(Modifier.fillMaxWidth().padding(top = 9.dp), shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Text("连接诊断", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    state.connectionDiagnostics.forEach { item -> DiagnosticRow(item) }
+                }
+            }
+        }
+
+        if (state.hasSavedConnection) {
+            AgentUpdateCard(
+                state = state,
+                onCheck = onCheckAgentUpdate,
+                onUpdate = { confirmAgentUpdate = true },
+            )
         }
 
         GatewayNote(HermesIconKind.LOCK, "本机凭据保护", "密码不会保存；登录 Cookie 使用 Android Keystore 加密。")
         GatewayNote(HermesIconKind.WARNING, "地址填写说明", "填写电脑端“远程 URL”的完整内容，不要额外添加 /api 或 /v1。")
 
         if (onDisconnect != null) {
-            TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            TextButton(
+                onClick = onDisconnect,
+                enabled = !state.agentUpdateProgress.running,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
                 Text("清除连接并退出", color = MaterialTheme.colorScheme.error)
             }
         }
         Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (confirmAgentUpdate) {
+        AlertDialog(
+            onDismissRequest = { confirmAgentUpdate = false },
+            title = { Text("更新 Hermes Agent？") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("服务器会执行 Hermes 官方更新流程，通常需要 1–4 分钟。期间 Gateway 短暂断开属于正常重启。")
+                    state.agentUpdateInfo.commits.take(5).forEach { commit ->
+                        Text("• ${commit.summary.ifBlank { commit.sha }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("更新时请不要关闭本页，也不要同时运行新的 Agent 任务。", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmAgentUpdate = false; onApplyAgentUpdate() }) { Text("开始更新") }
+            },
+            dismissButton = { TextButton(onClick = { confirmAgentUpdate = false }) { Text("取消") } },
+        )
+    }
+}
+
+@Composable
+private fun AgentUpdateCard(state: AppUiState, onCheck: () -> Unit, onUpdate: () -> Unit) {
+    val info = state.agentUpdateInfo
+    val progress = state.agentUpdateProgress
+    GlassPanel(Modifier.fillMaxWidth().padding(top = 9.dp), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HermesMulticolorIcon(HermesIconKind.SYNC, null, iconSize = 21.dp)
+                Column(Modifier.weight(1f).padding(start = 9.dp)) {
+                    Text("Hermes Agent 版本", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        info.currentVersion.ifBlank { state.gatewayInfo.agentVersion }.ifBlank { "等待读取" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.isAgentUpdateChecking || progress.running) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+            if (info.installMethod.isNotBlank()) {
+                Text("安装方式：${info.installMethod}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                when {
+                    progress.running -> "正在服务器上更新；连接中断后 APP 会继续等待并自动重连。"
+                    info.updateAvailable && info.canApply -> "发现新版本${info.behind?.let { " · 落后 $it 个提交" }.orEmpty()}"
+                    info.updateAvailable -> info.message.ifBlank { "发现更新，但当前安装方式不支持远程应用" }
+                    info.currentVersion.isNotBlank() -> info.message.ifBlank { "当前已是最新版本" }
+                    else -> info.message.ifBlank { "检查服务器上的 Agent 版本和更新状态" }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (info.updateAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (progress.lines.isNotBlank()) {
+                Surface(shape = RoundedCornerShape(9.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)) {
+                    Text(progress.lines.takeLast(900), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(9.dp), maxLines = 8)
+                }
+            }
+            if (info.updateAvailable && !info.canApply && info.updateCommand.isNotBlank()) {
+                Text("服务器命令：${info.updateCommand}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(Modifier.align(Alignment.End)) {
+                TextButton(onClick = onCheck, enabled = !state.isAgentUpdateChecking && !progress.running) { Text("检查更新") }
+                if (info.updateAvailable && info.canApply) {
+                    Button(onClick = onUpdate, enabled = !progress.running && !state.isStreaming && state.pendingAgentRequests.isEmpty()) { Text("更新 Agent") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticRow(item: ConnectionDiagnosticItem) {
+    val icon = when (item.status) {
+        DiagnosticStatus.CHECKING -> HermesIconKind.STATUS_BUSY
+        DiagnosticStatus.PASSED -> HermesIconKind.CHECK_CIRCLE
+        DiagnosticStatus.WARNING -> HermesIconKind.WARNING
+        DiagnosticStatus.FAILED -> HermesIconKind.ERROR
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        HermesMulticolorIcon(icon, null, iconSize = 19.dp)
+        Column(Modifier.weight(1f).padding(start = 9.dp)) {
+            Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(item.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

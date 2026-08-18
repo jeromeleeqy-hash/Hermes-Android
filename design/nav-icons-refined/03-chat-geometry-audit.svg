@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <filter id="cardShadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="14" stdDeviation="24" flood-color="#283145" flood-opacity="0.11"/></filter>
+    <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#DDE4EE" stroke-width="1"/></pattern>
+    <symbol id="chat-outline" viewBox="0 0 256 256"><path d="M232.07,186.76a80,80,0,0,0-62.5-114.17A80,80,0,1,0,23.93,138.76l-7.27,24.71a16,16,0,0,0,19.87,19.87l24.71-7.27a80.39,80.39,0,0,0,25.18,7.35,80,80,0,0,0,108.34,40.65l24.71,7.27a16,16,0,0,0,19.87-19.86ZM62,159.5a8.28,8.28,0,0,0-2.26.32L32,168l8.17-27.76a8,8,0,0,0-.63-6,64,64,0,1,1,26.26,26.26A8,8,0,0,0,62,159.5Zm153.79,28.73L224,216l-27.76-8.17a8,8,0,0,0-6,.63,64.05,64.05,0,0,1-85.87-24.88A79.93,79.93,0,0,0,174.7,89.71a64,64,0,0,1,41.75,92.48A8,8,0,0,0,215.82,188.23Z"/></symbol>
+    <symbol id="chat-fill" viewBox="0 0 256 256"><path d="M232.07,186.76a80,80,0,0,0-62.5-114.17A80,80,0,1,0,23.93,138.76l-7.27,24.71a16,16,0,0,0,19.87,19.87l24.71-7.27a80.39,80.39,0,0,0,25.18,7.35,80,80,0,0,0,108.34,40.65l24.71,7.27a16,16,0,0,0,19.87-19.86Zm-16.25,1.47L224,216l-27.76-8.17a8,8,0,0,0-6,.63,64.05,64.05,0,0,1-85.87-24.88A79.93,79.93,0,0,0,174.7,89.71a64,64,0,0,1,41.75,92.48A8,8,0,0,0,215.82,188.23Z"/></symbol>
+  </defs>
+  <rect width="1400" height="900" fill="#F5F7FB"/>
+  <text x="86" y="88" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="5" fill="#2A9FE8">CHAT ICON QUALITY AUDIT</text>
+  <text x="86" y="145" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700" fill="#182033">The overlap is geometry, not layered strokes</text>
+  <text x="86" y="186" font-family="Inter, Arial, sans-serif" font-size="22" fill="#788398">Closed compound paths eliminate the gaps and double-thickness you identified.</text>
+  <g transform="translate(86 245)">
+    <rect width="560" height="520" rx="42" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="44" y="44" width="472" height="360" rx="30" fill="url(#grid)"/>
+    <use href="#chat-outline" x="112" y="60" width="336" height="336" fill="#5F6B7E"/>
+    <text x="44" y="454" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#273044">Outline master</text>
+    <text x="44" y="490" font-family="Inter, Arial, sans-serif" font-size="18" fill="#8993A4">Single compound silhouette · regular optical weight</text>
+  </g>
+  <g transform="translate(684 245)">
+    <rect width="630" height="520" rx="42" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="44" y="44" width="270" height="270" rx="34" fill="#E7F4FD"/>
+    <use href="#chat-fill" x="79" y="79" width="200" height="200" fill="#2A9FE8"/>
+    <rect x="348" y="44" width="238" height="270" rx="34" fill="#F7F9FC"/>
+    <use href="#chat-outline" x="427" y="98" width="80" height="80" fill="#5F6B7E"/>
+    <use href="#chat-outline" x="455" y="219" width="24" height="24" fill="#5F6B7E"/>
+    <text x="467" y="280" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="15" fill="#8993A4">actual 24 px</text>
+    <text x="44" y="370" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#273044">Selected + actual size</text>
+    <circle cx="57" cy="420" r="6" fill="#28C7BE"/><text x="78" y="427" font-family="Inter, Arial, sans-serif" font-size="18" fill="#667286">No disconnected tail</text>
+    <circle cx="57" cy="459" r="6" fill="#28C7BE"/><text x="78" y="466" font-family="Inter, Arial, sans-serif" font-size="18" fill="#667286">No crossing strokes</text>
+    <circle cx="57" cy="498" r="6" fill="#28C7BE"/><text x="78" y="505" font-family="Inter, Arial, sans-serif" font-size="18" fill="#667286">No doubled overlap weight</text>
+  </g>
+</svg>

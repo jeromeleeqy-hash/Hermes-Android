@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="1560" viewBox="0 0 920 1560">
+  <defs>
+    <filter id="phoneShadow" x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#26334A" flood-opacity=".16"/></filter>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#55BCF2"/><stop offset="1" stop-color="#2C7EEA"/></linearGradient>
+    <linearGradient id="gViolet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#BE6CF2"/><stop offset="1" stop-color="#7058E6"/></linearGradient>
+    <linearGradient id="gRed" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF7F8D"/><stop offset="1" stop-color="#E84260"/></linearGradient>
+    <linearGradient id="gCyan" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#48D3D3"/><stop offset="1" stop-color="#1598CA"/></linearGradient>
+    <linearGradient id="gIndigo" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#849EFF"/><stop offset="1" stop-color="#5362E4"/></linearGradient>
+    <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#51DA97"/><stop offset="1" stop-color="#1CA66C"/></linearGradient>
+    <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFC65B"/><stop offset="1" stop-color="#ED8919"/></linearGradient>
+    <linearGradient id="gTeal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4AD2C2"/><stop offset="1" stop-color="#189A8F"/></linearGradient>
+    <linearGradient id="gPurpleBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#A36FF4"/><stop offset="1" stop-color="#497FE8"/></linearGradient>
+  </defs>
+  <rect width="920" height="1560" fill="#EAF0F7"/>
+  <g transform="translate(70 28)" filter="url(#phoneShadow)">
+    <rect width="780" height="1500" rx="72" fill="#F3F2F7" stroke="#D7DEE8" stroke-width="2"/>
+    <rect x="287" y="18" width="206" height="50" rx="25" fill="#07090D"/>
+    <text x="52" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="27" font-weight="700" fill="#141A27">12:40</text>
+    <text x="650" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="19" font-weight="700" fill="#141A27">5G  ▰  ◒</text>
+    <text x="50" y="130" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="40" font-weight="720" fill="#202333">Settings</text>
+    <g transform="translate(673 93)" fill="none" stroke="#485466" stroke-width="5" stroke-linecap="round"><circle cx="18" cy="18" r="13"/><path d="m28 28 12 12"/></g>
+
+    <g transform="translate(32 166)">
+      <rect width="716" height="346" rx="34" fill="white"/>
+      <g transform="translate(28 22)">
+        <rect width="58" height="58" rx="16" fill="url(#gBlue)"/>
+        <g transform="translate(13 13)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="2" width="28" height="11" rx="3"/><rect x="2" y="19" width="28" height="11" rx="3"/><path d="M7 7.5h.1M7 24.5h.1M13 7.5h13M13 24.5h13"/></g>
+        <text x="86" y="26" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Remote gateway</text><text x="86" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#8A92A1">Connected · 0.20.1</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text>
+        <line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 106)">
+        <rect width="58" height="58" rx="16" fill="url(#gViolet)"/>
+        <g transform="translate(13 13)" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2C8.3 2 2 7.3 2 14s5.8 12 12.8 12h1.7c1.4 0 2.3-1.4 1.8-2.7-.5-1.3.5-2.8 2-2.8h3c4 0 6.7-2.7 6.7-6.5C30 7.3 23.7 2 16 2Z"/><path d="M8 14h.1M13 8h.1M20 8.5h.1M25 14h.1"/></g>
+        <text x="86" y="26" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Appearance</text><text x="86" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#8A92A1">Theme, color and motion</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text>
+        <line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 190)">
+        <rect width="58" height="58" rx="16" fill="url(#gRed)"/>
+        <g transform="translate(13 11)" fill="white"><path d="M16 1.5a3 3 0 0 1 3 3v.7c4.3 1.3 7 5.3 7 10v5l3 4.3H3l3-4.3v-5c0-4.7 2.7-8.7 7-10v-.7a3 3 0 0 1 3-3Z"/><path d="M11.5 27h9c-.7 2.3-2.2 3.5-4.5 3.5s-3.8-1.2-4.5-3.5Z"/></g>
+        <text x="86" y="26" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Notifications</text><text x="86" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#8A92A1">Replies and task alerts</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text>
+        <line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 274)">
+        <rect width="58" height="58" rx="16" fill="url(#gCyan)"/>
+        <g transform="translate(13 10)" fill="none" stroke="white" stroke-width="2.7" stroke-linecap="round"><rect x="10" y="1" width="12" height="22" rx="6"/><path d="M4 16c0 7 4.7 11 12 11s12-4 12-11M16 27v6M10 33h12"/></g>
+        <text x="86" y="26" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Voice</text><text x="86" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#8A92A1">STT, TTS and conversation</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text>
+      </g>
+    </g>
+
+    <g transform="translate(32 534)">
+      <rect width="716" height="514" rx="34" fill="white"/>
+      <g transform="translate(28 22)">
+        <rect width="58" height="58" rx="16" fill="url(#gPurpleBlue)"/>
+        <g transform="translate(12 12)" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 30 14-14M3 25l6 6-3.2 2.4-5.2-5.2Z"/><path d="m23 2 1.8 4.2L29 8l-4.2 1.8L23 14l-1.8-4.2L17 8l4.2-1.8ZM30 18l1.2 2.8L34 22l-2.8 1.2L30 26l-1.2-2.8L26 22l2.8-1.2Z"/></g>
+        <text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Skills &amp; tools</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 106)">
+        <rect width="58" height="58" rx="16" fill="url(#gIndigo)"/>
+        <g transform="translate(13 13)" fill="white"><path d="m16 1 15 7.5L16 16 1 8.5Zm-10 13 10 5 10-5 5 2.5L16 24 1 16.5Zm0 7 10 5 10-5 5 2.5L16 31 1 23.5Z"/></g>
+        <text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Models</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 190)">
+        <rect width="58" height="58" rx="16" fill="url(#gBlue)"/>
+        <g transform="translate(11 12)" fill="white"><path d="M4 3h19a5 5 0 0 1 5 5v6a5 5 0 0 1-5 5H13l-7 5v-5.4A5 5 0 0 1 0 14V8a5 5 0 0 1 4-5Z"/><path d="M25 11h3a5 5 0 0 1 5 5v5a5 5 0 0 1-3 4.6V31l-7-5h-5a5 5 0 0 1-4.3-2.5h9.5c3.2 0 5.8-2.6 5.8-5.8V14c0-1.1-.3-2.1-.8-3Z" opacity=".7"/></g>
+        <text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Conversation</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 274)">
+        <rect width="58" height="58" rx="16" fill="url(#gGreen)"/>
+        <g transform="translate(13 12)" fill="none" stroke="white" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2 29 7v9c0 7.7-5.2 12.6-13 15.5C8.2 28.6 3 23.7 3 16V7Z"/><path d="m9.5 16 4.2 4.1L23 11"/></g>
+        <text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Approval</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 358)">
+        <rect width="58" height="58" rx="16" fill="url(#gTeal)"/>
+        <g transform="translate(13 10)" fill="none" stroke="white" stroke-width="2.5"><ellipse cx="16" cy="6" rx="13" ry="5"/><path d="M3 6v10c0 2.8 5.8 5 13 5s13-2.2 13-5V6M3 16v10c0 2.8 5.8 5 13 5s13-2.2 13-5V16"/></g>
+        <text x="86" y="26" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Memory &amp; context</text><text x="86" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#8A92A1">Persistent agent state</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/>
+      </g>
+      <g transform="translate(28 442)">
+        <rect width="58" height="58" rx="16" fill="url(#gOrange)"/>
+        <g transform="translate(12 12)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h28v7H4zM6 12h24v20H6zM13 19h10"/></g>
+        <text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Archived chats</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text>
+      </g>
+    </g>
+
+    <g transform="translate(32 1070)">
+      <rect width="716" height="262" rx="34" fill="white"/>
+      <g transform="translate(28 22)"><rect width="58" height="58" rx="16" fill="url(#gCyan)"/><g transform="translate(12 12)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9a13 13 0 1 1-2 16M2 5v8h8M17 8v9l6 3"/></g><text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">Changelog</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/></g>
+      <g transform="translate(28 106)"><rect width="58" height="58" rx="16" fill="url(#gBlue)"/><g transform="translate(12 12)" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round"><circle cx="17" cy="17" r="15"/><path d="M17 15v10M17 9h.1"/></g><text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">About Hermes</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text><line x1="86" y1="76" x2="660" y2="76" stroke="#E8E9ED"/></g>
+      <g transform="translate(28 190)"><rect width="58" height="58" rx="16" fill="url(#gViolet)"/><g transform="translate(13 13)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h28v21H2zM8 12h16M8 18h11"/></g><text x="86" y="36" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="24" font-weight="650" fill="#22283A">User guide</text><text x="645" y="39" font-size="33" fill="#A4ACB8">›</text></g>
+    </g>
+    <text x="390" y="1370" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#9AA2B1">HERMES MOBILE  ·  ICON STUDY 02</text>
+    <rect x="286" y="1455" width="208" height="8" rx="4" fill="#9DA4AE"/>
+  </g>
+</svg>

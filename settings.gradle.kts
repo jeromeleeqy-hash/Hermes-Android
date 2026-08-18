@@ -1,5 +1,9 @@
 pluginManagement {
+    val hermesLocalMaven = System.getenv("HERMES_LOCAL_MAVEN")?.trim()?.trimEnd('/')
     repositories {
+        if (!hermesLocalMaven.isNullOrBlank()) {
+            maven("$hermesLocalMaven/maven") { isAllowInsecureProtocol = true }
+        }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -7,8 +11,12 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+    val hermesLocalMaven = System.getenv("HERMES_LOCAL_MAVEN")?.trim()?.trimEnd('/')
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        if (!hermesLocalMaven.isNullOrBlank()) {
+            maven("$hermesLocalMaven/maven") { isAllowInsecureProtocol = true }
+        }
         google()
         mavenCentral()
     }
@@ -16,4 +24,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "HermesCompanion"
 include(":app")
-

@@ -7,6 +7,37 @@ data class ConnectionConfig(
     val username: String,
 )
 
+data class GatewayInfo(
+    val agentVersion: String = "",
+    val gatewayVersion: String = "",
+    val capabilities: List<String> = emptyList(),
+)
+
+data class AgentUpdateCommit(
+    val sha: String,
+    val summary: String,
+    val author: String = "",
+    val at: String = "",
+)
+
+data class AgentUpdateInfo(
+    val currentVersion: String = "",
+    val installMethod: String = "",
+    val behind: Int? = null,
+    val updateAvailable: Boolean = false,
+    val canApply: Boolean = false,
+    val updateCommand: String = "",
+    val message: String = "",
+    val commits: List<AgentUpdateCommit> = emptyList(),
+)
+
+data class AgentUpdateProgress(
+    val started: Boolean = false,
+    val running: Boolean = false,
+    val exitCode: Int? = null,
+    val lines: String = "",
+)
+
 data class HermesProfile(
     val name: String,
     val path: String = "",
@@ -38,6 +69,12 @@ val HermesSession.scopedId: String
 
 data class SessionPage(
     val sessions: List<HermesSession>,
+    val totalCount: Int,
+)
+
+data class MessagePage(
+    val messages: List<ChatMessage>,
+    val offset: Int,
     val totalCount: Int,
 )
 
@@ -111,12 +148,31 @@ data class MemoryContextSettings(
     val protectLastMessages: Int = 20,
 )
 
+data class ServerSttSettings(
+    val enabled: Boolean = true,
+    val provider: String = "local",
+    val model: String = "base",
+    val language: String = "zh",
+)
+
+data class ServerTtsSettings(
+    val provider: String = "edge",
+    val model: String = "",
+    val voice: String = "zh-CN-XiaoxiaoNeural",
+)
+
+data class ServerVoiceSettings(
+    val stt: ServerSttSettings = ServerSttSettings(),
+    val tts: ServerTtsSettings = ServerTtsSettings(),
+)
+
 data class ServerSettings(
     val rawConfig: String = "{}",
     val models: ServerModelSettings = ServerModelSettings(),
     val conversation: ConversationStyleSettings = ConversationStyleSettings(),
     val approvals: ApprovalSettings = ApprovalSettings(),
     val memory: MemoryContextSettings = MemoryContextSettings(),
+    val voice: ServerVoiceSettings = ServerVoiceSettings(),
 )
 
 data class ServerSkill(
@@ -205,9 +261,93 @@ data class PendingAttachment(
     val textContent: String? = null,
 )
 
+data class IncomingShare(
+    val sharedText: String = "",
+    val instruction: String = "",
+    val attachments: List<PendingAttachment> = emptyList(),
+)
+
 data class FailedSend(
     val prompt: String,
     val attachments: List<PendingAttachment> = emptyList(),
+)
+
+enum class AgentRequestType {
+    APPROVAL,
+    CLARIFICATION,
+}
+
+data class AgentRequestChoice(
+    val label: String,
+    val value: String = label,
+)
+
+data class AgentRequest(
+    val requestId: String,
+    val runtimeSessionId: String,
+    val conversationId: String = "",
+    val type: AgentRequestType,
+    val title: String,
+    val detail: String = "",
+    val choices: List<AgentRequestChoice> = emptyList(),
+    val allowSession: Boolean = true,
+    val allowPermanent: Boolean = false,
+    val isResponding: Boolean = false,
+)
+
+data class QueuedRunMessage(
+    val session: HermesSession,
+    val prompt: String,
+    val attachments: List<PendingAttachment> = emptyList(),
+)
+
+data class RunCompletionSummary(
+    val sessionId: String,
+    val title: String,
+    val summary: String,
+    val artifacts: List<ChatArtifact> = emptyList(),
+    val completedAtMillis: Long = System.currentTimeMillis(),
+)
+
+data class ActiveRunSnapshot(
+    val profile: String,
+    val sessionId: String,
+    val title: String,
+    val submittedPrompt: String,
+    val baselineAssistantSignature: String,
+    val startedAtMillis: Long,
+)
+
+data class RecentArtifact(
+    val profile: String,
+    val sessionId: String,
+    val sessionTitle: String,
+    val messageId: String = "",
+    val path: String,
+    val name: String,
+    val kind: String,
+    val seenAtMillis: Long = System.currentTimeMillis(),
+)
+
+data class SessionSearchResult(
+    val session: HermesSession,
+    val snippet: String,
+    val messageId: String? = null,
+    val matchedMessage: Boolean = false,
+)
+
+enum class DiagnosticStatus {
+    CHECKING,
+    PASSED,
+    WARNING,
+    FAILED,
+}
+
+data class ConnectionDiagnosticItem(
+    val key: String,
+    val title: String,
+    val detail: String,
+    val status: DiagnosticStatus,
 )
 
 data class WorkspaceEntry(
@@ -232,7 +372,13 @@ data class WorkspaceDocument(
     val path: String,
     val mimeType: String,
     val content: String,
+    val bytes: ByteArray = content.toByteArray(Charsets.UTF_8),
 )
+
+enum class HermesProfileFile(val fileName: String) {
+    MEMORY("MEMORY.md"),
+    SOUL("SOUL.md"),
+}
 
 data class ImagePreview(
     val name: String,
@@ -274,7 +420,59 @@ data class NotificationPreferences(
 data class VoicePreferences(
     val enabled: Boolean = true,
     val language: String = "zh-CN",
+    val transcriptScript: String = "simplified",
     val autoSend: Boolean = false,
+    val engine: String = "automatic",
+    val autoRead: Boolean = true,
+    val continuous: Boolean = false,
+    val speechRate: Float = 1.0f,
+)
+
+enum class VoicePhase {
+    IDLE,
+    LISTENING,
+    TRANSCRIBING,
+    THINKING,
+    SPEAKING,
+    ERROR,
+}
+
+data class VoiceConversationState(
+    val active: Boolean = false,
+    val phase: VoicePhase = VoicePhase.IDLE,
+    val transcript: String = "",
+    val provider: String = "",
+    val message: String = "",
+    val agentSttAvailable: Boolean? = null,
+    val agentTtsAvailable: Boolean? = null,
+    val requiresAgentUpdate: Boolean = false,
+    val inputLevel: Float = 0f,
+)
+
+enum class VoiceCaptureTarget {
+    CHAT_INPUT,
+    SETTINGS_TEST,
+}
+
+data class VoiceCaptureState(
+    val phase: VoicePhase = VoicePhase.IDLE,
+    val target: VoiceCaptureTarget = VoiceCaptureTarget.CHAT_INPUT,
+    val transcript: String = "",
+    val provider: String = "",
+    val message: String = "",
+    val agentSttAvailable: Boolean? = null,
+    val requiresAgentUpdate: Boolean = false,
+)
+
+data class SpeechTranscription(
+    val transcript: String,
+    val provider: String = "",
+)
+
+data class SpeechAudio(
+    val bytes: ByteArray,
+    val mimeType: String,
+    val provider: String = "",
 )
 
 data class UserProfilePreferences(
@@ -299,7 +497,10 @@ sealed interface StreamEvent {
         val preview: String,
         val todos: List<ChatTodo> = emptyList(),
     ) : StreamEvent
+    data class ToolProgress(val name: String, val preview: String) : StreamEvent
     data class ToolFailed(val name: String, val preview: String) : StreamEvent
+    data class AgentRequestPending(val request: AgentRequest) : StreamEvent
+    data class AgentRequestExpired(val requestId: String) : StreamEvent
     data class ConnectionInterrupted(val message: String) : StreamEvent
     data class Error(val message: String) : StreamEvent
     data object Completed : StreamEvent

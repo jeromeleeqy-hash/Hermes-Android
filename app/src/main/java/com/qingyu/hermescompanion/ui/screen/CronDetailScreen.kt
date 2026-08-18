@@ -67,7 +67,7 @@ fun CronDetailScreen(
                 HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回")
             }
             Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-                Text(if (editing) "编辑定时任务" else "定时任务详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (editing) "编辑定时任务" else "定时任务详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text(
                     if (job.enabled) "已启用 · ${job.schedule.display.ifBlank { job.schedule.expression }}" else "已暂停",
                     style = MaterialTheme.typography.bodySmall,
@@ -205,7 +205,15 @@ private fun CronActionIcon(
         else -> IconButtonDefaults.filledTonalIconButtonColors()
     }
     FilledTonalIconButton(onClick = onClick, enabled = enabled, colors = colors) {
-        HermesMulticolorIcon(icon, contentDescription = description)
+        HermesMulticolorIcon(
+            icon,
+            contentDescription = description,
+            tint = when {
+                emphasized -> MaterialTheme.colorScheme.onPrimary
+                destructive -> MaterialTheme.colorScheme.error
+                else -> null
+            },
+        )
     }
 }
 

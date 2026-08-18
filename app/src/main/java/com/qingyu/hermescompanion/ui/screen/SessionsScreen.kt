@@ -1,18 +1,20 @@
 package com.qingyu.hermescompanion.ui.screen
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -20,7 +22,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -29,8 +31,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,12 +41,17 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,10 +59,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import com.qingyu.hermescompanion.model.HermesProject
 import com.qingyu.hermescompanion.model.HermesProfile
@@ -69,6 +79,7 @@ import com.qingyu.hermescompanion.ui.component.HermesMulticolorIcon
 import com.qingyu.hermescompanion.ui.component.HermesPinnedMarker
 import com.qingyu.hermescompanion.ui.component.HermesStatusIcon
 import com.qingyu.hermescompanion.ui.component.HermesStatusKind
+import com.qingyu.hermescompanion.ui.component.HermesWelcomeAnimation
 import com.qingyu.hermescompanion.ui.component.UserAvatar
 import com.qingyu.hermescompanion.ui.format.ellipsizeSessionTitle
 import com.qingyu.hermescompanion.ui.format.sessionTimeLabel
@@ -77,6 +88,9 @@ import com.qingyu.hermescompanion.ui.format.sessionMatchesTime
 import com.qingyu.hermescompanion.ui.theme.HermesSkin
 import com.qingyu.hermescompanion.ui.theme.HermesColors
 import com.qingyu.hermescompanion.ui.theme.HermesSpacing
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlin.math.roundToInt
 
 private enum class SessionListMode { RECENT, PROJECTS }
 
@@ -102,7 +116,6 @@ fun SessionsScreen(
     onCreateProject: (String, String) -> Unit,
     onLoadProjectDirectories: (String?) -> Unit,
     onCloseProjectDirectoryPicker: () -> Unit,
-    onBatchAiRename: () -> Unit,
     onRefreshProfiles: () -> Unit,
     onSelectProfile: (HermesProfile) -> Unit,
 ) {
@@ -111,9 +124,7 @@ fun SessionsScreen(
     var showProjectPicker by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<HermesSession?>(null) }
     var archiveTarget by remember { mutableStateOf<HermesSession?>(null) }
-    var showBatchConfirm by remember { mutableStateOf(false) }
     var showCreateProject by remember { mutableStateOf(false) }
-    var cronExpanded by remember { mutableStateOf(false) }
     var selectedProjectId by remember(state.activeProfile) { mutableStateOf<String?>(null) }
     var timeFilter by remember(state.activeProfile) { mutableStateOf(SessionTimeFilter.ALL) }
 
@@ -134,9 +145,6 @@ fun SessionsScreen(
             projectMatches && sessionMatchesTime(session.updatedAt, timeFilter)
         }
     }
-    val cronSessions = remember(state.sessions, timeFilter) {
-        state.sessions.filter(HermesSession::isCron).filter { sessionMatchesTime(it.updatedAt, timeFilter) }
-    }
     val projectGroups = remember(filteredRegularSessions, state.projects, selectedProjectId) {
         state.projects.map { project ->
             project to filteredRegularSessions.filter { session ->
@@ -150,65 +158,59 @@ fun SessionsScreen(
     }
 
     val skin = HermesSkin.current
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(
-                bottomStart = if (skin.glass) 16.dp else 0.dp,
-                bottomEnd = if (skin.glass) 16.dp else 0.dp,
-            ),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
-            shadowElevation = skin.shadowElevation.dp,
-            tonalElevation = 0.dp,
-            border = if (skin.glass) BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant) else null,
-        ) {
-            Column(modifier = Modifier.padding(horizontal = HermesSpacing.page)) {
-                Header(
-                    assistantName = state.userProfile.hermesDisplayName.ifBlank { "Hermes" },
-                    assistantAvatarUri = state.userProfile.hermesAvatarUri,
-                    isBatchRenaming = state.isBatchRenaming,
-                    profiles = state.profiles,
-                    activeProfile = state.activeProfile,
-                    isProfilesLoading = state.isProfilesLoading || state.isProfileSwitching,
-                    isProfileSwitching = state.isProfileSwitching,
-                    onNewSession = onNewSession,
-                    onSearch = onSearch,
-                    onBatchAiRename = { showBatchConfirm = true },
-                    onRefreshProfiles = onRefreshProfiles,
-                    onSelectProfile = onSelectProfile,
-                )
-                SessionFilterBar(
-                    mode = listMode,
-                    projects = state.projects,
-                    selectedProjectId = selectedProjectId,
-                    timeFilter = timeFilter,
-                    onLoadProjects = onLoadProjects,
-                    onModeChange = {
-                        listMode = it
-                        if (it == SessionListMode.PROJECTS) onLoadProjects()
-                    },
-                    onProjectChange = { selectedProjectId = it },
-                    onTimeChange = { timeFilter = it },
-                )
-            }
-        }
-        PullToRefreshBox(
-            isRefreshing = state.isBusy,
-            onRefresh = onRefresh,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = HermesSpacing.page, top = 4.dp, end = HermesSpacing.page, bottom = 16.dp),
+    Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(0.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 0.dp,
+                tonalElevation = 0.dp,
             ) {
+                Column(modifier = Modifier.padding(horizontal = HermesSpacing.page)) {
+                    Header(
+                        assistantName = state.userProfile.hermesDisplayName.ifBlank { "Hermes" },
+                        assistantAvatarUri = state.userProfile.hermesAvatarUri,
+                        profiles = state.profiles,
+                        activeProfile = state.activeProfile,
+                        isProfilesLoading = state.isProfilesLoading || state.isProfileSwitching,
+                        isProfileSwitching = state.isProfileSwitching,
+                        onSearch = onSearch,
+                        onRefreshProfiles = onRefreshProfiles,
+                        onSelectProfile = onSelectProfile,
+                    )
+                    SessionFilterBar(
+                        mode = listMode,
+                        projects = state.projects,
+                        selectedProjectId = selectedProjectId,
+                        timeFilter = timeFilter,
+                        onLoadProjects = onLoadProjects,
+                        onModeChange = {
+                            listMode = it
+                            if (it == SessionListMode.PROJECTS) onLoadProjects()
+                        },
+                        onProjectChange = { selectedProjectId = it },
+                        onTimeChange = { timeFilter = it },
+                    )
+                }
+            }
+            PullToRefreshBox(
+                isRefreshing = state.isBusy,
+                onRefresh = onRefresh,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = HermesSpacing.page, top = 4.dp, end = HermesSpacing.page, bottom = 86.dp),
+                ) {
                 when {
-                    state.isBusy && state.sessions.isEmpty() -> item("loading") {
+                    state.isBusy && regularSessions.isEmpty() -> item("loading") {
                         Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.2.dp)
                         }
                     }
 
-                    state.sessions.isEmpty() && listMode == SessionListMode.RECENT -> item("empty") { EmptySessions(onNewSession) }
+                    regularSessions.isEmpty() && listMode == SessionListMode.RECENT -> item("empty") { EmptySessions(onNewSession) }
 
                     filteredRegularSessions.isEmpty() && listMode == SessionListMode.RECENT -> item("filtered-empty") {
                         FilteredSessionsEmpty()
@@ -216,7 +218,14 @@ fun SessionsScreen(
 
                     listMode == SessionListMode.RECENT -> {
                         items(filteredRegularSessions, key = { it.id }) { session ->
-                            SessionRow(session, unread = session.scopedId in state.unreadSessionIds, onClick = { onOpenSession(session) }, onLongClick = { actionTarget = session })
+                            SessionRow(
+                                session = session,
+                                unread = session.scopedId in state.unreadSessionIds,
+                                onClick = { onOpenSession(session) },
+                                onLongClick = { actionTarget = session },
+                                onArchive = { archiveTarget = session },
+                                onDelete = { deleteTarget = session },
+                            )
                         }
                     }
 
@@ -242,13 +251,27 @@ fun SessionsScreen(
                             projectGroups.forEach { (project, sessions) ->
                                 item("project-${project.id}") { ProjectSectionHeader(project.name, sessions.size) }
                                 items(sessions, key = { "${project.id}-${it.id}" }) { session ->
-                                    SessionRow(session, unread = session.scopedId in state.unreadSessionIds, onClick = { onOpenSession(session) }, onLongClick = { actionTarget = session })
+                                    SessionRow(
+                                        session = session,
+                                        unread = session.scopedId in state.unreadSessionIds,
+                                        onClick = { onOpenSession(session) },
+                                        onLongClick = { actionTarget = session },
+                                        onArchive = { archiveTarget = session },
+                                        onDelete = { deleteTarget = session },
+                                    )
                                 }
                             }
                             if (ungroupedSessions.isNotEmpty()) {
                                 item("project-ungrouped") { ProjectSectionHeader("未分项目", ungroupedSessions.size, muted = true) }
                                 items(ungroupedSessions, key = { "ungrouped-${it.id}" }) { session ->
-                                    SessionRow(session, unread = session.scopedId in state.unreadSessionIds, onClick = { onOpenSession(session) }, onLongClick = { actionTarget = session })
+                                    SessionRow(
+                                        session = session,
+                                        unread = session.scopedId in state.unreadSessionIds,
+                                        onClick = { onOpenSession(session) },
+                                        onLongClick = { actionTarget = session },
+                                        onArchive = { archiveTarget = session },
+                                        onDelete = { deleteTarget = session },
+                                    )
                                 }
                             }
                             if (projectGroups.isEmpty() && ungroupedSessions.isEmpty()) {
@@ -257,28 +280,22 @@ fun SessionsScreen(
                         }
                     }
                 }
-
-                if (cronSessions.isNotEmpty()) {
-                    item("cron-header") {
-                        CronGroupHeader(
-                            count = cronSessions.size,
-                            expanded = cronExpanded,
-                            onClick = { cronExpanded = !cronExpanded },
-                        )
-                    }
-                    if (cronExpanded) {
-                        items(cronSessions, key = { "cron-${it.id}" }) { session ->
-                            SessionRow(
-                                session = session,
-                                isCron = true,
-                                unread = session.scopedId in state.unreadSessionIds,
-                                onClick = { onOpenSession(session) },
-                                onLongClick = { actionTarget = session },
-                            )
-                        }
-                    }
                 }
             }
+        }
+        FloatingActionButton(
+            onClick = onNewSession,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 16.dp).size(48.dp),
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
+            HermesMulticolorIcon(
+                HermesIconKind.NEW_CHAT,
+                contentDescription = "新建对话",
+                iconSize = 20.dp,
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
         }
     }
 
@@ -326,7 +343,7 @@ fun SessionsScreen(
     deleteTarget?.let { session ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            shape = RoundedCornerShape(18.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             title = { Text("删除这段会话？") },
             text = { Text("“${ellipsizeSessionTitle(session.title)}”将从 Hermes 会话记录中永久删除。") },
             confirmButton = {
@@ -341,27 +358,13 @@ fun SessionsScreen(
     archiveTarget?.let { session ->
         AlertDialog(
             onDismissRequest = { archiveTarget = null },
-            shape = RoundedCornerShape(18.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             title = { Text("归档这段会话？") },
             text = { Text("归档后会从手机首页移除，仍可在 Hermes 电脑端恢复。") },
             confirmButton = {
                 TextButton(onClick = { onArchiveSession(session); archiveTarget = null }) { Text("归档") }
             },
             dismissButton = { TextButton(onClick = { archiveTarget = null }) { Text("取消") } },
-        )
-    }
-
-    if (showBatchConfirm) {
-        val count = regularSessions.count { it.messageCount > 0 }
-        AlertDialog(
-            onDismissRequest = { showBatchConfirm = false },
-            shape = RoundedCornerShape(18.dp),
-            title = { Text("批量改名？") },
-            text = { Text("Hermes 将根据对话内容重新生成 $count 个标题，每个标题最多 15 个字符。") },
-            confirmButton = {
-                TextButton(onClick = { showBatchConfirm = false; onBatchAiRename() }) { Text("开始改名") }
-            },
-            dismissButton = { TextButton(onClick = { showBatchConfirm = false }) { Text("取消") } },
         )
     }
 
@@ -389,42 +392,38 @@ fun SessionsScreen(
 private fun Header(
     assistantName: String,
     assistantAvatarUri: String,
-    isBatchRenaming: Boolean,
     profiles: List<HermesProfile>,
     activeProfile: String,
     isProfilesLoading: Boolean,
     isProfileSwitching: Boolean,
-    onNewSession: () -> Unit,
     onSearch: () -> Unit,
-    onBatchAiRename: () -> Unit,
     onRefreshProfiles: () -> Unit,
     onSelectProfile: (HermesProfile) -> Unit,
 ) {
     val skin = HermesSkin.current
-    var menuExpanded by remember { mutableStateOf(false) }
     var profileMenuExpanded by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 7.dp),
+        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 6.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (assistantAvatarUri.isNotBlank()) {
             UserAvatar(
                 uri = assistantAvatarUri,
                 displayName = assistantName,
-                size = 42.dp,
+                size = 38.dp,
                 hermesFallback = true,
             )
         } else {
-            HermesMark(compact = true, requestedSize = 42.dp)
+            HermesMark(compact = true, requestedSize = 38.dp)
         }
         Column(
-            modifier = Modifier.padding(start = 10.dp).height(42.dp).weight(1f),
+            modifier = Modifier.padding(start = 9.dp).height(38.dp).weight(1f),
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 assistantName,
-                style = MaterialTheme.typography.titleMedium.copy(lineHeight = 19.sp),
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge.copy(lineHeight = 22.sp),
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -448,75 +447,41 @@ private fun Header(
                 DropdownMenu(
                     expanded = profileMenuExpanded,
                     onDismissRequest = { profileMenuExpanded = false },
-                    shape = RoundedCornerShape(10.dp),
+                    offset = DpOffset(0.dp, 4.dp),
+                    shape = RoundedCornerShape(skin.menuRadius.dp),
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                    tonalElevation = 0.dp,
+                    shadowElevation = if (skin.glass) 6.dp else 2.dp,
                 ) {
                     if (isProfilesLoading && profiles.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("正在读取 Profile…") },
-                            onClick = {},
-                            enabled = false,
-                        )
+                        CompactMenuItem("正在读取 Profile…", enabled = false) {}
                     }
                     profiles.forEach { profile ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(
-                                        (if (profile.name == activeProfile) "✓  " else "    ") + profile.name,
-                                        fontWeight = if (profile.name == activeProfile) FontWeight.Bold else FontWeight.Medium,
-                                    )
-                                    val detail = profileDetailText(profile)
-                                    if (detail.isNotBlank()) Text(
-                                        detail,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            },
+                        CompactMenuItem(
+                            label = (if (profile.name == activeProfile) "✓  " else "") + profile.name,
+                            detail = profileDetailText(profile),
+                            selected = profile.name == activeProfile,
+                            enabled = !isProfilesLoading,
                             onClick = {
                                 profileMenuExpanded = false
                                 onSelectProfile(profile)
                             },
-                            enabled = !isProfilesLoading,
                         )
                     }
                     if (profiles.isNotEmpty()) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                        DropdownMenuItem(
-                            text = { Text(if (isProfilesLoading) "正在刷新…" else "刷新 Profile 列表") },
-                            onClick = onRefreshProfiles,
-                            enabled = !isProfilesLoading,
-                        )
+                        CompactMenuItem(if (isProfilesLoading) "正在刷新…" else "刷新 Profile 列表", enabled = !isProfilesLoading, onClick = onRefreshProfiles)
                     }
                 }
             }
         }
-        Box {
-            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(40.dp)) {
-                if (isBatchRenaming) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                else HermesMulticolorIcon(HermesIconKind.MORE, contentDescription = "更多操作")
-            }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                shape = RoundedCornerShape(10.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
-                tonalElevation = 0.dp,
-                shadowElevation = if (skin.glass) 6.dp else 2.dp,
-                border = BorderStroke(0.7.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-            ) {
-                CompactMenuItem("新建对话", HermesIconKind.NEW_CHAT) { menuExpanded = false; onNewSession() }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                CompactMenuItem("搜索对话", HermesIconKind.SEARCH) { menuExpanded = false; onSearch() }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                CompactMenuItem("批量改名", HermesIconKind.AI, enabled = !isBatchRenaming) {
-                    menuExpanded = false
-                    onBatchAiRename()
-                }
-            }
+        IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
+            HermesMulticolorIcon(
+                HermesIconKind.SEARCH,
+                contentDescription = "搜索对话",
+                iconSize = 22.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -533,17 +498,6 @@ internal fun profileDetailText(profile: HermesProfile): String {
 }
 
 @Composable
-private fun CompactMenuItem(label: String, icon: HermesIconKind, enabled: Boolean = true, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label, fontWeight = FontWeight.Medium) },
-        leadingIcon = { HermesMulticolorIcon(icon, contentDescription = null, iconSize = 21.dp) },
-        enabled = enabled,
-        onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-    )
-}
-
-@Composable
 private fun SessionFilterBar(
     mode: SessionListMode,
     projects: List<HermesProject>,
@@ -554,68 +508,59 @@ private fun SessionFilterBar(
     onProjectChange: (String?) -> Unit,
     onTimeChange: (SessionTimeFilter) -> Unit,
 ) {
+    val skin = HermesSkin.current
     var modeMenu by remember { mutableStateOf(false) }
     var projectMenu by remember { mutableStateOf(false) }
     var timeMenu by remember { mutableStateOf(false) }
     val projectLabel = projects.firstOrNull { it.id == selectedProjectId }?.name ?: "全部项目"
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.weight(0.72f)) {
-            FilterChipLabel(if (mode == SessionListMode.RECENT) "最近" else "项目", Modifier.fillMaxWidth(), onClick = { modeMenu = true })
-            FilterDropdownMenu(
+            FilterChipLabel(if (mode == SessionListMode.RECENT) "最近" else "项目", Modifier.fillMaxWidth(), active = mode == SessionListMode.PROJECTS, onClick = { modeMenu = true })
+            DropdownMenu(
                 expanded = modeMenu,
                 onDismissRequest = { modeMenu = false },
-                modifier = Modifier.widthIn(min = 124.dp),
+                offset = DpOffset(0.dp, 4.dp),
+                shape = RoundedCornerShape(skin.menuRadius.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
             ) {
                 SessionListMode.entries.forEach { option ->
                     val label = if (option == SessionListMode.RECENT) "最近" else "项目"
-                    FilterDropdownItem(
-                        label = label,
-                        selected = option == mode,
-                        onClick = { modeMenu = false; onModeChange(option) },
-                    )
+                    CompactMenuItem(label, selected = option == mode) { modeMenu = false; onModeChange(option) }
                 }
             }
         }
         Box(Modifier.weight(1.28f)) {
-            FilterChipLabel(projectLabel, Modifier.fillMaxWidth(), onClick = {
+            FilterChipLabel(projectLabel, Modifier.fillMaxWidth(), active = selectedProjectId != null, onClick = {
                 onLoadProjects()
                 projectMenu = true
             })
-            FilterDropdownMenu(
+            DropdownMenu(
                 expanded = projectMenu,
                 onDismissRequest = { projectMenu = false },
-                modifier = Modifier.widthIn(min = 188.dp, max = 286.dp),
+                offset = DpOffset(0.dp, 4.dp),
+                shape = RoundedCornerShape(skin.menuRadius.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
             ) {
-                FilterDropdownItem(
-                    label = "全部项目",
-                    selected = selectedProjectId == null,
-                    onClick = { projectMenu = false; onProjectChange(null) },
-                )
+                CompactMenuItem("全部项目", selected = selectedProjectId == null) { projectMenu = false; onProjectChange(null) }
                 projects.forEach { project ->
-                    FilterDropdownItem(
-                        label = project.name,
-                        selected = project.id == selectedProjectId,
-                        onClick = { projectMenu = false; onProjectChange(project.id) },
-                    )
+                    CompactMenuItem(project.name, selected = project.id == selectedProjectId) { projectMenu = false; onProjectChange(project.id) }
                 }
             }
         }
         Box(Modifier.weight(0.9f)) {
-            FilterChipLabel(timeFilter.label, Modifier.fillMaxWidth(), onClick = { timeMenu = true })
-            FilterDropdownMenu(
+            FilterChipLabel(timeFilter.label, Modifier.fillMaxWidth(), active = timeFilter != SessionTimeFilter.ALL, onClick = { timeMenu = true })
+            DropdownMenu(
                 expanded = timeMenu,
                 onDismissRequest = { timeMenu = false },
-                modifier = Modifier.widthIn(min = 152.dp),
+                offset = DpOffset(0.dp, 4.dp),
+                shape = RoundedCornerShape(skin.menuRadius.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
             ) {
                 SessionTimeFilter.entries.forEach { filter ->
-                    FilterDropdownItem(
-                        label = filter.label,
-                        selected = filter == timeFilter,
-                        onClick = { timeMenu = false; onTimeChange(filter) },
-                    )
+                    CompactMenuItem(filter.label, selected = filter == timeFilter) { timeMenu = false; onTimeChange(filter) }
                 }
             }
         }
@@ -623,72 +568,22 @@ private fun SessionFilterBar(
 }
 
 @Composable
-private fun FilterDropdownMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
+private fun FilterChipLabel(
+    text: String,
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
+    active: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = modifier,
-        offset = DpOffset(x = 0.dp, y = 6.dp),
-        shape = RoundedCornerShape(14.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 0.dp,
-        shadowElevation = 7.dp,
-        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
-        content = content,
-    )
-}
-
-@Composable
-private fun FilterDropdownItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    DropdownMenuItem(
-        text = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingIcon = {
-            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                if (selected) {
-                    Text(
-                        text = "✓",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        },
-        onClick = onClick,
-        modifier = Modifier
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-                else Color.Transparent,
-            ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-    )
-}
-
-@Composable
-private fun FilterChipLabel(text: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val skin = HermesSkin.current
+    val shape = RoundedCornerShape(skin.controlRadius.dp)
     Surface(
-        modifier = modifier.then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)),
-        shape = RoundedCornerShape(9.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+        modifier = modifier.clip(shape).then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)),
+        shape = shape,
+        color = when {
+            active -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = skin.selectedFillAlpha)
+            skin.glass -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
+            else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)
+        },
         tonalElevation = 0.dp,
     ) {
         Text(
@@ -697,7 +592,47 @@ private fun FilterChipLabel(text: String, modifier: Modifier = Modifier, onClick
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+        )
+    }
+}
+
+@Composable
+private fun CompactMenuItem(
+    label: String,
+    detail: String = "",
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = if (detail.isBlank()) 9.dp else 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.45f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (detail.isNotBlank()) Text(
+                detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.45f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            if (selected) "✓" else "",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.size(width = 20.dp, height = 18.dp),
         )
     }
 }
@@ -710,61 +645,161 @@ private fun SessionRow(
     unread: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onArchive: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
+    val skin = HermesSkin.current
     val palette = paletteFor(session)
-    Column(
-        modifier = Modifier.fillMaxWidth().combinedClickable(
-            onClick = onClick,
-            onLongClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onLongClick()
-            },
-        ),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-            SessionAvatar(palette, isCron)
-            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (session.isPinned) {
-                        HermesPinnedMarker(
-                            modifier = Modifier.padding(end = 5.dp).size(17.dp),
+    val rowContent: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                },
+            ),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SessionAvatar(palette, isCron, session.title)
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (session.isPinned) {
+                            HermesPinnedMarker(
+                                modifier = Modifier.padding(end = 5.dp),
+                                iconSize = 16.dp,
+                            )
+                        }
+                        Text(
+                            ellipsizeSessionTitle(session.title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.weight(1f),
                         )
+                        if (unread) {
+                            Box(
+                                Modifier.padding(start = 7.dp).size(7.dp).clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error),
+                            )
+                        }
+                        sessionTimeLabel(session.updatedAt).takeIf(String::isNotBlank)?.let { time ->
+                            Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(start = 9.dp))
+                        }
                     }
                     Text(
-                        ellipsizeSessionTitle(session.title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        session.preview.ifBlank { if (isCron) "定时任务运行记录" else "暂无内容摘要" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.weight(1f),
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
-                    if (unread) {
-                        Box(
-                            Modifier.padding(start = 7.dp).size(7.dp).clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.error),
-                        )
-                    }
-                    sessionTimeLabel(session.updatedAt).takeIf(String::isNotBlank)?.let { time ->
-                        Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(start = 9.dp))
-                    }
                 }
-                Text(
-                    session.preview.ifBlank { if (isCron) "定时任务运行记录" else "暂无内容摘要" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(start = if (skin.glass) 60.dp else 48.dp),
+                thickness = 0.6.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f),
+            )
+        }
+    }
+    if (isCron || onArchive == null || onDelete == null) {
+        rowContent()
+    } else {
+        val revealWidthPx = with(LocalDensity.current) { 132.dp.toPx() }
+        var dragOffsetPx by remember(session.id) { mutableFloatStateOf(0f) }
+        var settleJob by remember(session.id) { mutableStateOf<Job?>(null) }
+        val scope = rememberCoroutineScope()
+        val dragState = rememberDraggableState { delta ->
+            dragOffsetPx = (dragOffsetPx + delta).coerceIn(-revealWidthPx, 0f)
+        }
+        Box(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.matchParentSize(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SessionSwipeAction(
+                    label = "归档",
+                    icon = HermesIconKind.ARCHIVE,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    onClick = {
+                        settleJob?.cancel()
+                        dragOffsetPx = 0f
+                        onArchive()
+                    },
+                )
+                SessionSwipeAction(
+                    label = "删除",
+                    icon = HermesIconKind.DELETE,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        settleJob?.cancel()
+                        dragOffsetPx = 0f
+                        onDelete()
+                    },
                 )
             }
+            Box(
+                modifier = Modifier.offset { IntOffset(dragOffsetPx.roundToInt(), 0) }.draggable(
+                    state = dragState,
+                    orientation = Orientation.Horizontal,
+                    onDragStarted = { settleJob?.cancel() },
+                    onDragStopped = { velocity ->
+                        val target = if (dragOffsetPx <= -revealWidthPx * 0.28f || velocity < -520f) {
+                            -revealWidthPx
+                        } else {
+                            0f
+                        }
+                        settleJob = scope.launch {
+                            Animatable(dragOffsetPx).animateTo(
+                                targetValue = target,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) {
+                                dragOffsetPx = value
+                            }
+                        }
+                    },
+                ),
+            ) {
+                rowContent()
+            }
         }
-        HorizontalDivider(modifier = Modifier.padding(start = 60.dp), thickness = 0.6.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
     }
 }
 
 @Composable
-private fun SessionAvatar(palette: AvatarPalette, isCron: Boolean) {
+private fun SessionSwipeAction(
+    label: String,
+    icon: HermesIconKind,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.width(66.dp).fillMaxHeight().background(containerColor).clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        HermesMulticolorIcon(icon, contentDescription = label, iconSize = 18.dp, tint = contentColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor, modifier = Modifier.padding(top = 3.dp))
+    }
+}
+
+@Composable
+private fun SessionAvatar(palette: AvatarPalette, isCron: Boolean, title: String) {
+    val skin = HermesSkin.current
     val background = if (isCron) {
         MaterialTheme.colorScheme.secondaryContainer
     } else {
@@ -778,23 +813,44 @@ private fun SessionAvatar(palette: AvatarPalette, isCron: Boolean) {
         }
     }
     Box(
-        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(background.copy(alpha = 0.82f)),
+        modifier = Modifier
+            .size(if (skin.glass) 40.dp else 36.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background.copy(alpha = skin.iconWellAlpha)),
         contentAlignment = Alignment.Center,
     ) {
-        HermesMulticolorIcon(
-            if (isCron) HermesIconKind.RECENT else HermesIconKind.CHAT,
-            contentDescription = null,
-            iconSize = if (isCron) 21.dp else 20.dp,
-        )
+        if (isCron) {
+            HermesMulticolorIcon(HermesIconKind.RECENT, contentDescription = null, iconSize = 19.dp)
+        } else {
+            val foreground = when (palette.tone) {
+                0 -> MaterialTheme.colorScheme.primary
+                1 -> HermesColors.extended.success
+                2 -> MaterialTheme.colorScheme.secondary
+                3 -> MaterialTheme.colorScheme.tertiary
+                4 -> MaterialTheme.colorScheme.error
+                else -> HermesColors.extended.warning
+            }
+            Text(
+                title.trim().firstOrNull()?.uppercase() ?: "H",
+                style = MaterialTheme.typography.titleSmall,
+                color = foreground,
+                fontWeight = FontWeight.Bold,
+            )
+        }
     }
 }
 
 @Composable
 private fun ProjectSectionHeader(name: String, count: Int, muted: Boolean = false) {
+    val skin = HermesSkin.current
     Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(28.dp).clip(RoundedCornerShape(9.dp))
-                .background(if (muted) MaterialTheme.colorScheme.surfaceVariant else HermesColors.extended.successContainer),
+            Modifier.size(if (skin.glass) 28.dp else 24.dp).clip(RoundedCornerShape(if (skin.glass) 9.dp else 6.dp))
+                .background(
+                    if (!skin.glass) Color.Transparent
+                    else if (muted) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = skin.iconWellAlpha)
+                    else HermesColors.extended.successContainer.copy(alpha = skin.iconWellAlpha),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             HermesMulticolorIcon(HermesIconKind.PROJECT, contentDescription = null, iconSize = 17.dp)
@@ -832,7 +888,7 @@ private fun CreateProjectDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text("新建项目") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -923,7 +979,7 @@ private fun SessionActions(
     onDelete: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-        Text(ellipsizeSessionTitle(session.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        Text(ellipsizeSessionTitle(session.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         if (busy) {
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 26.dp), horizontalArrangement = Arrangement.Center) {
                 CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
@@ -944,7 +1000,7 @@ private fun SessionPinActionRow(label: String, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HermesPinnedMarker(modifier = Modifier.size(21.dp), contentDescription = null)
+        HermesPinnedMarker(contentDescription = null, iconSize = 20.dp)
         Text(label, modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
     }
 }
@@ -965,7 +1021,7 @@ private fun ProjectPicker(projects: List<HermesProject>, loading: Boolean, onBac
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回") }
-            Text("移至项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("移至项目", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         }
         when {
             loading && projects.isEmpty() -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
@@ -994,39 +1050,20 @@ private fun ProjectPicker(projects: List<HermesProject>, loading: Boolean, onBac
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun CronGroupHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
-    val purple = MaterialTheme.colorScheme.secondary
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp).combinedClickable(onClick = onClick),
-        shape = RoundedCornerShape(13.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
-        tonalElevation = 0.dp,
-    ) {
-        Row(modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(purple.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                HermesMulticolorIcon(HermesIconKind.RECENT, contentDescription = null, iconSize = 19.dp)
-            }
-            Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-                Text("定时任务对话", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("$count 个 Cron 会话，默认折叠", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            HermesMulticolorIcon(
-                if (expanded) HermesIconKind.EXPAND_UP else HermesIconKind.EXPAND_DOWN,
-                contentDescription = if (expanded) "收起" else "展开",
-            )
-        }
-    }
-}
-
 @Composable
 private fun EmptySessions(onNewSession: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(54.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            HermesMulticolorIcon(HermesIconKind.AI, contentDescription = null, iconSize = 27.dp)
-        }
-        Text("还没有会话", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        HermesWelcomeAnimation(
+            modifier = Modifier.size(176.dp),
+            contentDescription = "Hermes 欢迎动画",
+        )
+        Text("还没有会话", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 2.dp))
+        Text(
+            "和 Hermes 开始一段新对话吧",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
         Button(onClick = onNewSession, modifier = Modifier.padding(top = 12.dp)) { Text("开始新对话") }
     }
 }

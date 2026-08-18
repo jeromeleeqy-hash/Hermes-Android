@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000">
+  <defs>
+    <filter id="phoneShadow" x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="26" stdDeviation="32" flood-color="#21304A" flood-opacity=".16"/></filter>
+    <filter id="dockShadow" x="-20%" y="-40%" width="140%" height="190%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#21304A" flood-opacity=".12"/></filter>
+    <symbol id="chat-o" viewBox="0 0 24 24"><path d="M4.2 4.8h8.3c3.1 0 5.5 2.1 5.5 4.9s-2.4 4.9-5.5 4.9H8.1L4 17.6l.8-3.8a4.7 4.7 0 0 1-2.1-4.1c0-2.8 2.3-4.9 5.5-4.9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 7.6h1.1c2.3 0 4.1 1.7 4.1 3.9 0 1.5-.8 2.8-2.1 3.5l.6 3.1-3.3-2.3h-1.4c-1 0-1.9-.3-2.6-.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chat-f" viewBox="0 0 24 24"><path d="M7.8 3.4h4.9c3.9 0 6.8 2.5 6.8 5.9s-2.9 5.9-6.8 5.9H8.3l-4.9 3.3.9-4.3A5.7 5.7 0 0 1 1 9.3c0-3.4 2.9-5.9 6.8-5.9Z" fill="currentColor"/><path d="M18.7 8.2c2.6.6 4.3 2.5 4.3 4.9 0 1.8-.9 3.3-2.4 4.2l.7 3.5-3.8-2.6h-1.9c-1.7 0-3.2-.6-4.2-1.6 5-.1 8.2-3.2 8.2-7.3 0-.4 0-.7-.1-1.1Z" fill="currentColor" opacity=".74"/></symbol>
+    <symbol id="space-o" viewBox="0 0 24 24"><rect x="3" y="3.5" width="12.5" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 8h4.7M7 11.5h4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15.7 7.2h2.1c1.8 0 3.2 1.4 3.2 3.2v7.4c0 1.8-1.4 3.2-3.2 3.2h-7.3c-1.6 0-2.9-1.2-3.1-2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="task-o" viewBox="0 0 24 24"><path d="m3.3 6.2 1.8 1.8 3.2-3.5M11 6.3h9.5M3.3 12.2 5.1 14l3.2-3.5M11 12.3h9.5M3.3 18.2 5.1 20l3.2-3.5M11 18.3h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="profile-o" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c.4-4.9 3.2-7.5 8-7.5s7.6 2.6 8 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  </defs>
+  <rect width="1500" height="1000" fill="#EEF2F8"/>
+  <text x="850" y="112" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="19" font-weight="700" letter-spacing="4" fill="#2FA3E6">IN-CONTEXT PREVIEW</text>
+  <text x="850" y="164" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="38" font-weight="700" fill="#182033">Quiet when idle.</text>
+  <text x="850" y="211" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="38" font-weight="700" fill="#182033">Confident when selected.</text>
+  <text x="850" y="257" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="18" fill="#748096">The selected icon becomes solid without changing its</text>
+  <text x="850" y="285" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="18" fill="#748096">optical center, so the transition feels calm instead of jumpy.</text>
+
+  <g transform="translate(108 55)" filter="url(#phoneShadow)">
+    <rect width="650" height="890" rx="72" fill="#F8F9FC" stroke="#D9E0EA" stroke-width="2"/>
+    <rect x="242" y="18" width="166" height="47" rx="24" fill="#080A0E"/>
+    <text x="44" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="26" font-weight="700" fill="#141A27">12:40</text>
+    <text x="538" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="19" font-weight="700" fill="#141A27">5G  ▰  ◒</text>
+    <g transform="translate(44 104)">
+      <circle cx="38" cy="38" r="38" fill="#DDF7F3"/><text x="38" y="47" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="28" font-weight="700" fill="#15A78F">H</text>
+      <text x="95" y="37" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="32" font-weight="650" fill="#1A2232">Hermes</text>
+      <circle cx="98" cy="61" r="6" fill="#30C895"/><text x="113" y="68" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#6E788A">Profile · work</text>
+      <circle cx="535" cy="37" r="18" fill="none" stroke="#687487" stroke-width="5"/><path d="m548 50 14 14" stroke="#687487" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(34 205)" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" fill="#687487">
+      <rect width="150" height="54" rx="22" fill="#F0F3F8"/><text x="26" y="34">Recent ⌄</text>
+      <rect x="164" width="215" height="54" rx="22" fill="#F0F3F8"/><text x="202" y="34">All projects⌄</text>
+      <rect x="393" width="190" height="54" rx="22" fill="#F0F3F8"/><text x="427" y="34">All time⌄</text>
+    </g>
+    <text x="44" y="315" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="18" font-weight="700" fill="#7A8598">RECENT CHATS</text>
+    <g font-family="Noto Sans,DejaVu Sans,sans-serif">
+      <g transform="translate(44 346)"><rect width="64" height="64" rx="20" fill="#E2F7F4"/><text x="32" y="42" text-anchor="middle" font-size="22" font-weight="700" fill="#11A491">S</text><text x="90" y="27" font-size="22" font-weight="650" fill="#20283A">AI sales pilot</text><text x="90" y="54" font-size="16" fill="#7D8798">Pilot scope and delivery notes…</text><text x="520" y="27" font-size="15" fill="#9AA4B5">Now</text><line x1="90" y1="75" x2="560" y2="75" stroke="#E3E7EE"/></g>
+      <g transform="translate(44 438)"><rect width="64" height="64" rx="20" fill="#FFF2D9"/><text x="32" y="42" text-anchor="middle" font-size="22" font-weight="700" fill="#D98D1D">W</text><text x="90" y="27" font-size="22" font-weight="650" fill="#20283A">Weekly progress</text><text x="90" y="54" font-size="16" fill="#7D8798">Five updates and three follow-ups…</text><text x="520" y="27" font-size="15" fill="#9AA4B5">10:24</text><line x1="90" y1="75" x2="560" y2="75" stroke="#E3E7EE"/></g>
+      <g transform="translate(44 530)"><rect width="64" height="64" rx="20" fill="#EEE8FF"/><text x="32" y="42" text-anchor="middle" font-size="22" font-weight="700" fill="#7357E8">P</text><text x="90" y="27" font-size="22" font-weight="650" fill="#20283A">Product planning</text><text x="90" y="54" font-size="16" fill="#7D8798">Reframed the first phase proposal…</text><text x="520" y="27" font-size="15" fill="#9AA4B5">Yesterday</text><line x1="90" y1="75" x2="560" y2="75" stroke="#E3E7EE"/></g>
+      <g transform="translate(44 622)"><rect width="64" height="64" rx="20" fill="#E5F4FF"/><text x="32" y="42" text-anchor="middle" font-size="22" font-weight="700" fill="#2F80ED">D</text><text x="90" y="27" font-size="22" font-weight="650" fill="#20283A">Data dashboard</text><text x="90" y="54" font-size="16" fill="#7D8798">Waiting for source permissions…</text><text x="520" y="27" font-size="15" fill="#9AA4B5">Aug 10</text></g>
+    </g>
+    <g transform="translate(24 748)" filter="url(#dockShadow)">
+      <rect width="602" height="112" rx="42" fill="white"/>
+      <rect x="10" y="10" width="136" height="92" rx="34" fill="#E4F3FD"/>
+      <g transform="translate(57 22)" color="#2FA3E6"><use href="#chat-f" width="42" height="42"/></g><text x="78" y="83" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" font-weight="650" fill="#2FA3E6">Chat</text>
+      <g transform="translate(205 22)" color="#8A94A3"><use href="#space-o" width="42" height="42"/></g><text x="226" y="83" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#7A8494">Space</text>
+      <g transform="translate(353 22)" color="#8A94A3"><use href="#task-o" width="42" height="42"/></g><text x="374" y="83" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#7A8494">Tasks</text>
+      <g transform="translate(501 22)" color="#8A94A3"><use href="#profile-o" width="42" height="42"/></g><text x="522" y="83" text-anchor="middle" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#7A8494">Profile</text>
+    </g>
+  </g>
+
+  <g transform="translate(850 365)">
+    <rect width="538" height="338" rx="30" fill="white"/>
+    <text x="34" y="52" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#9AA5B8">TRANSITION BEHAVIOR</text>
+    <g transform="translate(36 88)">
+      <circle cx="46" cy="46" r="46" fill="#F3F5F8"/><g transform="translate(22 22)" color="#707B8D"><use href="#chat-o" width="48" height="48"/></g>
+      <path d="M116 46h70" stroke="#C9D1DD" stroke-width="3" stroke-linecap="round"/><path d="m176 36 12 10-12 10" fill="none" stroke="#C9D1DD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="242" cy="46" r="46" fill="#E4F3FD"/><g transform="translate(218 22)" color="#2FA3E6"><use href="#chat-f" width="48" height="48"/></g>
+      <text x="322" y="37" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" font-weight="700" fill="#20283A">180–220 ms</text><text x="322" y="65" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#7C8799">crossfade + 0.94→1 scale</text>
+    </g>
+    <line x1="34" y1="214" x2="504" y2="214" stroke="#E6EAF0"/>
+    <g transform="translate(34 242)" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#566277"><circle cx="8" cy="9" r="5" fill="#2FA3E6"/><text x="26" y="15">No ripple overlay on navigation targets</text><circle cx="8" cy="51" r="5" fill="#2FA3E6"/><text x="26" y="57">Shared optical center prevents visual jumping</text></g>
+  </g>
+  <g transform="translate(850 744)">
+    <rect width="538" height="170" rx="30" fill="#172133"/>
+    <text x="34" y="50" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#5CC2F5">DESIGN DECISION</text>
+    <text x="34" y="89" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="20" font-weight="650" fill="white">Borrow Telegram’s discipline,</text><text x="34" y="120" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="20" font-weight="650" fill="white">not its exact pictograms.</text><text x="34" y="147" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#AAB5C7">Space and Tasks remain unmistakably Hermes.</text>
+  </g>
+</svg>

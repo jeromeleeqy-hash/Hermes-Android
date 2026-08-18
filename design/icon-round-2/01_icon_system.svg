@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="24" flood-color="#25314A" flood-opacity="0.10"/>
+    </filter>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#49B6F2"/><stop offset="1" stop-color="#2F80ED"/></linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#B36AF5"/><stop offset="1" stop-color="#7357E8"/></linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF7A87"/><stop offset="1" stop-color="#E94361"/></linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#45CED5"/><stop offset="1" stop-color="#1598CA"/></linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#48D79B"/><stop offset="1" stop-color="#20A96E"/></linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFC452"/><stop offset="1" stop-color="#F18A1C"/></linearGradient>
+    <linearGradient id="indigo" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7EA1FF"/><stop offset="1" stop-color="#5167E8"/></linearGradient>
+
+    <symbol id="chat-outline" viewBox="0 0 24 24">
+      <path d="M4.2 4.8h8.3c3.1 0 5.5 2.1 5.5 4.9s-2.4 4.9-5.5 4.9H8.1L4 17.6l.8-3.8a4.7 4.7 0 0 1-2.1-4.1c0-2.8 2.3-4.9 5.5-4.9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16.4 7.6h1.1c2.3 0 4.1 1.7 4.1 3.9 0 1.5-.8 2.8-2.1 3.5l.6 3.1-3.3-2.3h-1.4c-1 0-1.9-.3-2.6-.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="chat-filled" viewBox="0 0 24 24">
+      <path d="M7.8 3.4h4.9c3.9 0 6.8 2.5 6.8 5.9s-2.9 5.9-6.8 5.9H8.3l-4.9 3.3.9-4.3A5.7 5.7 0 0 1 1 9.3c0-3.4 2.9-5.9 6.8-5.9Z" fill="currentColor"/>
+      <path d="M18.7 8.2c2.6.6 4.3 2.5 4.3 4.9 0 1.8-.9 3.3-2.4 4.2l.7 3.5-3.8-2.6h-1.9c-1.7 0-3.2-.6-4.2-1.6 5-.1 8.2-3.2 8.2-7.3 0-.4 0-.7-.1-1.1Z" fill="currentColor" opacity=".74"/>
+    </symbol>
+    <symbol id="space-outline" viewBox="0 0 24 24">
+      <rect x="3" y="3.5" width="12.5" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M7 8h4.7M7 11.5h4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M15.7 7.2h2.1c1.8 0 3.2 1.4 3.2 3.2v7.4c0 1.8-1.4 3.2-3.2 3.2h-7.3c-1.6 0-2.9-1.2-3.1-2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="space-filled" viewBox="0 0 24 24">
+      <rect x="2" y="2.5" width="14.5" height="15.5" rx="3" fill="currentColor"/>
+      <path d="M6 7.4h6.3M6 11h4.8" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M17.4 6.8h1.4A4.2 4.2 0 0 1 23 11v7.7a4.2 4.2 0 0 1-4.2 4.2h-7.7a4.2 4.2 0 0 1-4-3h5.2a5.1 5.1 0 0 0 5.1-5.1Z" fill="currentColor" opacity=".74"/>
+    </symbol>
+    <symbol id="task-outline" viewBox="0 0 24 24">
+      <path d="m3.3 6.2 1.8 1.8 3.2-3.5M11 6.3h9.5M3.3 12.2 5.1 14l3.2-3.5M11 12.3h9.5M3.3 18.2 5.1 20l3.2-3.5M11 18.3h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="task-filled" viewBox="0 0 24 24">
+      <circle cx="5.5" cy="6" r="4" fill="currentColor"/><circle cx="5.5" cy="12" r="4" fill="currentColor"/><circle cx="5.5" cy="18" r="4" fill="currentColor"/>
+      <path d="m3.7 6 1.2 1.2 2.4-2.6M3.7 12l1.2 1.2 2.4-2.6M3.7 18l1.2 1.2 2.4-2.6" fill="none" stroke="white" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M11 5h10v2H11zM11 11h10v2H11zM11 17h10v2H11z" fill="currentColor"/>
+    </symbol>
+    <symbol id="profile-outline" viewBox="0 0 24 24">
+      <circle cx="12" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M4 21c.4-4.9 3.2-7.5 8-7.5s7.6 2.6 8 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="profile-filled" viewBox="0 0 24 24">
+      <circle cx="12" cy="6.6" r="5" fill="currentColor"/><path d="M2.5 22.5c0-5.8 3.5-9.2 9.5-9.2s9.5 3.4 9.5 9.2Z" fill="currentColor"/>
+    </symbol>
+  </defs>
+
+  <rect width="1600" height="1120" fill="#F4F6FA"/>
+  <text x="74" y="94" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="22" font-weight="700" letter-spacing="5" fill="#2FA3E6">HERMES ICON SYSTEM 02</text>
+  <text x="74" y="154" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="44" font-weight="700" fill="#182033">Telegram-inspired, Hermes-owned.</text>
+  <text x="74" y="197" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="20" fill="#748096">Cleaner contours, stronger negative space and a more confident settings palette.</text>
+
+  <g transform="translate(74 246)">
+    <rect width="926" height="794" rx="34" fill="white" filter="url(#shadow)"/>
+    <text x="42" y="60" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#9AA5B8">BOTTOM NAVIGATION</text>
+    <text x="42" y="98" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="28" font-weight="700" fill="#1B2334">One silhouette, two states</text>
+    <text x="42" y="129" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#7B879B">24 px grid · 1.8 px outline · round caps · no crossing contours</text>
+
+    <g transform="translate(44 182)">
+      <text x="0" y="18" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="700" fill="#9AA5B8">OUTLINE</text>
+      <text x="449" y="18" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="700" fill="#2FA3E6">SELECTED / FILLED</text>
+      <g transform="translate(0 46)">
+        <rect width="390" height="116" rx="24" fill="#F6F8FB"/><circle cx="68" cy="58" r="38" fill="white"/>
+        <g transform="translate(44 34)" color="#606C80"><use href="#chat-outline" width="48" height="48"/></g>
+        <text x="130" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Chat</text><text x="130" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#8792A6">Clean masked overlap</text>
+        <rect x="449" width="390" height="116" rx="24" fill="#EAF6FD"/><circle cx="517" cy="58" r="38" fill="white"/>
+        <g transform="translate(493 34)" color="#2FA3E6"><use href="#chat-filled" width="48" height="48"/></g>
+        <text x="579" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Chat</text><text x="579" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#2FA3E6">Solid dual bubble</text>
+      </g>
+      <g transform="translate(0 180)">
+        <rect width="390" height="116" rx="24" fill="#F6F8FB"/><circle cx="68" cy="58" r="38" fill="white"/>
+        <g transform="translate(44 34)" color="#606C80"><use href="#space-outline" width="48" height="48"/></g>
+        <text x="130" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Space</text><text x="130" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#8792A6">Front card hides overlap</text>
+        <rect x="449" width="390" height="116" rx="24" fill="#EAF6FD"/><circle cx="517" cy="58" r="38" fill="white"/>
+        <g transform="translate(493 34)" color="#2FA3E6"><use href="#space-filled" width="48" height="48"/></g>
+        <text x="579" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Space</text><text x="579" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#2FA3E6">Layered content cards</text>
+      </g>
+      <g transform="translate(0 314)">
+        <rect width="390" height="116" rx="24" fill="#F6F8FB"/><circle cx="68" cy="58" r="38" fill="white"/>
+        <g transform="translate(44 34)" color="#606C80"><use href="#task-outline" width="48" height="48"/></g>
+        <text x="130" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Tasks</text><text x="130" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#8792A6">Consistent row rhythm</text>
+        <rect x="449" width="390" height="116" rx="24" fill="#EAF6FD"/><circle cx="517" cy="58" r="38" fill="white"/>
+        <g transform="translate(493 34)" color="#2FA3E6"><use href="#task-filled" width="48" height="48"/></g>
+        <text x="579" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Tasks</text><text x="579" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#2FA3E6">Dense but legible</text>
+      </g>
+      <g transform="translate(0 448)">
+        <rect width="390" height="116" rx="24" fill="#F6F8FB"/><circle cx="68" cy="58" r="38" fill="white"/>
+        <g transform="translate(44 34)" color="#606C80"><use href="#profile-outline" width="48" height="48"/></g>
+        <text x="130" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Profile</text><text x="130" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#8792A6">Open shoulder contour</text>
+        <rect x="449" width="390" height="116" rx="24" fill="#EAF6FD"/><circle cx="517" cy="58" r="38" fill="white"/>
+        <g transform="translate(493 34)" color="#2FA3E6"><use href="#profile-filled" width="48" height="48"/></g>
+        <text x="579" y="54" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="21" font-weight="700" fill="#20283A">Profile</text><text x="579" y="82" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="15" fill="#2FA3E6">Simple human silhouette</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(1032 246)">
+    <rect width="494" height="794" rx="34" fill="white" filter="url(#shadow)"/>
+    <text x="36" y="60" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#9AA5B8">SETTINGS GLYPHS</text>
+    <text x="36" y="98" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="28" font-weight="700" fill="#1B2334">Color carries category</text>
+    <text x="36" y="129" font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="16" fill="#7B879B">White glyph · vivid gradient · 14 px corner radius</text>
+
+    <g font-family="Noto Sans,DejaVu Sans,sans-serif" font-size="18" font-weight="650" fill="#263044">
+      <g transform="translate(36 174)"><rect width="62" height="62" rx="16" fill="url(#blue)"/><g transform="translate(16 16)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><rect x="1" y="2" width="28" height="10" rx="3"/><rect x="1" y="18" width="28" height="10" rx="3"/><path d="M6 7h.1M6 23h.1M12 7h12M12 23h12"/></g><text x="82" y="39">Gateway</text></g>
+      <g transform="translate(36 254)"><rect width="62" height="62" rx="16" fill="url(#violet)"/><g transform="translate(15 15)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2C8.3 2 2 7.6 2 14.5 2 21.4 7.8 27 14.8 27h1.7c1.4 0 2.3-1.4 1.8-2.7-.5-1.3.5-2.8 2-2.8h3.2c4 0 6.5-3 6.5-7C30 7.6 23.7 2 16 2Z"/><path d="M8 15h.1M13 9h.1M20 9.5h.1M25 15h.1"/></g><text x="82" y="39">Appearance</text></g>
+      <g transform="translate(36 334)"><rect width="62" height="62" rx="16" fill="url(#red)"/><g transform="translate(16 15)" fill="white"><path d="M15 1.5a3 3 0 0 1 3 3v.7c4.3 1.3 7 5.3 7 10v5l3 4.3H2l3-4.3v-5c0-4.7 2.7-8.7 7-10v-.7a3 3 0 0 1 3-3Z"/><path d="M10.5 27h9c-.7 2.3-2.2 3.5-4.5 3.5S11.2 29.3 10.5 27Z"/></g><text x="82" y="39">Notifications</text></g>
+      <g transform="translate(36 414)"><rect width="62" height="62" rx="16" fill="url(#cyan)"/><g transform="translate(16 14)" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round"><rect x="9" y="1" width="12" height="22" rx="6"/><path d="M3 16c0 7 4.7 11 12 11s12-4 12-11M15 27v6M9 33h12"/></g><text x="82" y="39">Voice</text></g>
+      <g transform="translate(36 494)"><rect width="62" height="62" rx="16" fill="url(#indigo)"/><g transform="translate(15 15)" fill="white"><path d="m16 1 14 7-14 7L2 8Zm-10 12 10 5 10-5 4 2-14 7L2 15Zm0 7 10 5 10-5 4 2-14 7L2 22Z"/></g><text x="82" y="39">Models</text></g>
+      <g transform="translate(36 574)"><rect width="62" height="62" rx="16" fill="url(#green)"/><g transform="translate(15 14)" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2 28 6.6v8.7c0 7.3-4.8 12.2-12 15.1C8.8 27.5 4 22.6 4 15.3V6.6Z"/><path d="m9.5 16 4.2 4.1L23 11"/></g><text x="82" y="39">Approval</text></g>
+      <g transform="translate(36 654)"><rect width="62" height="62" rx="16" fill="url(#orange)"/><g transform="translate(15 15)" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h24v6H4zM6 11h20v17H6zM12 17h8"/></g><text x="82" y="39">Archive</text></g>
+    </g>
+  </g>
+</svg>

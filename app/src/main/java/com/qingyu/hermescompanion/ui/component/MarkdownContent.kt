@@ -67,12 +67,16 @@ fun MarkdownContent(
     inlineImagePreviews: Map<String, ImagePreview> = emptyMap(),
 ) {
     val blocks = remember(markdown) { parseMarkdown(markdown) }
+    val relaxedBody = MaterialTheme.typography.bodyMedium.copy(
+        color = MaterialTheme.colorScheme.onSurface,
+        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.1f,
+    )
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MarkdownBlock.Paragraph -> InlineMarkdownText(
                     text = block.text,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    style = relaxedBody,
                     onOpenLink = onOpenLink,
                 )
 
@@ -83,7 +87,7 @@ fun MarkdownContent(
                             1 -> MaterialTheme.typography.titleLarge
                             2 -> MaterialTheme.typography.titleMedium
                             3 -> MaterialTheme.typography.titleSmall
-                            else -> MaterialTheme.typography.bodyMedium
+                            else -> relaxedBody
                         }.copy(
                             fontWeight = if (block.level <= 3) FontWeight.Bold else FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -104,7 +108,7 @@ fun MarkdownContent(
                     )
                     InlineMarkdownText(
                         text = block.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                        style = relaxedBody,
                         onOpenLink = onOpenLink,
                     )
                 }
@@ -118,7 +122,7 @@ fun MarkdownContent(
                     )
                     InlineMarkdownText(
                         text = block.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(
+                        style = relaxedBody.copy(
                             color = if (block.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                             textDecoration = if (block.checked) TextDecoration.LineThrough else null,
                         ),
@@ -139,7 +143,7 @@ fun MarkdownContent(
                     )
                     InlineMarkdownText(
                         text = block.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                        style = relaxedBody.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                         onOpenLink = onOpenLink,
                     )
                 }

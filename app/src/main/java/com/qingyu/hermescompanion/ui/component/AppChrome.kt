@@ -1,11 +1,18 @@
 package com.qingyu.hermescompanion.ui.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,13 +24,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +44,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -62,9 +75,9 @@ fun AmbientBackground(content: @Composable () -> Unit) {
                 if (skin.glass) Brush.verticalGradient(
                     listOf(
                         colors.background,
-                        colors.primaryContainer.copy(alpha = 0.30f),
+                        colors.primaryContainer.copy(alpha = 0.18f),
                         colors.background,
-                        colors.secondaryContainer.copy(alpha = 0.24f),
+                        colors.secondaryContainer.copy(alpha = 0.14f),
                     ),
                 ) else SolidColor(colors.background),
             ),
@@ -75,7 +88,7 @@ fun AmbientBackground(content: @Composable () -> Unit) {
                     .size(300.dp)
                     .offset(x = (-130).dp, y = (-105).dp)
                     .background(
-                        Brush.radialGradient(listOf(colors.primary.copy(alpha = 0.16f), Color.Transparent)),
+                        Brush.radialGradient(listOf(colors.primary.copy(alpha = 0.10f), Color.Transparent)),
                         CircleShape,
                     ),
             )
@@ -85,7 +98,7 @@ fun AmbientBackground(content: @Composable () -> Unit) {
                     .size(270.dp)
                     .offset(x = 135.dp, y = (-80).dp)
                     .background(
-                        Brush.radialGradient(listOf(colors.secondary.copy(alpha = 0.14f), Color.Transparent)),
+                        Brush.radialGradient(listOf(colors.secondary.copy(alpha = 0.09f), Color.Transparent)),
                         CircleShape,
                     ),
             )
@@ -95,7 +108,7 @@ fun AmbientBackground(content: @Composable () -> Unit) {
                     .size(250.dp)
                     .offset(x = (-120).dp, y = 120.dp)
                     .background(
-                        Brush.radialGradient(listOf(colors.tertiary.copy(alpha = 0.11f), Color.Transparent)),
+                        Brush.radialGradient(listOf(colors.tertiary.copy(alpha = 0.07f), Color.Transparent)),
                         CircleShape,
                     ),
             )
@@ -107,43 +120,50 @@ fun AmbientBackground(content: @Composable () -> Unit) {
 @Composable
 fun GlassPanel(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(17.dp),
+    shape: Shape? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val skin = HermesSkin.current
-    val panelBrush = if (skin.glass) {
+    val resolvedShape = shape ?: RoundedCornerShape(skin.panelRadius.dp)
+    val panelBrush: Brush = if (skin.glass) {
         Brush.linearGradient(
             listOf(
-                colors.surfaceContainerLow,
-                colors.surfaceContainer,
+                colors.surface.copy(alpha = skin.panelAlpha + 0.08f),
+                colors.surfaceContainerLow.copy(alpha = skin.panelAlpha),
+                colors.primaryContainer.copy(alpha = 0.12f),
             ),
         )
     } else {
-        Brush.linearGradient(listOf(colors.surfaceContainerLow, colors.surfaceContainerLow))
+        SolidColor(colors.surface.copy(alpha = skin.panelAlpha))
     }
     val panelModifier = modifier
         .then(
-            if (skin.glass) {
+            if (skin.shadowElevation > 0) {
                 Modifier.shadow(
                     skin.shadowElevation.dp,
-                    shape,
-                    ambientColor = colors.primary.copy(alpha = 0.10f),
-                    spotColor = Color.Black.copy(alpha = 0.18f),
+                    resolvedShape,
+                    ambientColor = colors.primary.copy(alpha = if (skin.glass) 0.08f else 0.025f),
+                    spotColor = Color.Black.copy(alpha = if (skin.glass) 0.16f else 0.06f),
                 )
             } else {
                 Modifier
             },
         )
-        .clip(shape)
+        .clip(resolvedShape)
         .background(panelBrush)
         .then(
-            if (skin.glass) {
+            if (skin.borderAlpha > 0f) {
                 Modifier.border(
-                    width = 0.9.dp,
-                    color = colors.outlineVariant.copy(alpha = skin.borderAlpha),
-                    shape = shape,
+                    width = if (skin.glass) 0.8.dp else 0.6.dp,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = if (skin.glass) skin.borderAlpha else 0.3f),
+                            colors.outlineVariant.copy(alpha = skin.borderAlpha * 0.7f),
+                        ),
+                    ),
+                    shape = resolvedShape,
                 )
             } else {
                 Modifier
@@ -161,41 +181,94 @@ fun HermesSegmentedControl(
     modifier: Modifier = Modifier.fillMaxWidth(),
     compact: Boolean = false,
 ) {
+    val skin = HermesSkin.current
+    val safeIndex = selectedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+    val innerPadding = if (compact) 3.dp else 5.dp
+    val itemSpacing = if (compact) 3.dp else 4.dp
+    val controlHeight = if (compact) 31.dp else 38.dp
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(if (compact) 11.dp else 16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(if (compact) skin.controlRadius.dp else (skin.controlRadius + 2).dp),
+        color = if (skin.glass) MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha)
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(
             0.7.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f),
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (skin.glass) skin.borderAlpha else 0.58f),
         ),
     ) {
-        Row(
-            modifier = Modifier.padding(if (compact) 3.dp else 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth().padding(innerPadding).height(controlHeight),
         ) {
-            items.forEachIndexed { index, label ->
-                val selected = selectedIndex == index
+            if (items.isNotEmpty()) {
+                val itemWidth = (maxWidth - itemSpacing * (items.size - 1)) / items.size
+                val indicatorOffset by animateDpAsState(
+                    targetValue = (itemWidth + itemSpacing) * safeIndex,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.86f),
+                    label = "segmentIndicator",
+                )
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(if (compact) 8.dp else 12.dp))
-                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                        .clickable { onSelect(index) }
-                        .padding(vertical = if (compact) 5.dp else 7.dp),
-                    contentAlignment = Alignment.Center,
+                        .offset(x = indicatorOffset)
+                        .width(itemWidth)
+                        .height(controlHeight)
+                        .clip(RoundedCornerShape(if (compact) skin.controlRadius.dp else (skin.controlRadius + 1).dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = skin.selectedFillAlpha)),
+                )
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(itemSpacing),
                 ) {
-                    Text(
-                        label,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                        fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
-                    )
+                    items.forEachIndexed { index, label ->
+                        val selected = safeIndex == index
+                        val textColor by animateColorAsState(
+                            targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "segmentTextColor",
+                        )
+                        Box(
+                            modifier = Modifier.width(itemWidth).height(controlHeight).clickable { onSelect(index) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                label,
+                                color = textColor,
+                                style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+fun HermesSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val animatedScale by animateFloatAsState(
+        targetValue = if (checked) 0.82f else 0.78f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = 0.72f),
+        label = "switchScale",
+    )
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        modifier = modifier.graphicsLayer { scaleX = animatedScale; scaleY = animatedScale },
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            uncheckedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+        ),
+    )
 }
 
 @Composable
@@ -228,78 +301,115 @@ fun HermesBottomDock(
     onSelect: (AppRoute) -> Unit,
 ) {
     val skin = HermesSkin.current
-    if (skin.glass) {
-        GlassPanel(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-                .padding(horizontal = HermesSpacing.sm, vertical = 7.dp),
-            shape = RoundedCornerShape(24.dp),
-            contentPadding = PaddingValues(horizontal = 7.dp, vertical = 5.dp),
-        ) {
-            DockItems(selected, hasUnreadConversations, onSelect)
-        }
-    } else {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 0.dp,
-        ) {
-            Column(Modifier.navigationBarsPadding()) {
-                HorizontalDivider(
-                    thickness = 0.6.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f),
-                )
-                Box(Modifier.padding(horizontal = HermesSpacing.xs, vertical = 4.dp)) {
-                    DockItems(selected, hasUnreadConversations, onSelect)
-                }
-            }
-        }
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = Color.Black.copy(alpha = 0.06f),
+                spotColor = Color.Black.copy(alpha = 0.10f),
+            ),
+        shape = RoundedCornerShape(22.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+    ) {
+        DockItems(selected, hasUnreadConversations, onSelect)
     }
 }
 
 @Composable
 private fun DockItems(selected: AppRoute, hasUnreadConversations: Boolean, onSelect: (AppRoute) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(54.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DockItem("对话", HermesIconKind.CHAT, selected == AppRoute.SESSIONS, hasUnreadConversations, Modifier.weight(1f)) { onSelect(AppRoute.SESSIONS) }
-        DockItem("空间", HermesIconKind.SPACE, selected == AppRoute.WORKSPACE, false, Modifier.weight(1f)) { onSelect(AppRoute.WORKSPACE) }
-        DockItem("任务", HermesIconKind.TASK, selected == AppRoute.TASKS, false, Modifier.weight(1f)) { onSelect(AppRoute.TASKS) }
-        DockItem("我的", HermesIconKind.PROFILE, selected == AppRoute.PROFILE, false, Modifier.weight(1f)) { onSelect(AppRoute.PROFILE) }
+    val routes = listOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE)
+    val selectedIndex = routes.indexOf(selected).coerceAtLeast(0)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(50.dp)) {
+        val itemWidth = maxWidth / routes.size
+        val indicatorOffset by animateDpAsState(
+            targetValue = itemWidth * selectedIndex,
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.84f),
+            label = "dockIndicator",
+        )
+        Box(
+            modifier = Modifier.align(Alignment.CenterStart).offset(x = indicatorOffset)
+                .width(itemWidth).height(44.dp).padding(horizontal = 3.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = HermesSkin.current.selectedFillAlpha)),
+        )
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DockItem("对话", HermesIconKind.NAV_CHAT_OUTLINE, HermesIconKind.NAV_CHAT_FILLED, selected == AppRoute.SESSIONS, hasUnreadConversations, Modifier.weight(1f)) { onSelect(AppRoute.SESSIONS) }
+            DockItem("空间", HermesIconKind.NAV_SPACE_OUTLINE, HermesIconKind.NAV_SPACE_FILLED, selected == AppRoute.WORKSPACE, false, Modifier.weight(1f)) { onSelect(AppRoute.WORKSPACE) }
+            DockItem("任务", HermesIconKind.NAV_TASK_OUTLINE, HermesIconKind.NAV_TASK_FILLED, selected == AppRoute.TASKS, false, Modifier.weight(1f)) { onSelect(AppRoute.TASKS) }
+            DockItem("我的", HermesIconKind.NAV_PROFILE_OUTLINE, HermesIconKind.NAV_PROFILE_FILLED, selected == AppRoute.PROFILE, false, Modifier.weight(1f)) { onSelect(AppRoute.PROFILE) }
+        }
     }
 }
 
 @Composable
 private fun DockItem(
     label: String,
-    icon: HermesIconKind,
+    outlineIcon: HermesIconKind,
+    filledIcon: HermesIconKind,
     selected: Boolean,
     showBadge: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val selectionProgress by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.86f),
+        label = "dockIconFill",
+    )
+    val tint by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "dockTint",
+    )
+    val itemScale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.96f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = 0.82f),
+        label = "dockScale",
+    )
     Column(
         modifier = modifier
-            .height(HermesSpacing.minTouchTarget)
-            .clip(RoundedCornerShape(15.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-                else Color.Transparent,
+            .height(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
             )
-            .clickable(onClick = onClick)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 2.dp)
+            .graphicsLayer { scaleX = itemScale; scaleY = itemScale },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        Box(modifier = Modifier.size(width = 30.dp, height = 27.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(width = 28.dp, height = 25.dp), contentAlignment = Alignment.Center) {
             HermesMulticolorIcon(
-                kind = icon,
+                kind = outlineIcon,
                 contentDescription = label,
-                iconSize = 25.dp,
-                grayscale = !selected,
-                modifier = Modifier.alpha(if (selected) 1f else 0.72f),
+                iconSize = 22.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 1f - selectionProgress
+                    val scale = 1f - selectionProgress * 0.08f
+                    scaleX = scale
+                    scaleY = scale
+                },
+            )
+            HermesMulticolorIcon(
+                kind = filledIcon,
+                contentDescription = null,
+                iconSize = 22.dp,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.graphicsLayer {
+                    alpha = selectionProgress
+                    val scale = 0.9f + selectionProgress * 0.1f
+                    scaleX = scale
+                    scaleY = scale
+                },
             )
             if (showBadge) {
                 Box(

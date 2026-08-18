@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -30,9 +31,9 @@ fun UserAvatar(
     size: Dp = 36.dp,
     modifier: Modifier = Modifier,
     hermesFallback: Boolean = false,
+    shape: Shape = RoundedCornerShape(size / 3.2f),
 ) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(size / 3.2f)
     val framedModifier = modifier.size(size).clip(shape)
         .border(0.8.dp, MaterialTheme.colorScheme.outlineVariant, shape)
     val privateBitmap = remember(uri) {
@@ -57,6 +58,37 @@ fun UserAvatar(
             contentDescription = displayName,
             contentScale = ContentScale.Crop,
             modifier = framedModifier,
+        )
+    }
+}
+
+/** Renders the same stored user image without forcing avatar dimensions or a circular crop. */
+@Composable
+fun UserPhoto(
+    uri: String,
+    displayName: String,
+    modifier: Modifier = Modifier,
+    shape: Shape,
+) {
+    val context = LocalContext.current
+    val privateBitmap = remember(uri) {
+        resolvePrivateAvatarFile(uri, File(context.filesDir, "avatars"))
+            ?.let { file -> runCatching { BitmapFactory.decodeFile(file.path)?.asImageBitmap() }.getOrNull() }
+    }
+    val photoModifier = modifier.clip(shape)
+    if (privateBitmap != null) {
+        Image(
+            bitmap = privateBitmap,
+            contentDescription = displayName,
+            contentScale = ContentScale.Crop,
+            modifier = photoModifier,
+        )
+    } else {
+        Image(
+            painter = painterResource(R.drawable.fixed_user_avatar),
+            contentDescription = displayName,
+            contentScale = ContentScale.Crop,
+            modifier = photoModifier,
         )
     }
 }

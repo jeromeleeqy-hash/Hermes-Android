@@ -8,23 +8,37 @@ import com.qingyu.hermescompanion.model.CronSchedule
 import com.qingyu.hermescompanion.model.HermesSession
 import com.qingyu.hermescompanion.model.HermesProject
 import com.qingyu.hermescompanion.model.HermesProfile
+import com.qingyu.hermescompanion.model.HermesProfileFile
 import com.qingyu.hermescompanion.model.SessionPage
 import com.qingyu.hermescompanion.model.MessageRole
 import com.qingyu.hermescompanion.model.ModelCatalog
+import com.qingyu.hermescompanion.model.MessagePage
 import com.qingyu.hermescompanion.model.ModelProvider
 import com.qingyu.hermescompanion.model.ModelChoice
 import com.qingyu.hermescompanion.model.FallbackModel
 import com.qingyu.hermescompanion.model.ServerModelSettings
 import com.qingyu.hermescompanion.model.ConversationStyleSettings
 import com.qingyu.hermescompanion.model.ApprovalSettings
+import com.qingyu.hermescompanion.model.AgentRequest
+import com.qingyu.hermescompanion.model.AgentRequestChoice
+import com.qingyu.hermescompanion.model.AgentRequestType
 import com.qingyu.hermescompanion.model.MemoryContextSettings
 import com.qingyu.hermescompanion.model.ServerSettings
+import com.qingyu.hermescompanion.model.ServerSttSettings
+import com.qingyu.hermescompanion.model.ServerTtsSettings
+import com.qingyu.hermescompanion.model.ServerVoiceSettings
 import com.qingyu.hermescompanion.model.SlashCommand
 import com.qingyu.hermescompanion.model.ServerSkill
 import com.qingyu.hermescompanion.model.ToolsetInfo
 import com.qingyu.hermescompanion.model.McpServerInfo
 import com.qingyu.hermescompanion.model.PendingAttachment
 import com.qingyu.hermescompanion.model.ImagePreview
+import com.qingyu.hermescompanion.model.GatewayInfo
+import com.qingyu.hermescompanion.model.AgentUpdateCommit
+import com.qingyu.hermescompanion.model.AgentUpdateInfo
+import com.qingyu.hermescompanion.model.AgentUpdateProgress
+import com.qingyu.hermescompanion.model.SpeechAudio
+import com.qingyu.hermescompanion.model.SpeechTranscription
 import com.qingyu.hermescompanion.model.StreamEvent
 import com.qingyu.hermescompanion.model.WorkspaceDocument
 import com.qingyu.hermescompanion.model.WorkspaceEntry
@@ -54,6 +68,45 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+
+internal fun parseServerVoiceSettings(config: JSONObject): ServerVoiceSettings {
+    val stt = config.optJSONObject("stt") ?: JSONObject()
+    val sttProvider = stt.optString("provider").trim().ifBlank { "local" }
+    val sttProviderConfig = stt.optJSONObject(sttProvider) ?: JSONObject()
+    val sttModel = sttProviderConfig.optString("model").trim()
+        .ifBlank { stt.optString("model").trim() }
+        .ifBlank { defaultServerSttModel(sttProvider) }
+
+    val tts = config.optJSONObject("tts") ?: JSONObject()
+    val ttsProvider = tts.optString("provider").trim().ifBlank { "edge" }
+    val ttsProviderConfig = tts.optJSONObject(ttsProvider) ?: JSONObject()
+    val ttsModel = ttsProviderConfig.optString("model").trim()
+        .ifBlank { ttsProviderConfig.optString("model_id").trim() }
+    val ttsVoice = ttsProviderConfig.optString("voice").trim()
+        .ifBlank { ttsProviderConfig.optString("voice_id").trim() }
+
+    return ServerVoiceSettings(
+        stt = ServerSttSettings(
+            enabled = !stt.has("enabled") || stt.optBoolean("enabled"),
+            provider = sttProvider,
+            model = sttModel,
+            language = sttProviderConfig.optString("language").trim(),
+        ),
+        tts = ServerTtsSettings(
+            provider = ttsProvider,
+            model = ttsModel,
+            voice = ttsVoice,
+        ),
+    )
+}
+
+private fun defaultServerSttModel(provider: String): String = when (provider) {
+    "groq" -> "whisper-large-v3-turbo"
+    "openai" -> "whisper-1"
+    "mistral" -> "voxtral-mini-latest"
+    "xai" -> "grok-stt"
+    else -> "base"
+}
 
 class HermesApiClient(
     private val config: ConnectionConfig,
@@ -115,6 +168,143 @@ class HermesApiClient(
         return authenticatedUsername()
     }
 
+    fun checkGatewayAccess() {
+        checkGatewayStatus()
+    }
+
+    fun gatewayInfo(): GatewayInfo {
+        val status = checkGatewayStatus()
+        val health = runCatching {
+            JSONObject(request("GET", "/api/health", includeProfile = false))
+        }.getOrDefault(JSONObject())
+        val build = status.optJSONObject("build") ?: JSONObject()
+        val gateway = status.optJSONObject("gateway") ?: JSONObject()
+        val capabilities = buildList {
+            status.optJSONArray("capabilities")?.let { array ->
+                for (index in 0 until array.length()) {
+                    array.optString(index).trim().takeIf(String::isNotBlank)?.let(::add)
+                }
+            }
+            status.optJSONObject("capabilities")?.let { values ->
+                values.keys().forEach { key -> if (values.optBoolean(key)) add(key) }
+            }
+        }.distinct()
+        return GatewayInfo(
+            agentVersion = (
+                firstString(status, "agent_version", "hermes_version", "version")
+                    ?: firstString(build, "agent_version", "hermes_version", "version")
+                    ?: firstString(health, "agent_version", "hermes_version", "version")
+                ).orEmpty(),
+            gatewayVersion = (
+                firstString(status, "gateway_version", "api_version")
+                    ?: firstString(gateway, "version", "api_version")
+                ).orEmpty(),
+            capabilities = capabilities,
+        )
+    }
+
+    fun checkAgentUpdate(force: Boolean = false): AgentUpdateInfo {
+        val root = JSONObject(
+            request(
+                "GET",
+                "/api/hermes/update/check?force=${if (force) "true" else "false"}",
+                includeProfile = false,
+            ),
+        )
+        val commits = buildList {
+            val array = root.optJSONArray("commits") ?: JSONArray()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                add(
+                    AgentUpdateCommit(
+                        sha = firstString(item, "sha", "hash").orEmpty(),
+                        summary = firstString(item, "summary", "message", "title").orEmpty(),
+                        author = firstString(item, "author").orEmpty(),
+                        at = firstString(item, "at", "date", "timestamp").orEmpty(),
+                    ),
+                )
+            }
+        }
+        return AgentUpdateInfo(
+            currentVersion = firstString(root, "current_version", "version").orEmpty(),
+            installMethod = firstString(root, "install_method").orEmpty(),
+            behind = root.takeIf { it.has("behind") && !it.isNull("behind") }?.optInt("behind"),
+            updateAvailable = root.optBoolean("update_available"),
+            canApply = root.optBoolean("can_apply"),
+            updateCommand = firstString(root, "update_command").orEmpty(),
+            message = firstString(root, "message", "error").orEmpty(),
+            commits = commits,
+        )
+    }
+
+    fun startAgentUpdate(): AgentUpdateProgress {
+        val root = JSONObject(request("POST", "/api/hermes/update", "{}", includeProfile = false))
+        if (!root.optBoolean("ok", false)) {
+            throw ApiException(400, firstString(root, "message", "error") ?: "服务器未能启动 Hermes 更新")
+        }
+        return AgentUpdateProgress(
+            started = true,
+            running = true,
+            lines = firstString(root, "message").orEmpty(),
+        )
+    }
+
+    fun agentUpdateStatus(lines: Int = 80): AgentUpdateProgress {
+        val root = JSONObject(
+            request(
+                "GET",
+                "/api/actions/hermes-update/status?lines=${lines.coerceIn(20, 300)}",
+                includeProfile = false,
+            ),
+        )
+        val output = when (val value = root.opt("lines")) {
+            is JSONArray -> buildList {
+                for (index in 0 until value.length()) add(value.optString(index))
+            }.joinToString("\n")
+            else -> value?.toString().orEmpty()
+        }
+        return AgentUpdateProgress(
+            started = true,
+            running = root.optBoolean("running"),
+            exitCode = root.takeIf { it.has("exit_code") && !it.isNull("exit_code") }?.optInt("exit_code"),
+            lines = output,
+        )
+    }
+
+    fun transcribeAudio(bytes: ByteArray, mimeType: String): SpeechTranscription {
+        val encoded = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        val body = JSONObject()
+            .put("data_url", "data:$mimeType;base64,$encoded")
+            .put("mime_type", mimeType)
+        val root = JSONObject(request("POST", "/api/audio/transcribe", body.toString()))
+        if (!root.optBoolean("ok", true)) {
+            throw ApiException(400, firstString(root, "message", "error") ?: "Hermes 语音识别失败")
+        }
+        val transcript = firstString(root, "transcript", "text").orEmpty().trim()
+        if (transcript.isBlank()) throw ApiException(400, "Hermes 没有识别到语音内容")
+        return SpeechTranscription(transcript, firstString(root, "provider").orEmpty())
+    }
+
+    fun synthesizeSpeech(text: String): SpeechAudio {
+        val root = JSONObject(
+            request("POST", "/api/audio/speak", JSONObject().put("text", text.take(8_000)).toString()),
+        )
+        if (!root.optBoolean("ok", true)) {
+            throw ApiException(400, firstString(root, "message", "error") ?: "Hermes 语音合成失败")
+        }
+        val dataUrl = firstString(root, "data_url")
+            ?: throw ApiException(500, "Hermes 没有返回语音数据")
+        val mimeType = firstString(root, "mime_type")
+            ?: dataUrl.substringAfter("data:", "audio/mpeg").substringBefore(';')
+        val encoded = dataUrl.substringAfter(',', "")
+        if (encoded.isBlank()) throw ApiException(500, "Hermes 返回了无效的语音数据")
+        return SpeechAudio(
+            bytes = Base64.decode(encoded, Base64.DEFAULT),
+            mimeType = mimeType,
+            provider = firstString(root, "provider").orEmpty(),
+        )
+    }
+
     fun login(username: String, password: String): String {
         checkGatewayStatus()
         val providers = JSONObject(request("GET", "/api/auth/providers"))
@@ -148,7 +338,7 @@ class HermesApiClient(
     }
 
     fun listSessions(): SessionPage {
-        val raw = request("GET", "/api/sessions?limit=100&offset=0&include_children=false&order=recent")
+        val raw = request("GET", "/api/sessions?limit=60&offset=0&include_children=false&order=recent")
         val root = JSONTokener(raw).nextValue()
         val array = findArray(root, "sessions", "items", "data") ?: JSONArray()
         val sessions = buildList {
@@ -187,10 +377,25 @@ class HermesApiClient(
         )
     }
 
-    fun loadMessages(session: HermesSession): List<ChatMessage> {
-        val pageSize = 200
+    fun loadMessages(session: HermesSession, pageSize: Int = 60): List<ChatMessage> =
+        loadRecentMessagePage(session, pageSize).messages
+
+    fun loadRecentMessagePage(session: HermesSession, pageSize: Int = 60): MessagePage {
         val offset = (session.messageCount - pageSize).coerceAtLeast(0)
-        return loadMessagePage(session.id, pageSize, offset)
+        return MessagePage(
+            messages = loadMessagePage(session.id, pageSize, offset),
+            offset = offset,
+            totalCount = session.messageCount,
+        )
+    }
+
+    fun loadMessagePage(session: HermesSession, pageSize: Int, offset: Int): MessagePage {
+        val safeOffset = offset.coerceAtLeast(0)
+        return MessagePage(
+            messages = loadMessagePage(session.id, pageSize, safeOffset),
+            offset = safeOffset,
+            totalCount = session.messageCount,
+        )
     }
 
     fun loadLatestMessages(session: HermesSession): List<ChatMessage> {
@@ -450,6 +655,30 @@ class HermesApiClient(
             .put("threshold", value.compressionThreshold.coerceIn(0.10, 0.95))
             .put("target_ratio", value.compressionTargetRatio.coerceIn(0.05, 0.80))
             .put("protect_last_n", value.protectLastMessages.coerceAtLeast(1))
+    }
+
+    fun saveVoiceSettings(value: ServerVoiceSettings): ServerSettings = updateConfig { config ->
+        val stt = config.ensureObject("stt")
+            .put("enabled", value.stt.enabled)
+            .put("provider", value.stt.provider)
+        val sttProvider = stt.ensureObject(value.stt.provider)
+        if (value.stt.model.isNotBlank()) sttProvider.put("model", value.stt.model) else sttProvider.remove("model")
+        sttProvider.put("language", value.stt.language)
+
+        val tts = config.ensureObject("tts").put("provider", value.tts.provider)
+        val ttsProvider = tts.ensureObject(value.tts.provider)
+        if (value.tts.model.isNotBlank()) {
+            ttsProvider.put(if (value.tts.provider == "elevenlabs") "model_id" else "model", value.tts.model)
+        } else {
+            ttsProvider.remove("model")
+            ttsProvider.remove("model_id")
+        }
+        if (value.tts.voice.isNotBlank()) {
+            ttsProvider.put(if (value.tts.provider == "elevenlabs") "voice_id" else "voice", value.tts.voice)
+        } else {
+            ttsProvider.remove("voice")
+            ttsProvider.remove("voice_id")
+        }
     }
 
     fun addCustomProvider(
@@ -749,8 +978,35 @@ class HermesApiClient(
             name = firstString(root, "name") ?: path.substringAfterLast('/'),
             path = firstString(root, "path") ?: path,
             mimeType = firstString(root, "mime_type") ?: "text/markdown",
-            content = bytes.toString(Charsets.UTF_8),
+            content = if (isTextDocument(path, firstString(root, "mime_type").orEmpty())) {
+                bytes.toString(Charsets.UTF_8)
+            } else {
+                ""
+            },
+            bytes = bytes,
         )
+    }
+
+    fun readProfileFile(file: HermesProfileFile): WorkspaceDocument {
+        val profile = currentProfile().trim().ifBlank { "default" }
+        if (!PROFILE_NAME_PATTERN.matches(profile)) {
+            throw ApiException(400, "当前 Hermes Profile 名称无法用于读取文件")
+        }
+        val filesRoot = listWorkspace(null).path
+        val candidates = hermesProfileFileCandidates(filesRoot, profile, file)
+        var lastFailure: Throwable? = null
+        candidates.forEach { path ->
+            runCatching { readWorkspaceDocument(path) }
+                .onSuccess { return it }
+                .onFailure { lastFailure = it }
+        }
+        val hint = if (file == HermesProfileFile.MEMORY) {
+            "当前 Profile 可能还没有生成 MEMORY.md；让 Hermes 记录一条记忆后再试"
+        } else {
+            "请确认当前 Profile 已创建 SOUL.md"
+        }
+        val status = (lastFailure as? ApiException)?.statusCode ?: 404
+        throw ApiException(status, "无法读取 ${file.fileName}。$hint")
     }
 
     fun saveWorkspaceDocument(path: String, content: String): WorkspaceDocument {
@@ -766,6 +1022,7 @@ class HermesApiClient(
             path = path,
             mimeType = "text/markdown",
             content = content,
+            bytes = content.toByteArray(Charsets.UTF_8),
         )
     }
 
@@ -886,6 +1143,7 @@ class HermesApiClient(
                     .put("session_id", runtimeId)
                     .put("text", text),
             )
+            onEvent(StreamEvent.RunStarted(runtimeId))
             if (!controller.awaitCompletion()) {
                 throw ApiException(408, "等待 Hermes 回复超时")
             }
@@ -898,6 +1156,33 @@ class HermesApiClient(
         runCatching {
             rpcObject("session.interrupt", JSONObject().put("session_id", runtimeSessionId))
         }
+    }
+
+    fun steerSession(runtimeSessionId: String, text: String): String {
+        val result = rpcObject(
+            "session.steer",
+            JSONObject()
+                .put("session_id", runtimeSessionId)
+                .put("text", text.trim()),
+        )
+        return firstString(result, "status").orEmpty().ifBlank { "queued" }
+    }
+
+    fun respondAgentRequest(request: AgentRequest, answer: String) {
+        val params = when (request.type) {
+            AgentRequestType.APPROVAL -> JSONObject()
+                .put("session_id", request.runtimeSessionId)
+                .put("request_id", request.requestId)
+                .put("choice", answer)
+
+            AgentRequestType.CLARIFICATION -> JSONObject()
+                .put("request_id", request.requestId)
+                .put("answer", answer)
+        }
+        rpcObject(
+            if (request.type == AgentRequestType.APPROVAL) "approval.respond" else "clarify.respond",
+            params,
+        )
     }
 
     fun reconnectGateway() {
@@ -913,7 +1198,7 @@ class HermesApiClient(
         http.connectionPool.evictAll()
     }
 
-    private fun checkGatewayStatus() {
+    private fun checkGatewayStatus(): JSONObject {
         val status = JSONObject(request("GET", "/api/status"))
         if (!status.optBoolean("auth_required", false)) {
             throw ApiException(400, "该地址不是已启用登录的 Hermes 远程网关")
@@ -922,6 +1207,7 @@ class HermesApiClient(
         if (advertised != null && (0 until advertised.length()).none { advertised.optString(it) == "basic" }) {
             throw ApiException(400, "该网关没有启用 Hermes 用户名密码登录")
         }
+        return status
     }
 
     private fun authenticatedUsername(): String {
@@ -1213,9 +1499,9 @@ class HermesApiClient(
             return
         }
         val stream = activeStream ?: return
-        val sessionId = params.optString("session_id")
-        if (sessionId.isNotBlank() && sessionId != stream.sessionId) return
-        val payload = params.optJSONObject("payload") ?: JSONObject()
+        val payload = params.optJSONObject("payload") ?: params
+        val sessionId = firstString(params, "session_id") ?: firstString(payload, "session_id")
+        if (!sessionId.isNullOrBlank() && sessionId != stream.sessionId) return
         when (type) {
             "message.delta" -> payload.optString("text").takeIf { it.isNotEmpty() }
                 ?.let { stream.onEvent(StreamEvent.AssistantDelta(it)) }
@@ -1225,7 +1511,7 @@ class HermesApiClient(
 
             "message.complete" -> {
                 val status = payload.optString("status")
-                if (status == "error") {
+                if (status in setOf("error", "failed", "failure")) {
                     stream.onEvent(StreamEvent.Error(firstString(payload, "error", "text") ?: "Hermes 运行失败"))
                 } else {
                     stream.onEvent(StreamEvent.AssistantCompleted(payload.optString("text")))
@@ -1250,11 +1536,80 @@ class HermesApiClient(
                 ),
             )
 
+            "tool.progress" -> stream.onEvent(
+                StreamEvent.ToolProgress(
+                    name = firstString(payload, "name", "tool_name") ?: "正在使用工具",
+                    preview = firstString(payload, "message", "summary", "context", "preview").orEmpty(),
+                ),
+            )
+
+            "tool.error", "tool.failed", "tool.failure" -> stream.onEvent(
+                StreamEvent.ToolFailed(
+                    name = firstString(payload, "name", "tool_name") ?: "工具",
+                    preview = firstString(payload, "message", "error", "summary", "context").orEmpty(),
+                ),
+            )
+
+            "approval.request" -> stream.onEvent(
+                StreamEvent.AgentRequestPending(parseAgentRequest(payload, stream.sessionId, AgentRequestType.APPROVAL)),
+            )
+
+            "clarify.request" -> stream.onEvent(
+                StreamEvent.AgentRequestPending(parseAgentRequest(payload, stream.sessionId, AgentRequestType.CLARIFICATION)),
+            )
+
+            "approval.expire", "approval.expired", "clarify.expire", "clarify.expired" -> {
+                firstString(payload, "request_id", "id")
+                    ?.let { stream.onEvent(StreamEvent.AgentRequestExpired(it)) }
+            }
+
             "error" -> {
                 stream.onEvent(StreamEvent.Error(firstString(payload, "message", "error") ?: "Hermes 运行失败"))
                 stream.controller.finish()
             }
         }
+    }
+
+    private fun parseAgentRequest(
+        payload: JSONObject,
+        fallbackSessionId: String,
+        type: AgentRequestType,
+    ): AgentRequest {
+        val item = payload.optJSONObject("request") ?: payload
+        val choices = item.optJSONArray("choices") ?: item.optJSONArray("options")
+        val parsedChoices = buildList {
+            if (choices != null) {
+                for (index in 0 until choices.length()) {
+                    when (val choice = choices.opt(index)) {
+                        is JSONObject -> {
+                            val label = firstString(choice, "label", "text", "title", "value") ?: continue
+                            add(AgentRequestChoice(label, firstString(choice, "value", "answer", "id") ?: label))
+                        }
+                        is String -> choice.takeIf(String::isNotBlank)?.let { add(AgentRequestChoice(it)) }
+                    }
+                }
+            }
+        }
+        val requestId = firstString(item, "request_id", "id")
+            ?: firstString(payload, "request_id", "id")
+            ?: UUID.randomUUID().toString()
+        val title = if (type == AgentRequestType.APPROVAL) {
+            firstString(item, "title", "command", "tool_name", "action") ?: "需要确认操作"
+        } else {
+            firstString(item, "question", "title", "prompt") ?: "Hermes 需要补充信息"
+        }
+        return AgentRequest(
+            requestId = requestId,
+            runtimeSessionId = firstString(item, "session_id")
+                ?: firstString(payload, "session_id")
+                ?: fallbackSessionId,
+            type = type,
+            title = title,
+            detail = firstString(item, "detail", "description", "reason", "message", "context").orEmpty(),
+            choices = parsedChoices,
+            allowSession = !item.has("allow_session") || item.optBoolean("allow_session"),
+            allowPermanent = item.optBoolean("allow_permanent") || item.optBoolean("allow_always"),
+        )
     }
 
     private fun handleSocketClosed(message: String) {
@@ -1479,6 +1834,7 @@ class HermesApiClient(
                 compressionTargetRatio = compression.optDouble("target_ratio", 0.20),
                 protectLastMessages = compression.optInt("protect_last_n", 20),
             ),
+            voice = parseServerVoiceSettings(config),
         )
     }
 
@@ -1588,7 +1944,7 @@ class HermesApiClient(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val USER_AGENT = "Hermes-Android/0.6.5.11"
+        const val USER_AGENT = "Hermes-Android/3.0.0"
         val AUXILIARY_TASK_KEYS = listOf(
             "vision",
             "web_extract",
@@ -1646,6 +2002,47 @@ internal fun webSocketFailureMessage(statusCode: Int?): String = when (statusCod
 }
 
 class ApiException(val statusCode: Int, override val message: String) : Exception(message)
+
+private val PROFILE_NAME_PATTERN = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
+
+internal fun hermesProfileFileCandidates(
+    filesRoot: String,
+    profile: String,
+    file: HermesProfileFile,
+): List<String> {
+    val cleanRoot = filesRoot.trim().trimEnd('/').ifBlank { "/" }
+    val hermesRoots = linkedSetOf<String>()
+    if (profile != "default" && cleanRoot.endsWith("/profiles/$profile")) {
+        return listOf(joinRemotePath(cleanRoot, when (file) {
+            HermesProfileFile.MEMORY -> "memories/MEMORY.md"
+            HermesProfileFile.SOUL -> "SOUL.md"
+        }))
+    }
+    if (cleanRoot.endsWith("/.hermes") || cleanRoot == ".hermes") {
+        hermesRoots += cleanRoot
+    } else {
+        hermesRoots += joinRemotePath(cleanRoot, ".hermes")
+        // Hosted/Docker deployments may expose HERMES_HOME itself as the managed root.
+        hermesRoots += cleanRoot
+    }
+    val relativePath = when (file) {
+        HermesProfileFile.MEMORY -> "memories/MEMORY.md"
+        HermesProfileFile.SOUL -> "SOUL.md"
+    }
+    return hermesRoots.map { hermesRoot ->
+        val profileRoot = if (profile == "default") {
+            hermesRoot
+        } else {
+            joinRemotePath(hermesRoot, "profiles/$profile")
+        }
+        joinRemotePath(profileRoot, relativePath)
+    }.distinct()
+}
+
+private fun joinRemotePath(root: String, child: String): String = when {
+    root == "/" -> "/${child.trimStart('/')}"
+    else -> "${root.trimEnd('/')}/${child.trimStart('/')}"
+}
 
 internal fun appendProfileQuery(path: String, profile: String): String {
     if (profile.isBlank() || Regex("(?:[?&])profile=").containsMatchIn(path)) return path
@@ -1715,6 +2112,19 @@ internal fun parseHermesProfiles(raw: String): List<HermesProfile> {
 private fun JSONObject.profileText(key: String): String = profileTextValue(opt(key))
 
 internal fun profileTextValue(value: Any?): String = (value as? String)?.trim().orEmpty()
+
+private fun isTextDocument(path: String, mimeType: String): Boolean {
+    if (mimeType.startsWith("text/", ignoreCase = true)) return true
+    if (mimeType.substringBefore(';').lowercase() in setOf(
+            "application/json", "application/xml", "application/javascript",
+            "application/x-yaml", "application/yaml",
+        )
+    ) return true
+    return path.substringAfterLast('.', "").lowercase() in setOf(
+        "md", "markdown", "txt", "csv", "tsv", "json", "xml", "yaml", "yml", "log",
+        "kt", "java", "py", "js", "ts", "html", "htm", "css", "sh", "sql",
+    )
+}
 
 private fun String.profileStringField(key: String): String? {
     val escapedKey = Regex.escape(key)

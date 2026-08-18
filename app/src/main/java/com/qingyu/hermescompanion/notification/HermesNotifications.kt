@@ -27,6 +27,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 object HermesNotifications {
     const val ACTION_POLL_CRON = "com.qingyu.hermescompanion.POLL_CRON"
+    const val EXTRA_PROFILE = "hermes_profile"
+    const val EXTRA_SESSION_ID = "hermes_session_id"
+    const val EXTRA_ROUTE = "hermes_route"
     private const val MESSAGE_CHANNEL = "hermes_messages"
     private const val TASK_CHANNEL = "hermes_tasks"
     private val nextId = AtomicInteger(2000)
@@ -40,18 +43,54 @@ object HermesNotifications {
         manager.createNotificationChannel(channel(TASK_CHANNEL, "Hermes 任务", "定时任务完成、失败与异常", preferences))
     }
 
-    fun showMessage(context: Context, title: String, body: String) {
+    fun showMessage(
+        context: Context,
+        title: String,
+        body: String,
+        profile: String? = null,
+        sessionId: String? = null,
+        route: String = "sessions",
+    ) {
         val preferences = SecureConfigStore(context).readNotificationPreferences()
         if (!preferences.enabled || !preferences.messageAlerts || !canNotify(context)) return
         ensureChannels(context, preferences)
-        notify(context, MESSAGE_CHANNEL, title, body, preferences)
+        notify(context, MESSAGE_CHANNEL, title, body, preferences, profile, sessionId, route)
     }
 
-    fun showTask(context: Context, title: String, body: String) {
+    fun showTask(
+        context: Context,
+        title: String,
+        body: String,
+        profile: String? = null,
+        route: String = "tasks",
+    ) {
         val preferences = SecureConfigStore(context).readNotificationPreferences()
         if (!preferences.enabled || !preferences.taskAlerts || !canNotify(context)) return
         ensureChannels(context, preferences)
-        notify(context, TASK_CHANNEL, title, body, preferences)
+        notify(context, TASK_CHANNEL, title, body, preferences, profile, null, route)
+    }
+
+    fun showAgentRequest(
+        context: Context,
+        title: String,
+        body: String,
+        profile: String? = null,
+        sessionId: String? = null,
+    ) {
+        val preferences = SecureConfigStore(context).readNotificationPreferences()
+        if (!preferences.enabled || !preferences.taskAlerts || !canNotify(context)) return
+        ensureChannels(context, preferences)
+        notify(
+            context,
+            TASK_CHANNEL,
+            title,
+            body,
+            preferences,
+            profile,
+            sessionId,
+            route = "tasks",
+            includeRequestActions = true,
+        )
     }
 
     fun scheduleCronPolling(context: Context, enabled: Boolean) {
@@ -101,14 +140,34 @@ object HermesNotifications {
         title: String,
         body: String,
         preferences: NotificationPreferences,
+        profile: String?,
+        sessionId: String?,
+        route: String,
+        includeRequestActions: Boolean = false,
     ) {
+        if (!canNotify(context)) return
+        val notificationId = nextId.incrementAndGet()
+        val deepLink = Uri.Builder()
+            .scheme("hermes-companion")
+            .authority("open")
+            .appendPath(route)
+            .apply {
+                profile?.takeIf(String::isNotBlank)?.let { appendQueryParameter("profile", it) }
+                sessionId?.takeIf(String::isNotBlank)?.let { appendQueryParameter("session", it) }
+            }
+            .build()
         val openApp = PendingIntent.getActivity(
             context,
-            0,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            notificationId,
+            Intent(context, MainActivity::class.java)
+                .setData(deepLink)
+                .putExtra(EXTRA_PROFILE, profile)
+                .putExtra(EXTRA_SESSION_ID, sessionId)
+                .putExtra(EXTRA_ROUTE, route)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, channel)
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_hermes)
             .setContentTitle(title)
             .setContentText(body)
@@ -118,8 +177,30 @@ object HermesNotifications {
             .setContentIntent(openApp)
             .setNumber(if (preferences.badge) 1 else 0)
             .setVibrate(if (preferences.vibration) longArrayOf(0, 180, 90, 180) else longArrayOf(0))
-            .build()
-        NotificationManagerCompat.from(context).notify(nextId.incrementAndGet(), notification)
+        if (includeRequestActions) {
+            builder.addAction(R.drawable.ic_stat_hermes, "去处理", openApp)
+            if (!sessionId.isNullOrBlank()) {
+                val chatLink = deepLink.buildUpon().path("chat").build()
+                val openChat = PendingIntent.getActivity(
+                    context,
+                    notificationId + 100_000,
+                    Intent(context, MainActivity::class.java)
+                        .setData(chatLink)
+                        .putExtra(EXTRA_PROFILE, profile)
+                        .putExtra(EXTRA_SESSION_ID, sessionId)
+                        .putExtra(EXTRA_ROUTE, "chat")
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                builder.addAction(R.drawable.ic_stat_hermes, "打开会话", openChat)
+            }
+        }
+        val notification = builder.build()
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (_: SecurityException) {
+            // Permission may be revoked between the check above and notify().
+        }
     }
 
     private fun pollingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
@@ -152,6 +233,8 @@ class CronNotificationReceiver : BroadcastReceiver() {
                 if (!cookies.hasCookies()) return@execute
                 val client = HermesApiClient(config, cookies)
                 try {
+                    val profile = store.readActiveHermesProfile()
+                    client.setProfile(profile)
                     val jobs = client.listCronJobs()
                     val previous = store.readCronSnapshot()
                     val current = jobs.associate { job -> job.id to "${job.lastRunAt}|${job.lastStatus}" }
@@ -164,6 +247,7 @@ class CronNotificationReceiver : BroadcastReceiver() {
                                     appContext,
                                     if (status.contains("fail", true) || status.contains("error", true)) "定时任务执行失败" else "定时任务已完成",
                                     "${job.name} · ${status.ifBlank { "已更新" }}",
+                                    profile = profile,
                                 )
                             }
                         }

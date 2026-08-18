@@ -20,6 +20,11 @@ class StreamRecoveryTest {
     }
 
     @Test
+    fun voiceConversationDoesNotNotifyWhileOpen() {
+        assertFalse(replyNeedsAttention(AppRoute.VOICE_CHAT, "session-1", "session-1", appInForeground = true))
+    }
+
+    @Test
     fun replyNeedsAttentionWhenAppIsInBackground() {
         assertTrue(replyNeedsAttention(AppRoute.CHAT, "session-1", "session-1", appInForeground = false))
     }

@@ -1,5 +1,6 @@
 package com.qingyu.hermescompanion.data
 
+import com.qingyu.hermescompanion.model.HermesProfileFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -75,4 +76,54 @@ class HermesApiClientTest {
         assertEquals("", profileTextValue(false))
         assertEquals("研究环境", profileTextValue(" 研究环境 "))
     }
+
+    @Test
+    fun resolvesNamedProfileMemoryAndSoulFilesFromUserHome() {
+        assertEquals(
+            listOf(
+                "/root/.hermes/profiles/work/memories/MEMORY.md",
+                "/root/profiles/work/memories/MEMORY.md",
+            ),
+            hermesProfileFileCandidates("/root", "work", HermesProfileFile.MEMORY),
+        )
+        assertEquals(
+            listOf(
+                "/root/.hermes/profiles/work/SOUL.md",
+                "/root/profiles/work/SOUL.md",
+            ),
+            hermesProfileFileCandidates("/root", "work", HermesProfileFile.SOUL),
+        )
+    }
+
+    @Test
+    fun resolvesDefaultProfileDirectlyUnderHermesHome() {
+        assertEquals(
+            listOf("/root/.hermes/SOUL.md"),
+            hermesProfileFileCandidates("/root/.hermes", "default", HermesProfileFile.SOUL),
+        )
+        assertEquals(
+            listOf("/root/.hermes/memories/MEMORY.md"),
+            hermesProfileFileCandidates("/root/.hermes/", "default", HermesProfileFile.MEMORY),
+        )
+    }
+
+    @Test
+    fun supportsHostedRootThatIsHermesHome() {
+        assertEquals(
+            listOf(
+                "/opt/data/.hermes/profiles/personal/SOUL.md",
+                "/opt/data/profiles/personal/SOUL.md",
+            ),
+            hermesProfileFileCandidates("/opt/data", "personal", HermesProfileFile.SOUL),
+        )
+        assertEquals(
+            listOf("/opt/data/profiles/personal/memories/MEMORY.md"),
+            hermesProfileFileCandidates(
+                "/opt/data/profiles/personal",
+                "personal",
+                HermesProfileFile.MEMORY,
+            ),
+        )
+    }
+
 }

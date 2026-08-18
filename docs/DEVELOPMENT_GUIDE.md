@@ -6,8 +6,8 @@ Hermes Android 是连接个人自部署 Hermes Gateway 的原生 Android 客户�
 
 当前交付基线：
 
-- 版本：`1.0-debug`
-- `versionCode`：`100`
+- 版本：`3.0.0-release`（Debug 构建会追加 `-debug`）
+- `versionCode`：`300`
 - Debug applicationId：`com.qingyu.hermescompanion.debug`
 - namespace：`com.qingyu.hermescompanion`
 - minSdk：26
@@ -32,7 +32,7 @@ Hermes Android 是连接个人自部署 Hermes Gateway 的原生 Android 客户�
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Debug 包启用 R8、关闭资源裁剪。本机存在 `signing/hermes-debug.keystore` 时使用固定测试签名，以维持历史 Debug 版本的覆盖安装兼容性；公开仓库不包含该私钥，缺少时会自动使用 Android 默认 Debug 签名。
+Debug 包启用 R8、关闭资源裁剪，并使用工程内固定开发签名，目的是维持单 DEX 与历史 Debug 版本的覆盖安装兼容性。不要随意更换 `signing/hermes-debug.keystore`，否则已安装设备无法直接覆盖升级。
 
 Release 构建当前没有配置正式发布签名。准备公开分发前必须另行创建并离线保存正式密钥，不应把正式密钥和密码提交到源码。
 
@@ -62,7 +62,7 @@ app/src/main/java/com/qingyu/hermescompanion/
 - `app/src/main/res/`：图标、默认头像、启动主题、颜色与系统资源。
 - `tools/`：图标生成和 APK 辅助脚本。
 - `docs/`：产品、界面、图标、网关和交接文档。
-- `signing/`：可选的本机固定 Debug 签名目录，私钥文件已被 Git 忽略，不进入公开仓库。
+- `signing/`：仅用于开发覆盖安装的固定 Debug 签名。
 
 ## 4. 应用架构
 
@@ -138,8 +138,8 @@ Screen 用户操作
 
 ## 6. UI 与资源约束
 
-- 两套皮肤共享同一信息结构：清爽办公、圆润卡片。
-- 圆润卡片使用不透明实体表面，不再使用降低可读性的半透明毛玻璃弹层。
+- 两套皮肤共享同一信息结构：清爽办公、液态玻璃。
+- 液态玻璃使用可降级的半透明表面；所有文字必须达到与清爽办公相同的可读性，长列表和正文仍保持平铺。
 - 所有业务图标通过 `HermesIconKind` 和 `HermesMulticolorIcon` 使用 Hermes Light 资源。
 - 返回箭头使用中性灰单色；不要重新引入灰蓝拼色或 Material 默认图标。
 - 深色模式必须使用语义色和 `values-night` 资源，禁止硬编码浅色文字/分割线颜色。

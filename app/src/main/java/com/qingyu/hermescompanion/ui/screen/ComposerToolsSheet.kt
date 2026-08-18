@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,25 +39,20 @@ fun ComposerToolsSheet(
     onInsertPrompt: (String) -> Unit,
 ) {
     val skin = HermesSkin.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         shape = RoundedCornerShape(
             topStart = if (skin.glass) 24.dp else 16.dp,
             topEnd = if (skin.glass) 24.dp else 16.dp,
         ),
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
         tonalElevation = 0.dp,
-        dragHandle = {
-            HermesMulticolorIcon(
-                HermesIconKind.DRAG_HANDLE,
-                contentDescription = null,
-                modifier = Modifier.padding(top = 8.dp, bottom = 3.dp),
-                iconSize = 30.dp,
-            )
-        },
+        dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 28.dp)) {
-            Text("添加到对话", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("添加到对话", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text("选择资料或快速组织提示词", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),

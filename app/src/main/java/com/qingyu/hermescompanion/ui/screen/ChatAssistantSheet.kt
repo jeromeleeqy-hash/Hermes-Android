@@ -18,11 +18,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +44,7 @@ import com.qingyu.hermescompanion.model.ChatArtifact
 import com.qingyu.hermescompanion.model.ModelProvider
 import com.qingyu.hermescompanion.model.TodoStatus
 import com.qingyu.hermescompanion.ui.AppUiState
+import com.qingyu.hermescompanion.ui.CouncilMode
 import com.qingyu.hermescompanion.ui.component.HermesIconKind
 import com.qingyu.hermescompanion.ui.component.HermesMark
 import com.qingyu.hermescompanion.ui.component.HermesMulticolorIcon
@@ -59,30 +62,26 @@ fun ChatAssistantSheet(
     onLoadModels: () -> Unit,
     onSwitchModel: (String, String) -> Unit,
     onOpenArtifact: (ChatArtifact) -> Unit,
+    onOpenCouncil: () -> Unit,
 ) {
     val skin = HermesSkin.current
     var page by remember { mutableStateOf(AssistantPage.HOME) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
+        sheetState = sheetState,
         shape = RoundedCornerShape(
             topStart = if (skin.glass) 24.dp else 16.dp,
             topEnd = if (skin.glass) 24.dp else 16.dp,
         ),
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
         tonalElevation = 0.dp,
-        dragHandle = {
-            HermesMulticolorIcon(
-                HermesIconKind.DRAG_HANDLE,
-                contentDescription = null,
-                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
-                iconSize = 30.dp,
-            )
-        },
+        dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
         when (page) {
             AssistantPage.HOME -> AssistantHome(
                 state = state,
+                onOpenCouncil = onOpenCouncil,
                 onNavigate = { next ->
                     page = next
                     if (next == AssistantPage.MODELS) onLoadModels()
@@ -105,7 +104,11 @@ fun ChatAssistantSheet(
 }
 
 @Composable
-private fun AssistantHome(state: AppUiState, onNavigate: (AssistantPage) -> Unit) {
+private fun AssistantHome(
+    state: AppUiState,
+    onOpenCouncil: () -> Unit,
+    onNavigate: (AssistantPage) -> Unit,
+) {
     val hermesName = state.userProfile.hermesDisplayName.ifBlank { "Hermes" }
     val model = state.selectedSession?.model.orEmpty()
         .ifBlank { state.modelCatalog.currentModel }
@@ -123,7 +126,7 @@ private fun AssistantHome(state: AppUiState, onNavigate: (AssistantPage) -> Unit
                 HermesMark()
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text("$hermesName 助理面板", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("$hermesName 助理面板", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text("管理当前对话，不改变其他会话", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -134,6 +137,17 @@ private fun AssistantHome(state: AppUiState, onNavigate: (AssistantPage) -> Unit
             subtitle = model.substringAfterLast('/'),
             background = MaterialTheme.colorScheme.primaryContainer,
             onClick = { onNavigate(AssistantPage.MODELS) },
+        )
+        AssistantEntry(
+            icon = HermesIconKind.COUNCIL,
+            title = "专家会审",
+            subtitle = when (state.councilMode) {
+                CouncilMode.DEEP -> "深度会审 · 已开启"
+                CouncilMode.QUICK -> "快速 MoA · 已开启"
+                CouncilMode.OFF -> "为下一条消息选择会审方式"
+            },
+            background = HermesColors.extended.purpleContainer,
+            onClick = onOpenCouncil,
         )
         AssistantEntry(
             icon = HermesIconKind.ARTIFACT,
@@ -184,7 +198,7 @@ private fun SheetHeader(title: String, subtitle: String, onBack: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回") }
         Column(modifier = Modifier.padding(start = 2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

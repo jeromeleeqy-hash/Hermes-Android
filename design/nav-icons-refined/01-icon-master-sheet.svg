@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="24" flood-color="#283145" flood-opacity="0.10"/>
+    </filter>
+    <symbol id="chat-outline" viewBox="0 0 256 256"><path d="M232.07,186.76a80,80,0,0,0-62.5-114.17A80,80,0,1,0,23.93,138.76l-7.27,24.71a16,16,0,0,0,19.87,19.87l24.71-7.27a80.39,80.39,0,0,0,25.18,7.35,80,80,0,0,0,108.34,40.65l24.71,7.27a16,16,0,0,0,19.87-19.86ZM62,159.5a8.28,8.28,0,0,0-2.26.32L32,168l8.17-27.76a8,8,0,0,0-.63-6,64,64,0,1,1,26.26,26.26A8,8,0,0,0,62,159.5Zm153.79,28.73L224,216l-27.76-8.17a8,8,0,0,0-6,.63,64.05,64.05,0,0,1-85.87-24.88A79.93,79.93,0,0,0,174.7,89.71a64,64,0,0,1,41.75,92.48A8,8,0,0,0,215.82,188.23Z"/></symbol>
+    <symbol id="chat-fill" viewBox="0 0 256 256"><path d="M232.07,186.76a80,80,0,0,0-62.5-114.17A80,80,0,1,0,23.93,138.76l-7.27,24.71a16,16,0,0,0,19.87,19.87l24.71-7.27a80.39,80.39,0,0,0,25.18,7.35,80,80,0,0,0,108.34,40.65l24.71,7.27a16,16,0,0,0,19.87-19.86Zm-16.25,1.47L224,216l-27.76-8.17a8,8,0,0,0-6,.63,64.05,64.05,0,0,1-85.87-24.88A79.93,79.93,0,0,0,174.7,89.71a64,64,0,0,1,41.75,92.48A8,8,0,0,0,215.82,188.23Z"/></symbol>
+    <symbol id="space-outline" viewBox="0 0 256 256"><path d="M12,111l112,64a8,8,0,0,0,7.94,0l112-64a8,8,0,0,0,0-13.9l-112-64a8,8,0,0,0-7.94,0l-112,64A8,8,0,0,0,12,111ZM128,49.21,223.87,104,128,158.79,32.13,104ZM246.94,140A8,8,0,0,1,244,151L132,215a8,8,0,0,1-7.94,0L12,151A8,8,0,0,1,20,137.05l108,61.74,108-61.74A8,8,0,0,1,246.94,140Z"/></symbol>
+    <symbol id="space-fill" viewBox="0 0 256 256"><path d="M12,111l112,64a8,8,0,0,0,7.94,0l112-64a8,8,0,0,0,0-13.9l-112-64a8,8,0,0,0-7.94,0l-112,64A8,8,0,0,0,12,111Z"/><path d="M236,137.05,128,198.79,20,137.05A8,8,0,1,0,12,151l112,64a8,8,0,0,0,7.94,0l112-64a8,8,0,1,0-7.94-13.9Z"/></symbol>
+    <symbol id="tasks-outline" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128ZM128,72h88a8,8,0,0,0,0-16H128a8,8,0,0,0,0,16Zm88,112H128a8,8,0,0,0,0,16h88a8,8,0,0,0,0-16ZM82.34,42.34,56,68.69,45.66,58.34A8,8,0,0,0,34.34,69.66l16,16a8,8,0,0,0,11.32,0l32-32A8,8,0,0,0,82.34,42.34Zm0,64L56,132.69,45.66,122.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Zm0,64L56,196.69,45.66,186.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol>
+    <symbol id="tasks-fill" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM117.66,149.66l-32,32a8,8,0,0,1-11.32,0l-16-16a8,8,0,0,1,11.32-11.32L80,164.69l26.34-26.35a8,8,0,0,1,11.32,11.32Zm0-64-32,32a8,8,0,0,1-11.32,0l-16-16A8,8,0,0,1,69.66,90.34L80,100.69l26.34-26.35a8,8,0,0,1,11.32,11.32ZM192,168H144a8,8,0,0,1,0-16h48a8,8,0,0,1,0,16Zm0-64H144a8,8,0,0,1,0-16h48a8,8,0,0,1,0,16Z"/></symbol>
+    <symbol id="profile-outline" viewBox="0 0 256 256"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/></symbol>
+    <symbol id="profile-fill" viewBox="0 0 256 256"><path d="M230.93,220a8,8,0,0,1-6.93,4H32a8,8,0,0,1-6.92-12c15.23-26.33,38.7-45.21,66.09-54.16a72,72,0,1,1,73.66,0c27.39,8.95,50.86,27.83,66.09,54.16A8,8,0,0,1,230.93,220Z"/></symbol>
+  </defs>
+
+  <rect width="1600" height="1120" fill="#F5F7FB"/>
+  <text x="92" y="100" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="6" fill="#2A9FE8">HERMES MOBILE</text>
+  <text x="92" y="164" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="700" fill="#182033">Bottom navigation icon masters</text>
+  <text x="92" y="207" font-family="Inter, Arial, sans-serif" font-size="23" fill="#748096">Closed geometry · clean overlaps · optical 24 px sizing</text>
+
+  <g font-family="Inter, Arial, sans-serif">
+    <g transform="translate(72 274)">
+      <rect width="340" height="540" rx="42" fill="#FFFFFF" filter="url(#shadow)"/>
+      <text x="34" y="54" font-size="18" font-weight="700" letter-spacing="2" fill="#8691A5">01 · CHAT</text>
+      <rect x="34" y="84" width="272" height="174" rx="34" fill="#F6F8FC"/>
+      <use href="#chat-outline" x="100" y="111" width="140" height="140" fill="#657084"/>
+      <rect x="34" y="280" width="272" height="174" rx="34" fill="#E6F4FD"/>
+      <use href="#chat-fill" x="100" y="307" width="140" height="140" fill="#2A9FE8"/>
+      <text x="34" y="493" font-size="20" font-weight="700" fill="#273044">Rounded double bubble</text>
+      <text x="34" y="524" font-size="17" fill="#8A94A6">No open endpoints or collisions</text>
+    </g>
+
+    <g transform="translate(444 274)">
+      <rect width="340" height="540" rx="42" fill="#FFFFFF" filter="url(#shadow)"/>
+      <text x="34" y="54" font-size="18" font-weight="700" letter-spacing="2" fill="#8691A5">02 · SPACE</text>
+      <rect x="34" y="84" width="272" height="174" rx="34" fill="#F6F8FC"/>
+      <use href="#space-outline" x="100" y="111" width="140" height="140" fill="#657084"/>
+      <rect x="34" y="280" width="272" height="174" rx="34" fill="#E6F4FD"/>
+      <use href="#space-fill" x="100" y="307" width="140" height="140" fill="#2A9FE8"/>
+      <text x="34" y="493" font-size="20" font-weight="700" fill="#273044">Layered workspace</text>
+      <text x="34" y="524" font-size="17" fill="#8A94A6">Clear at 20 px and 24 px</text>
+    </g>
+
+    <g transform="translate(816 274)">
+      <rect width="340" height="540" rx="42" fill="#FFFFFF" filter="url(#shadow)"/>
+      <text x="34" y="54" font-size="18" font-weight="700" letter-spacing="2" fill="#8691A5">03 · TASKS</text>
+      <rect x="34" y="84" width="272" height="174" rx="34" fill="#F6F8FC"/>
+      <use href="#tasks-outline" x="100" y="111" width="140" height="140" fill="#657084"/>
+      <rect x="34" y="280" width="272" height="174" rx="34" fill="#E6F4FD"/>
+      <use href="#tasks-fill" x="100" y="307" width="140" height="140" fill="#2A9FE8"/>
+      <text x="34" y="493" font-size="20" font-weight="700" fill="#273044">Checklist → solid tile</text>
+      <text x="34" y="524" font-size="17" fill="#8A94A6">Selected state is unmistakable</text>
+    </g>
+
+    <g transform="translate(1188 274)">
+      <rect width="340" height="540" rx="42" fill="#FFFFFF" filter="url(#shadow)"/>
+      <text x="34" y="54" font-size="18" font-weight="700" letter-spacing="2" fill="#8691A5">04 · PROFILE</text>
+      <rect x="34" y="84" width="272" height="174" rx="34" fill="#F6F8FC"/>
+      <use href="#profile-outline" x="100" y="111" width="140" height="140" fill="#657084"/>
+      <rect x="34" y="280" width="272" height="174" rx="34" fill="#E6F4FD"/>
+      <use href="#profile-fill" x="100" y="307" width="140" height="140" fill="#2A9FE8"/>
+      <text x="34" y="493" font-size="20" font-weight="700" fill="#273044">Human, calm silhouette</text>
+      <text x="34" y="524" font-size="17" fill="#8A94A6">Balanced head and shoulders</text>
+    </g>
+  </g>
+
+  <g transform="translate(72 862)" font-family="Inter, Arial, sans-serif">
+    <rect width="1456" height="180" rx="44" fill="#FFFFFF" filter="url(#shadow)"/>
+    <text x="38" y="49" font-size="17" font-weight="700" letter-spacing="2" fill="#8691A5">ACTUAL-SIZE AUDIT</text>
+    <text x="38" y="91" font-size="19" fill="#273044">24 px navigation master</text>
+    <text x="38" y="125" font-size="17" fill="#8A94A6">Regular ≈ 1.5 px optical weight</text>
+    <g fill="#657084">
+      <use href="#chat-outline" x="432" y="69" width="24" height="24"/>
+      <use href="#space-outline" x="682" y="69" width="24" height="24"/>
+      <use href="#tasks-outline" x="932" y="69" width="24" height="24"/>
+      <use href="#profile-outline" x="1182" y="69" width="24" height="24"/>
+    </g>
+    <g font-size="17" fill="#657084" text-anchor="middle">
+      <text x="444" y="139">24 px</text>
+      <text x="694" y="139">24 px</text>
+      <text x="944" y="139">24 px</text>
+      <text x="1194" y="139">24 px</text>
+    </g>
+  </g>
+</svg>

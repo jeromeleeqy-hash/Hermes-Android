@@ -11,13 +11,14 @@ plugins {
 android {
     namespace = "com.qingyu.hermescompanion"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.qingyu.hermescompanion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0"
+        versionCode = 300
+        versionName = "3.0.0-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -38,9 +39,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            if (stableDebugKeystore.exists()) {
-                signingConfig = signingConfigs.getByName("stableDebug")
-            }
+            signingConfigs.findByName("stableDebug")?.let { signingConfig = it }
             // Keep the installable build in one DEX for compatibility with OEM runtimes.
             // Resource shrinking stays disabled while the new icon system is being verified.
             isMinifyEnabled = true
@@ -52,6 +51,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("stableDebug")?.let { signingConfig = it }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
