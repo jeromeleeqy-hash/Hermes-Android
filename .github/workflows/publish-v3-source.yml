@@ -1,0 +1,57 @@
+name: Publish Hermes v3 source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace repository with verified v3.0.0 source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          release_id="$(gh api "repos/${{ github.repository }}/releases" --paginate --jq '.[] | select(.draft == true and .tag_name == "v3.0.0-release") | .id' | head -n 1)"
+          test -n "$release_id"
+
+          asset_id="$(gh api "repos/${{ github.repository }}/releases/$release_id/assets" --jq '.[] | select(.name == "Hermes-3.0.0-github-source.zip") | .id' | head -n 1)"
+          test -n "$asset_id"
+
+          gh api --method GET -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$asset_id" > /tmp/hermes-v3-source.zip
+          mkdir -p /tmp/hermes-v3
+          unzip -q /tmp/hermes-v3-source.zip -d /tmp/hermes-v3
+
+          source_root="$(find /tmp/hermes-v3 -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$source_root"
+          test -f "$source_root/app/build.gradle.kts"
+          grep -q 'versionCode = 300' "$source_root/app/build.gradle.kts"
+          grep -q 'versionName = "3.0.0-release"' "$source_root/app/build.gradle.kts"
+
+          if find "$source_root" -type f \( -name '*.keystore' -o -name '*.jks' -o -name 'local.properties' \) -print -quit | grep -q .; then
+            echo "Refusing to publish sensitive signing or local configuration files."
+            exit 1
+          fi
+
+          rsync -a --delete --exclude='.git/' "$source_root/" ./
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No source changes to publish."
+            exit 0
+          fi
+
+          git commit -m "Release Hermes Android v3.0.0"
+          git push origin HEAD:main
