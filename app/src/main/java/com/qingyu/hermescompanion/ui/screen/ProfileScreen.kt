@@ -705,6 +705,8 @@ fun ProfileSettingsScreen(
     contentPadding: PaddingValues,
     onBack: () -> Unit,
     onSave: (UserProfilePreferences) -> Unit,
+    onUpdateHermesAvatar: (Uri, AvatarCropSpec) -> Unit,
+    onResetHermesAvatar: () -> Unit,
 ) {
     var draftName by remember(state.userProfile.displayName, state.username) {
         mutableStateOf(state.userProfile.displayName.ifBlank { state.username })
@@ -712,6 +714,10 @@ fun ProfileSettingsScreen(
     var draftBio by remember(state.userProfile.bio) { mutableStateOf(state.userProfile.bio) }
     var draftHermesName by remember(state.userProfile.hermesDisplayName) {
         mutableStateOf(state.userProfile.hermesDisplayName.ifBlank { "Hermes" })
+    }
+    var hermesAvatarCropRequest by remember { mutableStateOf<PendingAvatarCrop?>(null) }
+    val hermesAvatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) hermesAvatarCropRequest = PendingAvatarCrop(uri, AvatarTarget.HERMES)
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
@@ -748,30 +754,42 @@ fun ProfileSettingsScreen(
                 Text("Hermes 聊天资料", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Row(Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                     UserAvatar(
-                        uri = "",
+                        uri = state.userProfile.hermesAvatarUri,
                         displayName = draftHermesName.ifBlank { "Hermes" },
                         size = 68.dp,
                         hermesFallback = true,
                     )
                     Column(Modifier.weight(1f).padding(start = 13.dp)) {
                         Text(
-                            "固定 Hermes 头像",
+                            "Hermes 头像",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                         )
                         Text(
-                            "会同步显示在会话列表和聊天界面",
+                            "独立显示在会话列表、Hermes 回复和助理面板",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp),
                         )
+                        Row(Modifier.padding(top = 4.dp)) {
+                            TextButton(
+                                onClick = { hermesAvatarPicker.launch(arrayOf("image/*")) },
+                                enabled = !state.isAvatarUpdating,
+                            ) { Text(if (state.userProfile.hermesAvatarUri.isBlank()) "设置头像" else "更换头像") }
+                            if (state.userProfile.hermesAvatarUri.isNotBlank()) {
+                                TextButton(
+                                    onClick = onResetHermesAvatar,
+                                    enabled = !state.isAvatarUpdating,
+                                ) { Text("恢复默认") }
+                            }
+                        }
                     }
                 }
                 ProfileInputRow("Hermes 昵称", draftHermesName, "Hermes") { draftHermesName = it.take(24) }
             }
         }
         Text(
-            "照片请在“我的”主页单独设置；昵称和签名只用于这台手机，不会修改网关账号。",
+            "“我的”头像请在个人主页设置；Hermes 头像在这里单独设置，两者互不影响。昵称和签名只用于这台手机。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
@@ -793,6 +811,16 @@ fun ProfileSettingsScreen(
         }
     }
 
+    hermesAvatarCropRequest?.let { request ->
+        AvatarCropSheet(
+            request = request,
+            onDismiss = { hermesAvatarCropRequest = null },
+            onConfirm = { uri, crop ->
+                hermesAvatarCropRequest = null
+                onUpdateHermesAvatar(uri, crop)
+            },
+        )
+    }
 }
 
 private data class PendingAvatarCrop(val uri: Uri, val target: AvatarTarget)

@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.qingyu.hermescompanion.data.normalizeReasoningEffort
 import com.qingyu.hermescompanion.model.ApprovalSettings
 import com.qingyu.hermescompanion.model.ConversationStyleSettings
 import com.qingyu.hermescompanion.model.FallbackModel
@@ -201,7 +202,7 @@ fun ModelSettingsScreen(
         )
     }
     var main by remember(initialMain) { mutableStateOf(initialMain) }
-    var effort by remember(initial) { mutableStateOf(initial.reasoningEffort.ifBlank { "medium" }) }
+    var effort by remember(initial) { mutableStateOf(normalizeReasoningEffort(initial.reasoningEffort)) }
     var contextLength by remember(initial) { mutableStateOf(initial.contextLength.takeIf { it > 0 }?.toString().orEmpty()) }
     var auxiliary by remember(initial) { mutableStateOf(initial.auxiliary) }
     val references = remember(initial) { mutableStateListOf<String>().apply { addAll(initial.moaReferenceModels) } }
@@ -698,7 +699,7 @@ private val AUXILIARY_LABELS = listOf(
     "vision" to "视觉模型", "web_extract" to "网页提取", "compression" to "上下文压缩", "skills_hub" to "技能中心",
     "approval" to "审批模型", "mcp" to "MCP 调度", "title_generation" to "标题生成", "curator" to "维护器",
 )
-private val REASONING_LEVELS = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra")
+private val REASONING_LEVELS = listOf("none", "low", "medium", "high", "max")
 private val PERSONALITIES = listOf(
     "helpful" to "通用助理", "concise" to "简洁直接", "technical" to "技术专家", "creative" to "创意伙伴", "teacher" to "耐心教师",
     "philosopher" to "深度思考", "kawaii" to "可爱活泼", "noir" to "冷峻侦探", "hype" to "高能鼓励",

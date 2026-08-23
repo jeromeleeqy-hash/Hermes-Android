@@ -126,4 +126,23 @@ class HermesApiClientTest {
         )
     }
 
+    @Test
+    fun gatewayTurnRejectsCompletionBeforeItsStartEdge() {
+        val turn = GatewayTurnTracker()
+
+        assertEquals(false, turn.hasStarted())
+        assertEquals(true, turn.markStarted())
+        assertEquals(true, turn.hasStarted())
+        assertEquals(false, turn.markStarted())
+    }
+
+    @Test
+    fun normalizesReasoningEffortForGatewayCompatibility() {
+        assertEquals("low", normalizeReasoningEffort("minimal"))
+        assertEquals("max", normalizeReasoningEffort("ultra"))
+        assertEquals("max", normalizeReasoningEffort("xhigh"))
+        assertEquals("medium", normalizeReasoningEffort("unexpected"))
+        assertEquals("high", normalizeReasoningEffort("HIGH"))
+    }
+
 }

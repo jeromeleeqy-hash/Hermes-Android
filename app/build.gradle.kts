@@ -17,8 +17,8 @@ android {
         applicationId = "com.qingyu.hermescompanion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 300
-        versionName = "3.0.0-release"
+        versionCode = 303
+        versionName = "3.0.3-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

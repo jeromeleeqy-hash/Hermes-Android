@@ -217,7 +217,7 @@ class SecureConfigStore(context: Context) {
             .filter(String::isNotBlank)
             .mapNotNull { line ->
                 val parts = line.split('\t')
-                if (parts.size != 8) return@mapNotNull null
+                if (parts.size !in setOf(8, 9)) return@mapNotNull null
                 runCatching {
                     RecentArtifact(
                         profile = decodeField(parts[0]),
@@ -227,7 +227,8 @@ class SecureConfigStore(context: Context) {
                         path = decodeField(parts[4]),
                         name = decodeField(parts[5]),
                         kind = decodeField(parts[6]),
-                        seenAtMillis = parts[7].toLong(),
+                        workspacePath = if (parts.size == 9) decodeField(parts[7]) else "",
+                        seenAtMillis = parts.last().toLong(),
                     )
                 }.getOrNull()
             }
@@ -245,6 +246,7 @@ class SecureConfigStore(context: Context) {
                 item.path,
                 item.name,
                 item.kind,
+                item.workspacePath,
             ).joinToString("\t", postfix = "\t${item.seenAtMillis}") { encodeField(it) }
         }
         preferences.edit { putString(KEY_RECENT_ARTIFACTS, encoded) }

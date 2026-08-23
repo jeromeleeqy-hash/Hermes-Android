@@ -315,6 +315,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 contentPadding = padding,
                 onBack = viewModel::closeSettingsPage,
                 onSave = viewModel::updateUserProfile,
+                onUpdateHermesAvatar = viewModel::updateHermesAvatar,
+                onResetHermesAvatar = viewModel::resetHermesAvatar,
             )
 
             AppRoute.SKILLS_TOOLS -> SkillsToolsScreen(

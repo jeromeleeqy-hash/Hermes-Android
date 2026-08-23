@@ -226,7 +226,8 @@ class CronNotificationReceiver : BroadcastReceiver() {
         }
         if (!preferences.enabled || !preferences.taskAlerts) return
         val pending = goAsync()
-        Executors.newSingleThreadExecutor().execute {
+        val executor = Executors.newSingleThreadExecutor()
+        executor.execute {
             try {
                 val config = store.read() ?: return@execute
                 val cookies = SecureCookieJar(store)
@@ -256,8 +257,12 @@ class CronNotificationReceiver : BroadcastReceiver() {
                 } finally {
                     client.close()
                 }
+            } catch (_: Exception) {
+                // Cron polling is best-effort background work. A server that is temporarily
+                // offline must not escape the receiver thread and be recorded as an app crash.
             } finally {
                 pending.finish()
+                executor.shutdown()
             }
         }
     }

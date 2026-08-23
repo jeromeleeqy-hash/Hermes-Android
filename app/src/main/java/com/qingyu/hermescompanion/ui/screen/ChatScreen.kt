@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -738,6 +739,12 @@ private fun MessageItem(
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                 }
+                if (message.reasoning.isNotBlank()) {
+                    ReasoningDisclosure(
+                        reasoning = message.reasoning,
+                        streaming = message.isStreaming,
+                    )
+                }
                 if (visibleContent.isNotBlank()) {
                     if (message.isStreaming) {
                         Text(
@@ -794,6 +801,49 @@ private fun MessageItem(
         }
 
         MessageRole.TOOL, MessageRole.SYSTEM -> Unit
+        }
+    }
+}
+
+@Composable
+private fun ReasoningDisclosure(reasoning: String, streaming: Boolean) {
+    var expanded by remember { mutableStateOf(streaming) }
+    LaunchedEffect(streaming) {
+        if (streaming) expanded = true
+    }
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 7.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (streaming) {
+                CircularProgressIndicator(modifier = Modifier.size(13.dp), strokeWidth = 1.7.dp)
+            }
+            Text(
+                text = if (streaming) "正在思考" else "思考过程",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = if (streaming) 7.dp else 0.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            HermesMulticolorIcon(
+                kind = if (expanded) HermesIconKind.EXPAND_UP else HermesIconKind.EXPAND_DOWN,
+                contentDescription = if (expanded) "收起思考过程" else "展开思考过程",
+                iconSize = 15.dp,
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Text(
+                text = reasoning,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 6.dp, top = 3.dp),
+            )
         }
     }
 }
@@ -1218,23 +1268,23 @@ private fun Composer(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    attachments.take(2).forEach { attachment ->
+                    attachments.forEach { attachment ->
                         AttachmentChip(
                             attachment,
                             onOpen = { onPreviewAttachment(attachment) },
                             onRemove = { onRemoveAttachment(attachment.id) },
                         )
                     }
-                    if (attachments.size > 2) {
-                        Text(
-                            text = "+${attachments.size - 2}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
+                    Text(
+                        text = "${attachments.size}/10",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+                    )
                 }
             }
 

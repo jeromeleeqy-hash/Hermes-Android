@@ -948,9 +948,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.IO) { uris.map { AttachmentReader.read(resolver, it) } }
             }.onSuccess { attachments ->
                 uiState = uiState.copy(
-                    attachments = (uiState.attachments + attachments).take(5),
-                    noticeMessage = if (uiState.attachments.size + attachments.size > 5) {
-                        "单次最多添加 5 个附件"
+                    attachments = (uiState.attachments + attachments).take(MAX_ATTACHMENTS),
+                    noticeMessage = if (uiState.attachments.size + attachments.size > MAX_ATTACHMENTS) {
+                        "单次最多添加 $MAX_ATTACHMENTS 个附件"
                     } else {
                         null
                     },
@@ -970,7 +970,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             }
             (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)?.let(::add)
             intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let(::addAll)
-        }.distinct().take(5)
+        }.distinct().take(MAX_ATTACHMENTS)
         if (sharedText.isBlank() && uris.isEmpty()) return
 
         if (uris.isEmpty()) {
@@ -1125,7 +1125,11 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun openChatArtifact(artifact: ChatArtifact) {
         val client = apiClient ?: return
-        val source = uiState.selectedSession?.let { session -> recentArtifactSource(session, artifact) }
+        val session = uiState.selectedSession
+        val resolvedPath = resolveArtifactPath(artifact.path, session?.workspacePath.orEmpty())
+            ?: return showNotice("无法确定 ${artifact.name} 的绝对路径，请回到来源会话后再试")
+        val resolvedArtifact = artifact.copy(path = resolvedPath)
+        val source = session?.let { recentArtifactSource(it, resolvedArtifact) }
         if (source != null) {
             val merged = (listOf(source) + uiState.recentArtifacts)
                 .distinctBy { "${it.profile}::${it.path}" }
@@ -1133,17 +1137,17 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             uiState = uiState.copy(recentArtifacts = merged)
             configStore.saveRecentArtifacts(merged)
         }
-        if (artifact.path.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")) {
-            openImage(artifact.path, artifact.name)
+        if (resolvedPath.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")) {
+            openImage(resolvedPath, artifact.name)
             return
         }
-        if (!artifact.path.isPreviewableArtifact()) {
+        if (!resolvedPath.isPreviewableArtifact()) {
             showNotice("${artifact.name} 已列入聊天产物；当前版本支持图片、Markdown、PDF、HTML 和常见文本预览")
             return
         }
         uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.readWorkspaceDocument(artifact.path) } }
+            runCatching { withContext(Dispatchers.IO) { client.readWorkspaceDocument(resolvedPath) } }
                 .onSuccess { document ->
                     uiState = uiState.copy(
                         route = AppRoute.WORKSPACE,
@@ -1181,12 +1185,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun openRecentArtifact(item: RecentArtifact) {
-        val artifact = ChatArtifact(item.path, item.name, item.kind)
-        if (item.path.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")) {
-            openImage(item.path, item.name)
+        val workspacePath = item.workspacePath.ifBlank {
+            uiState.sessions.firstOrNull { it.id == item.sessionId && it.profile == item.profile }?.workspacePath.orEmpty()
+        }
+        val resolvedPath = resolveArtifactPath(item.path, workspacePath)
+            ?: return showNotice("无法确定 ${item.name} 的绝对路径，请先回到来源会话再打开")
+        val artifact = ChatArtifact(resolvedPath, item.name, item.kind)
+        val resolvedItem = item.copy(path = resolvedPath, workspacePath = workspacePath)
+        if (resolvedPath.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")) {
+            openImage(resolvedPath, item.name)
             return
         }
-        if (!item.path.isPreviewableArtifact()) {
+        if (!resolvedPath.isPreviewableArtifact()) {
             showNotice("${item.name} 暂不支持在 APP 内预览，可保存到手机或回到来源对话继续处理")
             return
         }
@@ -1199,7 +1209,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         route = AppRoute.WORKSPACE,
                         workspaceDocument = document,
                         workspaceDocumentOrigin = null,
-                        workspaceSourceArtifact = item,
+                        workspaceSourceArtifact = resolvedItem,
                         workspaceDraft = document.content,
                         isWorkspaceEditing = false,
                         isWorkspaceLoading = false,
@@ -2160,10 +2170,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { avatarStorage.save(source, target, crop) } }
                 .onSuccess { privateUri ->
-                    val profile = when (target) {
-                        AvatarTarget.USER -> uiState.userProfile.copy(avatarUri = privateUri)
-                        AvatarTarget.HERMES -> uiState.userProfile.copy(hermesAvatarUri = privateUri)
-                    }
+                    val profile = updateAvatarUri(uiState.userProfile, target, privateUri)
                     configStore.saveUserProfile(profile)
                     uiState = uiState.copy(
                         userProfile = profile,
@@ -2187,10 +2194,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(isAvatarUpdating = true, errorMessage = null, noticeMessage = null)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { avatarStorage.delete(target) }
-            val profile = when (target) {
-                AvatarTarget.USER -> uiState.userProfile.copy(avatarUri = "")
-                AvatarTarget.HERMES -> uiState.userProfile.copy(hermesAvatarUri = "")
-            }
+            val profile = updateAvatarUri(uiState.userProfile, target, "")
             configStore.saveUserProfile(profile)
             uiState = uiState.copy(
                 userProfile = profile,
@@ -3048,12 +3052,25 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 runStage = "Hermes 正在执行",
                 runLastActivityAtMillis = System.currentTimeMillis(),
             )
+            is StreamEvent.ReasoningDelta -> {
+                updateStreamingReasoning { current -> current + event.text }
+                uiState = uiState.copy(
+                    runStage = "Hermes 正在思考",
+                    runLastActivityAtMillis = System.currentTimeMillis(),
+                )
+            }
+            is StreamEvent.ReasoningAvailable -> {
+                updateStreamingReasoning { current -> current.ifBlank { event.text } }
+                uiState = uiState.copy(runLastActivityAtMillis = System.currentTimeMillis())
+            }
             is StreamEvent.AssistantDelta -> {
                 enqueueStreamingDelta(event.text)
             }
             is StreamEvent.AssistantCompleted -> {
                 flushStreamingDelta()
-                if (event.content.isNotBlank()) updateStreamingMessage { event.content }
+                if (event.content.isNotBlank()) {
+                    updateStreamingMessage { current -> mergeCompletedAssistantText(current, event.content) }
+                }
                 uiState = uiState.copy(runLastActivityAtMillis = System.currentTimeMillis())
             }
             is StreamEvent.ToolStarted -> {
@@ -3154,6 +3171,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private fun updateStreamingMessage(transform: (String) -> String) {
         val updated = activeStreamMessages().map { message ->
             if (message.isStreaming) message.copy(content = transform(message.content)) else message
+        }
+        setActiveStreamMessages(updated)
+    }
+
+    private fun updateStreamingReasoning(transform: (String) -> String) {
+        val updated = activeStreamMessages().map { message ->
+            if (message.isStreaming) message.copy(reasoning = transform(message.reasoning)) else message
         }
         setActiveStreamMessages(updated)
     }
@@ -3279,7 +3303,6 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private fun startStreamWatchdog(session: HermesSession) {
         streamWatchdogJob?.cancel()
         streamWatchdogJob = viewModelScope.launch {
-            var observedRecoveredSignature = ""
             delay(STREAM_IDLE_POLL_AFTER_MILLIS)
             while (uiState.isStreaming && uiState.streamingSessionId == session.id) {
                 val hasPendingRequest = uiState.pendingAgentRequests.any { it.conversationId == session.id }
@@ -3292,26 +3315,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         handleStreamFailure(failure)
                         return@launch
                     }
-                    val messages = result.getOrNull()
-                    val recovered = messages?.let {
-                        findRecoveredAssistant(it, streamRecoveryPrompt, streamBaselineAssistantSignature)
-                    }
-                    if (messages != null && recovered != null) {
-                        val signature = recovered.recoverySignature()
-                        if (signature == observedRecoveredSignature) {
-                            streamController?.stop()
-                            completeRecoveredStream(session, messages, "回复已自动同步")
-                            return@launch
-                        }
-                        observedRecoveredSignature = signature
-                    } else {
-                        observedRecoveredSignature = ""
-                    }
+                    // Do not infer completion from unchanged persisted text. Long-running tools
+                    // and background sub-agents can legitimately leave the transcript unchanged.
+                    // The live path settles only on this turn's message.complete event.
                     if (failure != null && idleFor >= STREAM_CONNECTION_STALE_MILLIS) {
                         recoverInterruptedStream("实时连接暂时没有响应，正在自动取回结果")
                         return@launch
                     }
-                } else observedRecoveredSignature = ""
+                }
                 delay(STREAM_IDLE_POLL_INTERVAL_MILLIS)
             }
         }
@@ -3548,28 +3559,32 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val now = System.currentTimeMillis()
         val fromMessages = visibleMessages.asReversed().flatMap { message ->
             ChatInsightParser.artifactsFromText(message.content).map { artifact ->
+                val resolvedPath = resolveArtifactPath(artifact.path, session.workspacePath) ?: artifact.path
                 RecentArtifact(
                     profile = session.profile,
                     sessionId = session.id,
                     sessionTitle = session.title.ifBlank { "Hermes 对话" },
                     messageId = message.id,
-                    path = artifact.path,
+                    path = resolvedPath,
                     name = artifact.name,
                     kind = artifact.kind,
+                    workspacePath = session.workspacePath,
                     seenAtMillis = now,
                 )
             }
         }
         val fallbackMessageId = visibleMessages.lastOrNull()?.id.orEmpty()
         val extras = additionalArtifacts.map { artifact ->
+            val resolvedPath = resolveArtifactPath(artifact.path, session.workspacePath) ?: artifact.path
             RecentArtifact(
                 profile = session.profile,
                 sessionId = session.id,
                 sessionTitle = session.title.ifBlank { "Hermes 对话" },
                 messageId = fallbackMessageId,
-                path = artifact.path,
+                path = resolvedPath,
                 name = artifact.name,
                 kind = artifact.kind,
+                workspacePath = session.workspacePath,
                 seenAtMillis = now,
             )
         }
@@ -3589,7 +3604,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private fun recentArtifactSource(session: HermesSession, artifact: ChatArtifact): RecentArtifact {
         val sourceMessage = uiState.messages.asReversed().firstOrNull { message ->
             message.role in setOf(MessageRole.USER, MessageRole.ASSISTANT) &&
-                ChatInsightParser.artifactsFromText(message.content).any { it.path == artifact.path }
+                ChatInsightParser.artifactsFromText(message.content).any {
+                    resolveArtifactPath(it.path, session.workspacePath) == artifact.path
+                }
         }
         return RecentArtifact(
             profile = session.profile,
@@ -3599,6 +3616,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             path = artifact.path,
             name = artifact.name,
             kind = artifact.kind,
+            workspacePath = session.workspacePath,
         )
     }
 
@@ -3765,7 +3783,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val message = when (root) {
             is ApiException -> when (root.statusCode) {
                 401, 403 -> "登录已失效，或 Hermes 用户名/密码不正确"
-                404 -> "当前 Hermes 版本不支持所需接口，请先升级 Hermes Agent"
+                404 -> root.message.ifBlank { "当前 Hermes 版本不支持所需接口，请先升级 Hermes Agent" }
                 429 -> "Hermes 正在处理过多任务，请稍后再试"
                 else -> root.message.ifBlank { "服务器请求失败" }
             }
@@ -3835,14 +3853,25 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     loadGatewayInfo(client)
                     loadProfilesAndSessions(client)
                 }
-                .onFailure {
-                    cookieJar.clear()
-                    uiState = uiState.copy(
-                        route = AppRoute.SETUP,
-                        isBusy = false,
-                        hasSavedConnection = false,
-                        noticeMessage = "登录已过期，请重新输入密码",
-                    )
+                .onFailure { error ->
+                    val root = unwrapFailure(error)
+                    if (root is ApiException && root.statusCode in setOf(401, 403)) {
+                        cookieJar.clear()
+                        uiState = uiState.copy(
+                            route = AppRoute.SETUP,
+                            isBusy = false,
+                            hasSavedConnection = false,
+                            noticeMessage = "登录已过期，请重新输入密码",
+                        )
+                    } else {
+                        uiState = uiState.copy(
+                            route = AppRoute.SETUP,
+                            isBusy = false,
+                            hasSavedConnection = true,
+                            noticeMessage = null,
+                            errorMessage = "暂时无法连接已保存的远程网关，请确认服务器已启动且手机网络可访问该地址",
+                        )
+                    }
                 }
         }
     }
@@ -3961,6 +3990,7 @@ private val DEFAULT_SLASH_COMMANDS = listOf(
 )
 
 private const val CHAT_PAGE_SIZE = 60
+private const val MAX_ATTACHMENTS = 10
 private const val SEARCH_MESSAGE_LIMIT = 200
 private const val RECENT_ARTIFACT_SESSION_LIMIT = 24
 private const val RECENT_ARTIFACT_MESSAGE_LIMIT = 80
@@ -3971,6 +4001,15 @@ private const val STREAM_CONNECTION_STALE_MILLIS = 90_000L
 
 internal fun artifactIndexFingerprint(session: HermesSession): String =
     listOf(session.updatedAt, session.messageCount.toString(), session.preview.hashCode().toString()).joinToString("|")
+
+internal fun updateAvatarUri(
+    profile: UserProfilePreferences,
+    target: AvatarTarget,
+    uri: String,
+): UserProfilePreferences = when (target) {
+    AvatarTarget.USER -> profile.copy(avatarUri = uri)
+    AvatarTarget.HERMES -> profile.copy(hermesAvatarUri = uri)
+}
 
 private fun String.isMoaProvider(): Boolean =
     equals("moa", ignoreCase = true) || contains("mixture-of-agents", ignoreCase = true)
@@ -4032,7 +4071,34 @@ internal fun ChatMessage.recoverySignature(): String = buildString {
     append(createdAt)
     append('|')
     append(content.trim())
+    append('|')
+    append(reasoning.trim())
     images.forEach { append('|').append(it.source) }
+}
+
+internal fun mergeCompletedAssistantText(streamed: String, completed: String): String {
+    val live = streamed.trim()
+    val final = completed.trim()
+    return when {
+        live.isBlank() -> final
+        final.isBlank() -> live
+        final == live || final.startsWith(live) -> final
+        live.startsWith(final) -> live
+        else -> live
+    }
+}
+
+internal fun resolveArtifactPath(path: String, workspacePath: String): String? {
+    val cleanPath = normalizeChatLinkTarget(path)
+    if (cleanPath.isBlank()) return null
+    val isAbsolute = cleanPath.startsWith('/') ||
+        cleanPath.startsWith("\\\\") ||
+        Regex("^[A-Za-z]:[\\\\/]").containsMatchIn(cleanPath)
+    if (isAbsolute) return cleanPath
+    val cleanWorkspace = workspacePath.trim().trimEnd('/', '\\')
+    if (cleanWorkspace.isBlank()) return null
+    val separator = if ('\\' in cleanWorkspace && '/' !in cleanWorkspace) '\\' else '/'
+    return "$cleanWorkspace$separator${cleanPath.trimStart('/', '\\')}"
 }
 
 internal fun findRecoveredAssistant(

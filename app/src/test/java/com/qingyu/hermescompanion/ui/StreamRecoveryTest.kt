@@ -72,4 +72,33 @@ class StreamRecoveryTest {
             findRecoveredAssistant(messages, "尚未生成的新问题", previous.recoverySignature()),
         )
     }
+
+    @Test
+    fun keepsLongerStreamedTextWhenCompletionOnlyContainsLastParagraph() {
+        assertEquals(
+            "第一步：读取文件。\n第二步：修改配置。\n完成。",
+            mergeCompletedAssistantText(
+                "第一步：读取文件。\n第二步：修改配置。\n完成。",
+                "完成。",
+            ),
+        )
+    }
+
+    @Test
+    fun acceptsCompletionThatExtendsStreamedText() {
+        assertEquals("正在整理，已经完成", mergeCompletedAssistantText("正在整理", "正在整理，已经完成"))
+    }
+
+    @Test
+    fun resolvesRelativeArtifactAgainstConversationWorkspace() {
+        assertEquals(
+            "/root/workspace/report.md",
+            resolveArtifactPath("report.md", "/root/workspace"),
+        )
+        assertEquals(
+            "/root/workspace/report.md",
+            resolveArtifactPath("/root/workspace/report.md", "/ignored"),
+        )
+        assertNull(resolveArtifactPath("report.md", ""))
+    }
 }

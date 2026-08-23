@@ -213,6 +213,7 @@ data class ChatMessage(
     val content: String,
     val createdAt: String = "",
     val isStreaming: Boolean = false,
+    val reasoning: String = "",
     val images: List<ChatImage> = emptyList(),
 )
 
@@ -326,6 +327,7 @@ data class RecentArtifact(
     val path: String,
     val name: String,
     val kind: String,
+    val workspacePath: String = "",
     val seenAtMillis: Long = System.currentTimeMillis(),
 )
 
@@ -485,6 +487,8 @@ data class UserProfilePreferences(
 
 sealed interface StreamEvent {
     data class RunStarted(val runId: String) : StreamEvent
+    data class ReasoningDelta(val text: String) : StreamEvent
+    data class ReasoningAvailable(val text: String) : StreamEvent
     data class AssistantDelta(val text: String) : StreamEvent
     data class AssistantCompleted(val content: String) : StreamEvent
     data class ToolStarted(

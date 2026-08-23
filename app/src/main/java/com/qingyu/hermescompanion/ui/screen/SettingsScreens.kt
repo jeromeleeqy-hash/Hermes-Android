@@ -560,17 +560,32 @@ fun ChangeLogScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
     SettingsPage("更新日志", "Hermes 移动端版本记录", contentPadding, onBack) {
         if (BuildConfig.VERSION_CODE >= 300) {
             ChangeLogEntry(
-                version = "3.0.0-release",
-                date = "2026-08-18",
+                version = "3.0.3-release",
+                date = "2026-08-22",
                 current = true,
                 items = listOf(
-                    "界面全面收敛为轻量 Telegram 式设计，完成导航、会话、聊天、空间、任务、设置与状态反馈的统一图标和交互动效",
-                    "重建个人主页与沉浸式头像，加入我的记忆、我的心智和更完整的使用说明，并在关键空白页加入 Hermes 形象动画",
-                    "优化会话筛选、全文搜索、左滑归档与删除、命令面板、聊天排版和任务执行中心；Cron 会话统一归入任务页",
-                    "专家会审升级为更易理解的多成员协作展示，并完善 Agent 运行状态、追加要求、排队发送、审批与澄清闭环",
-                    "完善单次语音和连续语音、Agent STT/TTS、中文转写及系统能力回退；连续语音采用全新的声能核心交互",
-                    "升级空间与产物中心，支持 Markdown、PDF、HTML、图片和常见文本的预览、保存、分享及来源定位",
-                    "增强长对话性能、后台执行、断线恢复、静默流自检和参考来源解析，减少卡顿、假等待与重复信息",
+                    "用户头像与 Hermes 头像支持分别替换，互不覆盖",
+                    "Hermes 头像会同步显示在会话列表、Hermes 回复和助理面板",
+                ),
+            )
+            ChangeLogEntry(
+                version = "3.0.2-release",
+                date = "2026-08-22",
+                items = listOf(
+                    "实时展示 Agent 思考内容，并继续在聊天中处理审批、澄清问题和可选答案",
+                    "修复长任务与后台子 Agent 仍在运行时提前显示本轮完成的问题",
+                    "附件栏支持横向滑动，图片和文件单次选择上限统一提升到 10 个",
+                    "修复后台 Cron 检查在服务器离线时被误记为应用闪退，并改善已保存网关的断线提示",
+                    "修复相对路径产物无法打开、Memory / Soul 缺失误报版本不兼容和推理强度兼容问题",
+                ),
+            )
+            ChangeLogEntry(
+                version = "3.0.0-release",
+                date = "2.0–3.0 重要更新汇总",
+                items = listOf(
+                    "统一 Telegram 式设计、全套 Hermes 图标、个人主页、沉浸式头像与关键空白页形象动画",
+                    "完善会话、全文搜索、命令面板、任务执行中心、专家会审、审批澄清和后台运行闭环",
+                    "升级空间与产物预览、单次及连续语音、Agent STT/TTS、中文转写和长对话性能",
                 ),
             )
             ChangeLogEntry(

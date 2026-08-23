@@ -598,7 +598,7 @@ class HermesApiClient(
         model.put("provider", value.provider)
         model.put("default", value.model)
         if (value.contextLength > 0) model.put("context_length", value.contextLength) else model.remove("context_length")
-        config.ensureObject("agent").put("reasoning_effort", value.reasoningEffort)
+        config.ensureObject("agent").put("reasoning_effort", normalizeReasoningEffort(value.reasoningEffort))
 
         val auxiliary = config.ensureObject("auxiliary")
         AUXILIARY_TASK_KEYS.forEach { key ->
@@ -1143,7 +1143,6 @@ class HermesApiClient(
                     .put("session_id", runtimeId)
                     .put("text", text),
             )
-            onEvent(StreamEvent.RunStarted(runtimeId))
             if (!controller.awaitCompletion()) {
                 throw ApiException(408, "等待 Hermes 回复超时")
             }
@@ -1436,14 +1435,21 @@ class HermesApiClient(
         val content = flattenContent(item.opt("content")).ifBlank {
             flattenContent(item.opt("text"))
         }
+        val reasoning = listOf(
+            extractReasoning(item.opt("content")),
+            flattenContent(item.opt("reasoning_content")),
+            flattenContent(item.opt("reasoning")),
+            flattenContent(item.opt("thinking")),
+        ).firstOrNull(String::isNotBlank).orEmpty()
         val images = extractImages(item.opt("content")) + extractImages(item.opt("attachments"))
-        if (content.isBlank() && images.isEmpty() && role != MessageRole.TOOL) return null
+        if (content.isBlank() && reasoning.isBlank() && images.isEmpty() && role != MessageRole.TOOL) return null
         return ChatMessage(
             id = firstString(item, "row_id", "id", "message_id", "messageId")
                 ?: UUID.randomUUID().toString(),
             role = role,
             content = content,
             createdAt = firstString(item, "created_at", "createdAt", "timestamp").orEmpty(),
+            reasoning = reasoning,
             images = images.distinctBy(ChatImage::source),
         )
     }
@@ -1502,7 +1508,26 @@ class HermesApiClient(
         val payload = params.optJSONObject("payload") ?: params
         val sessionId = firstString(params, "session_id") ?: firstString(payload, "session_id")
         if (!sessionId.isNullOrBlank() && sessionId != stream.sessionId) return
+        if (type == "message.start") {
+            if (stream.turn.markStarted()) stream.onEvent(StreamEvent.RunStarted(stream.sessionId))
+            return
+        }
+        // A session id can be reused when a stored conversation is resumed. Ignore trailing
+        // notifications from the previous turn until this prompt receives its own start edge.
+        if (!stream.turn.hasStarted()) return
         when (type) {
+            "reasoning.delta" -> firstString(payload, "text", "delta", "content")
+                ?.takeIf(String::isNotEmpty)
+                ?.let { stream.onEvent(StreamEvent.ReasoningDelta(it)) }
+
+            "reasoning.available" -> firstString(payload, "text", "reasoning", "content", "context", "preview")
+                ?.takeIf(String::isNotBlank)
+                ?.let { stream.onEvent(StreamEvent.ReasoningAvailable(it)) }
+
+            "thinking.delta" -> firstString(payload, "text", "delta", "content")
+                ?.takeIf(String::isNotEmpty)
+                ?.let { stream.onEvent(StreamEvent.ReasoningDelta(it)) }
+
             "message.delta" -> payload.optString("text").takeIf { it.isNotEmpty() }
                 ?.let { stream.onEvent(StreamEvent.AssistantDelta(it)) }
 
@@ -1686,7 +1711,11 @@ class HermesApiClient(
         return when (content) {
             null, JSONObject.NULL -> ""
             is String -> content
-            is JSONObject -> firstString(content, "text", "content", "output_text").orEmpty()
+            is JSONObject -> {
+                val type = content.optString("type").lowercase()
+                if (type in setOf("reasoning", "reasoning_content", "thinking", "analysis")) ""
+                else firstString(content, "text", "content", "output_text").orEmpty()
+            }
             is JSONArray -> buildList {
                 for (index in 0 until content.length()) {
                     val value = flattenContent(content.opt(index))
@@ -1695,6 +1724,28 @@ class HermesApiClient(
             }.joinToString("\n")
             else -> content.toString()
         }
+    }
+
+    private fun extractReasoning(content: Any?): String = when (content) {
+        null, JSONObject.NULL -> ""
+        is JSONArray -> buildList {
+            for (index in 0 until content.length()) {
+                extractReasoning(content.opt(index)).takeIf(String::isNotBlank)?.let(::add)
+            }
+        }.joinToString("\n")
+        is JSONObject -> {
+            val type = content.optString("type").lowercase()
+            if (type in setOf("reasoning", "reasoning_content", "thinking", "analysis")) {
+                firstString(content, "text", "content", "reasoning").orEmpty()
+            } else {
+                buildList {
+                    content.keys().forEach { key ->
+                        extractReasoning(content.opt(key)).takeIf(String::isNotBlank)?.let(::add)
+                    }
+                }.joinToString("\n")
+            }
+        }
+        else -> ""
     }
 
     private fun extractImages(content: Any?): List<ChatImage> = when (content) {
@@ -1940,11 +1991,12 @@ class HermesApiClient(
         val sessionId: String,
         val controller: StreamController,
         val onEvent: (StreamEvent) -> Unit,
+        val turn: GatewayTurnTracker = GatewayTurnTracker(),
     )
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val USER_AGENT = "Hermes-Android/3.0.0"
+        const val USER_AGENT = "Hermes-Android/3.0.3"
         val AUXILIARY_TASK_KEYS = listOf(
             "vision",
             "web_extract",
@@ -2002,6 +2054,21 @@ internal fun webSocketFailureMessage(statusCode: Int?): String = when (statusCod
 }
 
 class ApiException(val statusCode: Int, override val message: String) : Exception(message)
+
+internal class GatewayTurnTracker {
+    private val started = AtomicBoolean(false)
+
+    fun markStarted(): Boolean = started.compareAndSet(false, true)
+
+    fun hasStarted(): Boolean = started.get()
+}
+
+internal fun normalizeReasoningEffort(raw: String): String = when (raw.trim().lowercase()) {
+    "none", "low", "medium", "high", "max" -> raw.trim().lowercase()
+    "minimal" -> "low"
+    "xhigh", "ultra" -> "max"
+    else -> "medium"
+}
 
 private val PROFILE_NAME_PATTERN = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
 
