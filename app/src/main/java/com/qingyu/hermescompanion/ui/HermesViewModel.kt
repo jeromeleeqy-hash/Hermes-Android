@@ -3066,10 +3066,20 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             is StreamEvent.AssistantDelta -> {
                 enqueueStreamingDelta(event.text)
             }
+            is StreamEvent.AssistantInterim -> {
+                flushStreamingDelta()
+                updateStreamingMessage { current -> mergeInterimAssistantText(current, event.content) }
+                uiState = uiState.copy(
+                    runStage = "Hermes 正在处理",
+                    runLastActivityAtMillis = System.currentTimeMillis(),
+                )
+            }
             is StreamEvent.AssistantCompleted -> {
                 flushStreamingDelta()
                 if (event.content.isNotBlank()) {
-                    updateStreamingMessage { current -> mergeCompletedAssistantText(current, event.content) }
+                    updateStreamingMessage { current ->
+                        mergeCompletedAssistantText(current, event.content, event.responsePreviewed)
+                    }
                 }
                 uiState = uiState.copy(runLastActivityAtMillis = System.currentTimeMillis())
             }
@@ -4076,17 +4086,42 @@ internal fun ChatMessage.recoverySignature(): String = buildString {
     images.forEach { append('|').append(it.source) }
 }
 
-internal fun mergeCompletedAssistantText(streamed: String, completed: String): String {
+internal fun mergeInterimAssistantText(streamed: String, interim: String): String {
+    val live = streamed.trim()
+    val preview = interim.trim()
+    if (live.isBlank()) return preview
+    if (preview.isBlank()) return live
+    val normalizedLive = live.normalizeStreamText()
+    val normalizedPreview = preview.normalizeStreamText()
+    return when {
+        normalizedLive == normalizedPreview -> live
+        normalizedLive.endsWith(normalizedPreview) -> live
+        normalizedPreview.startsWith(normalizedLive) -> preview
+        else -> "$live\n\n$preview"
+    }
+}
+
+internal fun mergeCompletedAssistantText(
+    streamed: String,
+    completed: String,
+    responsePreviewed: Boolean = false,
+): String {
     val live = streamed.trim()
     val final = completed.trim()
+    val normalizedLive = live.normalizeStreamText()
+    val normalizedFinal = final.normalizeStreamText()
     return when {
         live.isBlank() -> final
         final.isBlank() -> live
-        final == live || final.startsWith(live) -> final
-        live.startsWith(final) -> live
-        else -> live
+        normalizedFinal == normalizedLive -> live
+        normalizedFinal.startsWith(normalizedLive) -> final
+        normalizedLive.startsWith(normalizedFinal) || normalizedLive.endsWith(normalizedFinal) -> live
+        responsePreviewed && normalizedLive.contains(normalizedFinal) -> live
+        else -> "$live\n\n$final"
     }
 }
+
+private fun String.normalizeStreamText(): String = replace(Regex("\\s+"), " ").trim()
 
 internal fun resolveArtifactPath(path: String, workspacePath: String): String? {
     val cleanPath = normalizeChatLinkTarget(path)

@@ -560,7 +560,7 @@ fun ChangeLogScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
     SettingsPage("更新日志", "Hermes 移动端版本记录", contentPadding, onBack) {
         if (BuildConfig.VERSION_CODE >= 300) {
             ChangeLogEntry(
-                version = "3.0.3-release",
+                version = "3.0.3a-release",
                 date = "2026-08-22",
                 current = true,
                 items = listOf(

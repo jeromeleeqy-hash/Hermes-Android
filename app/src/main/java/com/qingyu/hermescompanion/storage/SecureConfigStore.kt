@@ -280,7 +280,13 @@ class SecureConfigStore(context: Context) {
                     val values = item.optJSONArray("choices") ?: JSONArray()
                     for (choiceIndex in 0 until values.length()) {
                         val choice = values.optJSONObject(choiceIndex) ?: continue
-                        add(AgentRequestChoice(choice.optString("label"), choice.optString("value")))
+                        add(
+                            AgentRequestChoice(
+                                label = choice.optString("label"),
+                                value = choice.optString("value"),
+                                description = choice.optString("description"),
+                            ),
+                        )
                     }
                 }
                 add(
@@ -293,6 +299,7 @@ class SecureConfigStore(context: Context) {
                         title = item.optString("title"),
                         detail = item.optString("detail"),
                         choices = choices,
+                        allowMultiple = item.optBoolean("allowMultiple"),
                         allowSession = item.optBoolean("allowSession", true),
                         allowPermanent = item.optBoolean("allowPermanent"),
                     ),
@@ -312,11 +319,17 @@ class SecureConfigStore(context: Context) {
                     .put("type", request.type.name)
                     .put("title", request.title)
                     .put("detail", request.detail)
+                    .put("allowMultiple", request.allowMultiple)
                     .put("allowSession", request.allowSession)
                     .put("allowPermanent", request.allowPermanent)
                     .put("choices", JSONArray().apply {
                         request.choices.forEach { choice ->
-                            put(JSONObject().put("label", choice.label).put("value", choice.value))
+                            put(
+                                JSONObject()
+                                    .put("label", choice.label)
+                                    .put("value", choice.value)
+                                    .put("description", choice.description),
+                            )
                         }
                     }),
             )

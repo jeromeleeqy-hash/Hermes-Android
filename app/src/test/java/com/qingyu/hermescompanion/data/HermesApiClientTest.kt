@@ -1,11 +1,84 @@
 package com.qingyu.hermescompanion.data
 
 import com.qingyu.hermescompanion.model.HermesProfileFile
+import com.qingyu.hermescompanion.model.AgentRequestType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class HermesApiClientTest {
+    @Test
+    fun parsesLegacySingleSelectClarification() {
+        val request = parseAgentRequestPayload(
+            payload = mapOf(
+                "request_id" to "clarify-1",
+                "question" to "选择一个工具",
+                "choices" to listOf("Git", "Docker"),
+            ),
+            fallbackSessionId = "runtime-1",
+            type = AgentRequestType.CLARIFICATION,
+        )
+
+        assertEquals("选择一个工具", request.title)
+        assertEquals(listOf("Git", "Docker"), request.choices.map { it.label })
+        assertEquals(false, request.allowMultiple)
+    }
+
+    @Test
+    fun parsesStructuredMultiSelectClarification() {
+        val request = parseAgentRequestPayload(
+            payload = mapOf(
+                "request_id" to "clarify-2",
+                "questions" to listOf(
+                    mapOf(
+                        "question" to "以下哪些工具你平时会用到？",
+                        "options" to listOf(
+                            mapOf("label" to "Git", "description" to "版本管理"),
+                            mapOf("label" to "Docker", "description" to "容器"),
+                            mapOf("label" to "Hermes Agent"),
+                        ),
+                        "multiSelect" to true,
+                    ),
+                ),
+            ),
+            fallbackSessionId = "runtime-2",
+            type = AgentRequestType.CLARIFICATION,
+        )
+
+        assertEquals("以下哪些工具你平时会用到？", request.title)
+        assertEquals(true, request.allowMultiple)
+        assertEquals(listOf("Git", "Docker", "Hermes Agent"), request.choices.map { it.value })
+        assertEquals("版本管理", request.choices.first().description)
+    }
+
+    @Test
+    fun parsesNestedRequestAndSnakeCaseMultiSelect() {
+        val request = parseAgentRequestPayload(
+            payload = mapOf(
+                "session_id" to "runtime-3",
+                "request" to mapOf(
+                    "id" to "clarify-3",
+                    "question" to mapOf(
+                        "title" to "选择需要保留的模块",
+                        "choices" to listOf(
+                            mapOf("text" to "会话", "value" to "sessions"),
+                            mapOf("text" to "任务", "value" to "tasks"),
+                        ),
+                        "multi_select" to true,
+                    ),
+                ),
+            ),
+            fallbackSessionId = "fallback",
+            type = AgentRequestType.CLARIFICATION,
+        )
+
+        assertEquals("clarify-3", request.requestId)
+        assertEquals("runtime-3", request.runtimeSessionId)
+        assertEquals("选择需要保留的模块", request.title)
+        assertEquals(listOf("sessions", "tasks"), request.choices.map { it.value })
+        assertEquals(true, request.allowMultiple)
+    }
+
     @Test
     fun convertsHttpUrlToWebSocketUrl() {
         assertEquals(

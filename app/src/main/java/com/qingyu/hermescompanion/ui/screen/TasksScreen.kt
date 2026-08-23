@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.model.CronJob
 import com.qingyu.hermescompanion.model.AgentRequest
+import com.qingyu.hermescompanion.model.AgentRequestChoice
 import com.qingyu.hermescompanion.model.AgentRequestType
 import com.qingyu.hermescompanion.model.ChatArtifact
 import com.qingyu.hermescompanion.model.HermesSession
@@ -354,14 +355,16 @@ private fun ActiveRunCard(
 @Composable
 private fun TaskAgentRequestCard(request: AgentRequest, onRespond: (AgentRequest, String) -> Unit) {
     var answer by remember(request.requestId) { mutableStateOf("") }
+    var selectedValues by remember(request.requestId) { mutableStateOf(emptySet<String>()) }
     val actions = if (request.type == AgentRequestType.APPROVAL) {
         buildList {
-            add("仅本次允许" to "once")
-            if (request.allowSession) add("本次会话允许" to "session")
-            if (request.allowPermanent) add("始终允许" to "always")
-            add("拒绝" to "deny")
+            add(AgentRequestChoice("仅本次允许", "once"))
+            if (request.allowSession) add(AgentRequestChoice("本次会话允许", "session"))
+            if (request.allowPermanent) add(AgentRequestChoice("始终允许", "always"))
+            add(AgentRequestChoice("拒绝", "deny"))
         }
-    } else request.choices.map { it.label to it.value }
+    } else request.choices
+    val isMultipleChoice = request.type == AgentRequestType.CLARIFICATION && request.allowMultiple
     GlassPanel(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = RoundedCornerShape(15.dp)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -379,28 +382,68 @@ private fun TaskAgentRequestCard(request: AgentRequest, onRespond: (AgentRequest
             }
             Text(request.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             if (request.detail.isNotBlank()) Text(request.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            actions.forEach { (label, value) ->
+            actions.forEach { choice ->
+                val selected = choice.value in selectedValues
                 Surface(
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) { onRespond(request, value) },
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) {
+                        if (isMultipleChoice) {
+                            selectedValues = if (selected) selectedValues - choice.value else selectedValues + choice.value
+                        } else {
+                            onRespond(request, choice.value)
+                        }
+                    },
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) { Text(label, modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isMultipleChoice) {
+                            HermesMulticolorIcon(
+                                if (selected) HermesIconKind.CHECKBOX_CHECKED else HermesIconKind.CHECKBOX_EMPTY,
+                                if (selected) "已选择" else "未选择",
+                                iconSize = 20.dp,
+                            )
+                            Spacer(Modifier.size(9.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(choice.label)
+                            if (choice.description.isNotBlank()) {
+                                Text(
+                                    choice.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            if (request.type == AgentRequestType.CLARIFICATION && actions.isEmpty()) {
+            if (request.type == AgentRequestType.CLARIFICATION && (actions.isEmpty() || isMultipleChoice)) {
                 OutlinedTextField(
                     value = answer,
                     onValueChange = { answer = it },
                     enabled = !request.isResponding,
-                    placeholder = { Text("输入回答") },
+                    placeholder = { Text(if (isMultipleChoice) "其他回答（可选）" else "输入回答") },
                     minLines = 2,
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                val response = buildAgentRequestAnswer(request, selectedValues, answer)
                 TextButton(
-                    enabled = answer.isNotBlank() && !request.isResponding,
-                    onClick = { onRespond(request, answer.trim()) },
+                    enabled = response.isNotBlank() && !request.isResponding,
+                    onClick = { onRespond(request, response) },
                     modifier = Modifier.align(Alignment.End),
-                ) { Text(if (request.isResponding) "提交中…" else "提交回答") }
+                ) {
+                    Text(
+                        when {
+                            request.isResponding -> "提交中…"
+                            isMultipleChoice -> "确认并继续"
+                            else -> "提交回答"
+                        },
+                    )
+                }
             }
             if (request.isResponding) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
         }

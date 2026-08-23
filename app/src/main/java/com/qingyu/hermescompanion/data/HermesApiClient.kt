@@ -1532,14 +1532,20 @@ class HermesApiClient(
                 ?.let { stream.onEvent(StreamEvent.AssistantDelta(it)) }
 
             "message.interim" -> payload.optString("text").takeIf { it.isNotBlank() }
-                ?.let { stream.onEvent(StreamEvent.AssistantDelta("\n\n$it")) }
+                ?.let { stream.onEvent(StreamEvent.AssistantInterim(it)) }
 
             "message.complete" -> {
                 val status = payload.optString("status")
                 if (status in setOf("error", "failed", "failure")) {
                     stream.onEvent(StreamEvent.Error(firstString(payload, "error", "text") ?: "Hermes 运行失败"))
                 } else {
-                    stream.onEvent(StreamEvent.AssistantCompleted(payload.optString("text")))
+                    stream.onEvent(
+                        StreamEvent.AssistantCompleted(
+                            content = payload.optString("text"),
+                            responsePreviewed = payload.optBoolean("response_previewed") ||
+                                payload.optBoolean("responsePreviewed"),
+                        ),
+                    )
                     stream.onEvent(StreamEvent.Completed)
                 }
                 stream.controller.finish()
@@ -1599,43 +1605,7 @@ class HermesApiClient(
         payload: JSONObject,
         fallbackSessionId: String,
         type: AgentRequestType,
-    ): AgentRequest {
-        val item = payload.optJSONObject("request") ?: payload
-        val choices = item.optJSONArray("choices") ?: item.optJSONArray("options")
-        val parsedChoices = buildList {
-            if (choices != null) {
-                for (index in 0 until choices.length()) {
-                    when (val choice = choices.opt(index)) {
-                        is JSONObject -> {
-                            val label = firstString(choice, "label", "text", "title", "value") ?: continue
-                            add(AgentRequestChoice(label, firstString(choice, "value", "answer", "id") ?: label))
-                        }
-                        is String -> choice.takeIf(String::isNotBlank)?.let { add(AgentRequestChoice(it)) }
-                    }
-                }
-            }
-        }
-        val requestId = firstString(item, "request_id", "id")
-            ?: firstString(payload, "request_id", "id")
-            ?: UUID.randomUUID().toString()
-        val title = if (type == AgentRequestType.APPROVAL) {
-            firstString(item, "title", "command", "tool_name", "action") ?: "需要确认操作"
-        } else {
-            firstString(item, "question", "title", "prompt") ?: "Hermes 需要补充信息"
-        }
-        return AgentRequest(
-            requestId = requestId,
-            runtimeSessionId = firstString(item, "session_id")
-                ?: firstString(payload, "session_id")
-                ?: fallbackSessionId,
-            type = type,
-            title = title,
-            detail = firstString(item, "detail", "description", "reason", "message", "context").orEmpty(),
-            choices = parsedChoices,
-            allowSession = !item.has("allow_session") || item.optBoolean("allow_session"),
-            allowPermanent = item.optBoolean("allow_permanent") || item.optBoolean("allow_always"),
-        )
-    }
+    ): AgentRequest = parseAgentRequestPayload(payload.toKotlinMap(), fallbackSessionId, type)
 
     private fun handleSocketClosed(message: String) {
         socketOpen = false
@@ -1996,7 +1966,7 @@ class HermesApiClient(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val USER_AGENT = "Hermes-Android/3.0.3"
+        const val USER_AGENT = "Hermes-Android/3.0.3a"
         val AUXILIARY_TASK_KEYS = listOf(
             "vision",
             "web_extract",
@@ -2009,6 +1979,120 @@ class HermesApiClient(
         )
     }
 }
+
+internal fun parseAgentRequestPayload(
+    payload: Map<String, Any?>,
+    fallbackSessionId: String,
+    type: AgentRequestType,
+): AgentRequest {
+    val request = payload.mapValue("request") ?: payload
+    val structuredQuestion = request.listValue("questions")
+        ?.firstNotNullOfOrNull { it as? Map<*, *> }
+        ?.stringKeyMap()
+        ?: payload.listValue("questions")
+            ?.firstNotNullOfOrNull { it as? Map<*, *> }
+            ?.stringKeyMap()
+        ?: (request["question"] as? Map<*, *>)?.stringKeyMap()
+    val sources = buildList {
+        structuredQuestion?.let(::add)
+        add(request)
+        if (payload !== request) add(payload)
+    }
+    val rawChoices = sources.firstNotNullOfOrNull { source ->
+        source.listValue("choices") ?: source.listValue("options")
+    }
+    val choices = rawChoices.orEmpty().mapNotNull { rawChoice ->
+        when (rawChoice) {
+            is String -> rawChoice.trim().takeIf(String::isNotBlank)?.let(::AgentRequestChoice)
+            is Map<*, *> -> {
+                val choice = rawChoice.stringKeyMap()
+                val label = choice.firstStringValue("label", "text", "title", "value", "name")
+                    ?: return@mapNotNull null
+                AgentRequestChoice(
+                    label = label,
+                    value = choice.firstStringValue("value", "answer", "id") ?: label,
+                    description = choice.firstStringValue("description", "detail", "help").orEmpty(),
+                )
+            }
+            else -> null
+        }
+    }.distinctBy { it.value }
+    val requestId = sources.firstStringValue("request_id", "requestId", "id", "tool_use_id")
+        ?: UUID.randomUUID().toString()
+    val title = if (type == AgentRequestType.APPROVAL) {
+        sources.firstStringValue("title", "command", "tool_name", "action") ?: "需要确认操作"
+    } else {
+        sources.firstStringValue("question", "title", "prompt", "header") ?: "Hermes 需要补充信息"
+    }
+    return AgentRequest(
+        requestId = requestId,
+        runtimeSessionId = sources.firstStringValue("session_id", "sessionId") ?: fallbackSessionId,
+        type = type,
+        title = title,
+        detail = sources.firstStringValue("detail", "description", "reason", "message", "context").orEmpty(),
+        choices = choices,
+        allowMultiple = sources.firstBooleanValue(
+            "multi_select",
+            "multiSelect",
+            "allow_multiple",
+            "allowMultiple",
+            "multiple",
+        ) ?: false,
+        allowSession = sources.firstBooleanValue("allow_session", "allowSession") ?: true,
+        allowPermanent = sources.firstBooleanValue("allow_permanent", "allowPermanent", "allow_always") ?: false,
+    )
+}
+
+private fun JSONObject.toKotlinMap(): Map<String, Any?> = buildMap {
+    val iterator = keys()
+    while (iterator.hasNext()) {
+        val key = iterator.next()
+        put(key, opt(key).toKotlinValue())
+    }
+}
+
+private fun Any?.toKotlinValue(): Any? = when (this) {
+    null, JSONObject.NULL -> null
+    is JSONObject -> toKotlinMap()
+    is JSONArray -> buildList {
+        for (index in 0 until length()) add(opt(index).toKotlinValue())
+    }
+    else -> this
+}
+
+private fun Map<*, *>.stringKeyMap(): Map<String, Any?> = entries.mapNotNull { (key, value) ->
+    (key as? String)?.let { it to value }
+}.toMap()
+
+private fun Map<String, Any?>.mapValue(key: String): Map<String, Any?>? =
+    (get(key) as? Map<*, *>)?.stringKeyMap()
+
+private fun Map<String, Any?>.listValue(key: String): List<Any?>? = get(key) as? List<Any?>
+
+private fun Map<String, Any?>.firstStringValue(vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+    (get(key) as? String)?.trim()?.takeIf(String::isNotBlank)
+}
+
+private fun List<Map<String, Any?>>.firstStringValue(vararg keys: String): String? =
+    firstNotNullOfOrNull { it.firstStringValue(*keys) }
+
+private fun List<Map<String, Any?>>.firstBooleanValue(vararg keys: String): Boolean? =
+    firstNotNullOfOrNull { source ->
+        keys.firstNotNullOfOrNull { key ->
+            when (val value = source[key]) {
+                is Boolean -> value
+                is Number -> value.toInt() != 0
+                is String -> value.trim().lowercase().let { normalized ->
+                    when (normalized) {
+                        "true", "1", "yes", "on" -> true
+                        "false", "0", "no", "off" -> false
+                        else -> null
+                    }
+                }
+                else -> null
+            }
+        }
+    }
 
 internal fun toWebSocketUrl(httpUrl: String): String = when {
     httpUrl.startsWith("https://", ignoreCase = true) -> "wss://" + httpUrl.substring(8)

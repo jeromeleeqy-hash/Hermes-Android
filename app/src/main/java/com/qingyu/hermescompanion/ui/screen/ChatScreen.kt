@@ -76,6 +76,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.model.ChatMessage
 import com.qingyu.hermescompanion.model.AgentRequest
+import com.qingyu.hermescompanion.model.AgentRequestChoice
 import com.qingyu.hermescompanion.model.AgentRequestType
 import com.qingyu.hermescompanion.model.scopedId
 import com.qingyu.hermescompanion.model.MessageRole
@@ -1021,16 +1022,18 @@ private fun AgentRequestCard(
     onRespond: (AgentRequest, String) -> Unit,
 ) {
     var answer by remember(request.requestId) { mutableStateOf("") }
+    var selectedValues by remember(request.requestId) { mutableStateOf(emptySet<String>()) }
     val actions = if (request.type == AgentRequestType.APPROVAL) {
         buildList {
-            add("仅本次允许" to "once")
-            if (request.allowSession) add("本次会话允许" to "session")
-            if (request.allowPermanent) add("始终允许" to "always")
-            add("拒绝" to "deny")
+            add(AgentRequestChoice("仅本次允许", "once"))
+            if (request.allowSession) add(AgentRequestChoice("本次会话允许", "session"))
+            if (request.allowPermanent) add(AgentRequestChoice("始终允许", "always"))
+            add(AgentRequestChoice("拒绝", "deny"))
         }
     } else {
-        request.choices.map { it.label to it.value }
+        request.choices
     }
+    val isMultipleChoice = request.type == AgentRequestType.CLARIFICATION && request.allowMultiple
     Surface(
         modifier = Modifier.fillMaxWidth().padding(start = 43.dp, end = 4.dp),
         shape = RoundedCornerShape(16.dp),
@@ -1055,16 +1058,45 @@ private fun AgentRequestCard(
             if (request.detail.isNotBlank()) {
                 Text(request.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            actions.forEach { (label, value) ->
+            actions.forEach { choice ->
+                val selected = choice.value in selectedValues
                 Surface(
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) { onRespond(request, value) },
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) {
+                        if (isMultipleChoice) {
+                            selectedValues = if (selected) selectedValues - choice.value else selectedValues + choice.value
+                        } else {
+                            onRespond(request, choice.value)
+                        }
+                    },
                     shape = RoundedCornerShape(11.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
                 ) {
-                    Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), style = MaterialTheme.typography.bodyMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isMultipleChoice) {
+                            HermesMulticolorIcon(
+                                if (selected) HermesIconKind.CHECKBOX_CHECKED else HermesIconKind.CHECKBOX_EMPTY,
+                                contentDescription = if (selected) "已选择" else "未选择",
+                                iconSize = 20.dp,
+                            )
+                            Spacer(Modifier.width(9.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(choice.label, style = MaterialTheme.typography.bodyMedium)
+                            if (choice.description.isNotBlank()) {
+                                Text(
+                                    choice.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            if (request.type == AgentRequestType.CLARIFICATION && actions.isEmpty()) {
+            if (request.type == AgentRequestType.CLARIFICATION && (actions.isEmpty() || isMultipleChoice)) {
                 Surface(shape = RoundedCornerShape(11.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)) {
                     BasicTextField(
                         value = answer,
@@ -1075,22 +1107,47 @@ private fun AgentRequestCard(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp, max = 120.dp).padding(11.dp),
                         decorationBox = { inner ->
                             Box {
-                                if (answer.isBlank()) Text("输入你的回答…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (answer.isBlank()) {
+                                    Text(
+                                        if (isMultipleChoice) "其他回答（可选）" else "输入你的回答…",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 inner()
                             }
                         },
                     )
                 }
+                val response = buildAgentRequestAnswer(request, selectedValues, answer)
                 TextButton(
-                    enabled = answer.isNotBlank() && !request.isResponding,
-                    onClick = { onRespond(request, answer.trim()) },
+                    enabled = response.isNotBlank() && !request.isResponding,
+                    onClick = { onRespond(request, response) },
                     modifier = Modifier.align(Alignment.End),
-                ) { Text(if (request.isResponding) "提交中…" else "提交回答") }
+                ) {
+                    Text(
+                        when {
+                            request.isResponding -> "提交中…"
+                            isMultipleChoice -> "确认并继续"
+                            else -> "提交回答"
+                        },
+                    )
+                }
             }
             if (request.isResponding) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
     }
 }
+
+internal fun buildAgentRequestAnswer(
+    request: AgentRequest,
+    selectedValues: Set<String>,
+    customAnswer: String,
+): String = buildList {
+    request.choices.forEach { choice ->
+        if (choice.value in selectedValues) add(choice.value)
+    }
+    customAnswer.trim().takeIf(String::isNotBlank)?.let(::add)
+}.joinToString(", ")
 
 @Composable
 private fun CompletionCard() {

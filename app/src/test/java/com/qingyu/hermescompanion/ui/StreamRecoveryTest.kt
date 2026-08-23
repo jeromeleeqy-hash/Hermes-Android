@@ -90,6 +90,46 @@ class StreamRecoveryTest {
     }
 
     @Test
+    fun doesNotAppendInterimTextThatWasAlreadyStreamed() {
+        assertEquals(
+            "好的，我来设计测试。",
+            mergeInterimAssistantText("好的，我来设计测试。", "好的，我来设计测试。"),
+        )
+    }
+
+    @Test
+    fun ignoresWhitespaceOnlyDifferencesInInterimSnapshot() {
+        assertEquals(
+            "单选测试通过。 接下来测试多选：",
+            mergeInterimAssistantText("单选测试通过。 接下来测试多选：", "单选测试通过。\n接下来测试多选："),
+        )
+    }
+
+    @Test
+    fun appendsDistinctInterimCommentaryOnce() {
+        assertEquals(
+            "正在检查配置。\n\n接下来验证连接。",
+            mergeInterimAssistantText("正在检查配置。", "接下来验证连接。"),
+        )
+    }
+
+    @Test
+    fun appendsFinalAnswerAfterDistinctInterimCommentary() {
+        assertEquals(
+            "我先检查一下。\n\n检查完成，没有发现异常。",
+            mergeCompletedAssistantText("我先检查一下。", "检查完成，没有发现异常。"),
+        )
+    }
+
+    @Test
+    fun settlesPreviewedCompletionWithoutDuplicatingText() {
+        assertEquals(
+            "任务已经完成。",
+            mergeCompletedAssistantText("任务已经完成。", "任务已经完成。", responsePreviewed = true),
+        )
+    }
+
+    @Test
     fun resolvesRelativeArtifactAgainstConversationWorkspace() {
         assertEquals(
             "/root/workspace/report.md",

@@ -281,6 +281,7 @@ enum class AgentRequestType {
 data class AgentRequestChoice(
     val label: String,
     val value: String = label,
+    val description: String = "",
 )
 
 data class AgentRequest(
@@ -291,6 +292,7 @@ data class AgentRequest(
     val title: String,
     val detail: String = "",
     val choices: List<AgentRequestChoice> = emptyList(),
+    val allowMultiple: Boolean = false,
     val allowSession: Boolean = true,
     val allowPermanent: Boolean = false,
     val isResponding: Boolean = false,
@@ -490,7 +492,11 @@ sealed interface StreamEvent {
     data class ReasoningDelta(val text: String) : StreamEvent
     data class ReasoningAvailable(val text: String) : StreamEvent
     data class AssistantDelta(val text: String) : StreamEvent
-    data class AssistantCompleted(val content: String) : StreamEvent
+    data class AssistantInterim(val content: String) : StreamEvent
+    data class AssistantCompleted(
+        val content: String,
+        val responsePreviewed: Boolean = false,
+    ) : StreamEvent
     data class ToolStarted(
         val name: String,
         val preview: String,
