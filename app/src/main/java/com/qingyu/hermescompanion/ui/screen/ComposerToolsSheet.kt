@@ -34,7 +34,7 @@ fun ComposerToolsSheet(
     onDismiss: () -> Unit,
     onPickFiles: () -> Unit,
     onPickImages: () -> Unit,
-    onAddLink: () -> Unit,
+    onOpenCommands: () -> Unit,
     onOpenWorkspace: () -> Unit,
     onInsertPrompt: (String) -> Unit,
 ) {
@@ -64,8 +64,8 @@ fun ComposerToolsSheet(
                 ToolTile("图片", HermesIconKind.PHOTO, MaterialTheme.colorScheme.secondaryContainer, Modifier.weight(1f)) {
                     onDismiss(); onPickImages()
                 }
-                ToolTile("链接", HermesIconKind.LINK, HermesColors.extended.warningContainer, Modifier.weight(1f)) {
-                    onDismiss(); onAddLink()
+                ToolTile("命令", HermesIconKind.COMMAND, MaterialTheme.colorScheme.tertiaryContainer, Modifier.weight(1f)) {
+                    onDismiss(); onOpenCommands()
                 }
                 ToolTile("空间", HermesIconKind.SPACE, HermesColors.extended.successContainer, Modifier.weight(1f)) {
                     onDismiss(); onOpenWorkspace()

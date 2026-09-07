@@ -17,8 +17,8 @@ android {
         applicationId = "com.qingyu.hermescompanion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 304
-        versionName = "3.0.3a-release"
+        versionCode = 315
+        versionName = "3.1.5-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -64,6 +64,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions { unitTests.isReturnDefaultValues = true; unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -93,9 +95,31 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    testImplementation(platform("androidx.compose:compose-bom:2026.06.00"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.16")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.06.00"))
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+}
+
+// Start Mockito's instrumentation with the test JVM; works in CI where self-attach is unavailable.
+val mockitoAgent by configurations.creating
+
+dependencies {
+    mockitoAgent("org.mockito:mockito-core:5.14.2") { isTransitive = false }
+}
+
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "2g"
+    System.getenv("HERMES_LOCAL_MAVEN")?.let { systemProperty("robolectric.dependency.repo.url", "$it/maven") }
+
+    doFirst { jvmArgs("-javaagent:${mockitoAgent.asPath}") }
 }

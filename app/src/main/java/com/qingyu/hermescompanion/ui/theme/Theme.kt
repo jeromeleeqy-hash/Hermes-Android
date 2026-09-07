@@ -33,7 +33,7 @@ data class HermesSkinTokens(
 /**
  * Hermes now ships one focused interface language.  The token name is kept
  * compatible with the old preference model, but every screen receives these
- * Telegram-inspired office tokens regardless of the legacy skin value.
+ * assistant workspace tokens regardless of the legacy skin value.
  */
 private val OfficeSkin = HermesSkinTokens(
     mode = SkinMode.CLEAN,
@@ -41,10 +41,10 @@ private val OfficeSkin = HermesSkinTokens(
     panelAlpha = 1f,
     chromeAlpha = 1f,
     shadowElevation = 0,
-    borderAlpha = 0f,
+    borderAlpha = .45f,
     ambientStrength = 0f,
-    panelRadius = 18,
-    controlRadius = 12,
+    panelRadius = 20,
+    controlRadius = 16,
     menuRadius = 16,
     selectedFillAlpha = 1f,
     iconWellAlpha = 1f,
@@ -78,18 +78,18 @@ data class HermesExtendedColors(
 private val LightExtendedColors = HermesExtendedColors(
     success = Color(0xFF20A67A),
     onSuccess = Color.White,
-    successContainer = Color(0xFFE3F5EE),
+    successContainer = Color(0xFFE6FAF4),
     onSuccessContainer = Color(0xFF0B5D4D),
-    warning = Color(0xFFD58C22),
+    warning = Color(0xFFEDA93A),
     onWarning = Color.White,
     warningContainer = Color(0xFFFFF4DC),
     onWarningContainer = Color(0xFF694300),
     infoContainer = Color(0xFFE6F3FF),
-    onInfoContainer = Color(0xFF17689B),
+    onInfoContainer = Color(0xFF0078AD),
     cyan = Color(0xFF16A6B6),
     cyanContainer = Color(0xFFE1F6F8),
     purple = Color(0xFF7567E8),
-    purpleContainer = Color(0xFFF0EDFF),
+    purpleContainer = Color(0xFFF0EBFF),
 )
 
 private val DarkExtendedColors = HermesExtendedColors(
@@ -129,10 +129,10 @@ object HermesSpacing {
 }
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF2A9FE8),
+    primary = Color(0xFF007AC5),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFE4F3FF),
-    onPrimaryContainer = Color(0xFF17689B),
+    onPrimaryContainer = Color(0xFF0078AD),
     secondary = Color(0xFF7567E8),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFF0ECFF),
@@ -141,21 +141,21 @@ private val LightColors = lightColorScheme(
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFFE4F6F5),
     onTertiaryContainer = Color(0xFF08645F),
-    background = Color(0xFFF1F2F6),
-    onBackground = Color(0xFF1D222B),
+    background = Color(0xFFF7FBFF),
+    onBackground = Color(0xFF161C2C),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1D222B),
-    surfaceDim = Color(0xFFEDEFF3),
+    onSurface = Color(0xFF161C2C),
+    surfaceDim = Color(0xFFEAF2F8),
     surfaceBright = Color(0xFFFFFFFF),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFAFBFC),
-    surfaceContainer = Color(0xFFF5F6F9),
-    surfaceContainerHigh = Color(0xFFEEF0F4),
-    surfaceContainerHighest = Color(0xFFE7E9EE),
-    surfaceVariant = Color(0xFFF1F3F6),
-    onSurfaceVariant = Color(0xFF6D7480),
+    surfaceContainerLow = Color(0xFFF8FCFF),
+    surfaceContainer = Color(0xFFF1F8FD),
+    surfaceContainerHigh = Color(0xFFEAF4FB),
+    surfaceContainerHighest = Color(0xFFE0EEF7),
+    surfaceVariant = Color(0xFFEFF7FC),
+    onSurfaceVariant = Color(0xFF606D7F),
     outline = Color(0xFF9AA1AC),
-    outlineVariant = Color(0xFFE1E4E9),
+    outlineVariant = Color(0xFFDDEBF4),
     error = Color(0xFFE25464),
     errorContainer = Color(0xFFFFE8EB),
     onErrorContainer = Color(0xFF6D2630),

@@ -15,11 +15,13 @@ data class ChatInsights(
 )
 
 object ChatInsightParser {
+    private const val extensions = "markdown|docx|xlsx|pptx|html|jpeg|md|txt|pdf|doc|xls|csv|ppt|htm|png|jpg|webp|gif|zip|apk"
     private val artifactPattern = Regex(
-        pattern = """(?:/|~/|\./)[^\"'`\n\r{}<>|]+?\.(?:md|markdown|txt|pdf|docx?|xlsx?|csv|pptx?|html?|png|jpe?g|webp|gif|zip|apk)""",
-        option = RegexOption.IGNORE_CASE,
+        """(?:~/|\./|/)[^\"'`\n\r{}<>|()，；]+?\.(?:$extensions)(?![\p{L}\p{N}_.])""",
+        RegexOption.IGNORE_CASE,
     )
-    private val markdownLinkPattern = Regex("""\[([^]]+)]\(([^)]+)\)""")
+    private val markdownLinkPattern = Regex("""!?\[([^]]*)]\((<(?:[^>]+)>|(?:[^()\n]|\([^()\n]*\))+)\)""")
+    private val urlPattern = Regex("""https?://[^\s<>\"'`]+""", RegexOption.IGNORE_CASE)
 
     fun fromMessages(messages: List<ChatMessage>): ChatInsights {
         val toolMessages = messages.filter { it.role == MessageRole.TOOL || it.role == MessageRole.SYSTEM }
@@ -35,21 +37,21 @@ object ChatInsightParser {
 
     fun artifactsFromText(text: String): List<ChatArtifact> {
         if (text.isBlank()) return emptyList()
+        val links = markdownLinkPattern.findAll(text).toList()
+        val protectedRanges = links.map { it.range } + urlPattern.findAll(text).map { it.range }.toList()
         val paths = buildList<Pair<Int, String>> {
-            markdownLinkPattern.findAll(text).forEach { match ->
-                val target = match.groupValues[2].trim()
-                if (target.hasArtifactExtension()) add(match.range.first to target)
+            links.forEach { match ->
+                val target = normalizeArtifactTarget(match.groupValues[2], markdownLink = true)
+                if (!target.contains("://") && target.hasArtifactExtension()) add(match.range.first to target)
             }
-            artifactPattern.findAll(text).forEach {
-                add(it.range.first to it.value.trim().trimEnd('.', ',', ';', ':', '。', '，'))
+            artifactPattern.findAll(text).forEach { match ->
+                if (protectedRanges.none { match.range.first in it }) {
+                    add(match.range.first to normalizeArtifactTarget(match.value.trim().trimEnd('.', ',', ';', ':', '。', '，')))
+                }
             }
         }
         return paths.sortedBy(Pair<Int, String>::first).map(Pair<Int, String>::second).distinct().map { path ->
-            ChatArtifact(
-                path = path,
-                name = path.substringAfterLast('/').ifBlank { path },
-                kind = artifactKind(path),
-            )
+            ChatArtifact(path = path, name = path.substringAfterLast('/').ifBlank { path }, kind = artifactKind(path))
         }
     }
 

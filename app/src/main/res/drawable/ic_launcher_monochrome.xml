@@ -1,25 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M54,31c-13.3,0 -22,9.4 -22,23.8c0,12.8 8.2,22.2 22,22.2s22,-9.4 22,-22.2C76,40.4 67.3,31 54,31Z" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M27,55C27,34 38.3,22 54,22s27,12 27,33"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeWidth="7" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M22,51h11c3.3,0 6,2.7 6,6v14c0,3.3 -2.7,6 -6,6H22Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M86,51H75c-3.3,0 -6,2.7 -6,6v14c0,3.3 2.7,6 6,6h11Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M25,91c4.5,-10 15.4,-15 29,-15s24.5,5 29,15Z" />
-</vector>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="26%" android:insetTop="26%" android:insetRight="26%" android:insetBottom="26%"
+    android:drawable="@drawable/hermes_nav_portrait_vector" />

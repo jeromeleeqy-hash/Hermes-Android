@@ -183,7 +183,7 @@ fun ConnectionScreen(
                     }
                 }
                 if (state.hasSavedConnection) {
-                    TextButton(
+                    TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                         onClick = onDiagnose,
                         enabled = !state.isConnectionDiagnosing && !state.isBusy,
                         modifier = Modifier.fillMaxWidth(),
@@ -223,7 +223,7 @@ fun ConnectionScreen(
         GatewayNote(HermesIconKind.WARNING, "地址填写说明", "填写电脑端“远程 URL”的完整内容，不要额外添加 /api 或 /v1。")
 
         if (onDisconnect != null) {
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 onClick = onDisconnect,
                 enabled = !state.agentUpdateProgress.running,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -249,9 +249,9 @@ fun ConnectionScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { confirmAgentUpdate = false; onApplyAgentUpdate() }) { Text("开始更新") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { confirmAgentUpdate = false; onApplyAgentUpdate() }) { Text("开始更新") }
             },
-            dismissButton = { TextButton(onClick = { confirmAgentUpdate = false }) { Text("取消") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { confirmAgentUpdate = false }) { Text("取消") } },
         )
     }
 }
@@ -297,7 +297,7 @@ private fun AgentUpdateCard(state: AppUiState, onCheck: () -> Unit, onUpdate: ()
                 Text("服务器命令：${info.updateCommand}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.align(Alignment.End)) {
-                TextButton(onClick = onCheck, enabled = !state.isAgentUpdateChecking && !progress.running) { Text("检查更新") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCheck, enabled = !state.isAgentUpdateChecking && !progress.running) { Text("检查更新") }
                 if (info.updateAvailable && info.canApply) {
                     Button(onClick = onUpdate, enabled = !progress.running && !state.isStreaming && state.pendingAgentRequests.isEmpty()) { Text("更新 Agent") }
                 }

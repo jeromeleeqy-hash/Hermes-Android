@@ -772,12 +772,12 @@ fun ProfileSettingsScreen(
                             modifier = Modifier.padding(top = 4.dp),
                         )
                         Row(Modifier.padding(top = 4.dp)) {
-                            TextButton(
+                            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                                 onClick = { hermesAvatarPicker.launch(arrayOf("image/*")) },
                                 enabled = !state.isAvatarUpdating,
                             ) { Text(if (state.userProfile.hermesAvatarUri.isBlank()) "设置头像" else "更换头像") }
                             if (state.userProfile.hermesAvatarUri.isNotBlank()) {
-                                TextButton(
+                                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                                     onClick = onResetHermesAvatar,
                                     enabled = !state.isAvatarUpdating,
                                 ) { Text("恢复默认") }
@@ -880,7 +880,7 @@ private fun AvatarCropSheet(
             CropSlider("左右", horizontal, -1f..1f) { horizontal = it }
             CropSlider("上下", vertical, -1f..1f) { vertical = it }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("取消") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("取消") }
                 Button(
                     onClick = { onConfirm(request.uri, AvatarCropSpec(zoom, horizontal, vertical)) },
                     enabled = bitmap != null,
@@ -944,31 +944,18 @@ private fun ProfileInputRow(label: String, value: String, placeholder: String, o
 
 @Composable
 private fun IconWell(icon: HermesIconKind) {
-    val container = when (icon) {
-        HermesIconKind.CONNECTION -> Color(0xFF2AABEE)
-        HermesIconKind.APPEARANCE -> Color(0xFF8B5CF6)
-        HermesIconKind.NOTIFICATION -> Color(0xFFF04455)
-        HermesIconKind.MICROPHONE -> Color(0xFF20B8C9)
-        HermesIconKind.SKILLS -> Color(0xFF9B5DE5)
-        HermesIconKind.MODEL -> Color(0xFF477EF5)
-        HermesIconKind.CONVERSATION_STYLE -> Color(0xFF22A699)
-        HermesIconKind.VERIFIED -> Color(0xFF31B95E)
-        HermesIconKind.MEMORY -> Color(0xFF477EF5)
-        HermesIconKind.SOUL -> Color(0xFFB45AF2)
-        HermesIconKind.ARCHIVE -> Color(0xFFF59E0B)
-        HermesIconKind.CHANGELOG -> Color(0xFF20A4E8)
-        HermesIconKind.INFORMATION -> Color(0xFF2AABEE)
-        HermesIconKind.AI -> Color(0xFF8B5CF6)
-        HermesIconKind.STORAGE -> Color(0xFF31B95E)
-        else -> Color(0xFF6B7280)
+    val tint = when(icon) {
+        HermesIconKind.APPEARANCE, HermesIconKind.SKILLS, HermesIconKind.SOUL, HermesIconKind.AI -> com.qingyu.hermescompanion.ui.theme.HermesColors.extended.purple
+        HermesIconKind.VERIFIED, HermesIconKind.CONVERSATION_STYLE, HermesIconKind.MICROPHONE -> com.qingyu.hermescompanion.ui.theme.HermesColors.extended.success
+        else -> com.qingyu.hermescompanion.ui.component.AssistantBlue
     }
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = container,
+        color = tint.copy(alpha=.10f),
         tonalElevation = 0.dp,
     ) {
         Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-            HermesMulticolorIcon(icon, contentDescription = null, iconSize = 19.dp, tint = Color.White)
+            HermesMulticolorIcon(icon, contentDescription = null, iconSize = 19.dp, tint = tint)
         }
     }
 }

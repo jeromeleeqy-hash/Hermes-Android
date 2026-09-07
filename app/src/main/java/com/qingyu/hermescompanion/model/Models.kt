@@ -260,6 +260,7 @@ data class PendingAttachment(
     val mimeType: String,
     val dataUrl: String? = null,
     val textContent: String? = null,
+    val remotePath: String? = null,
 )
 
 data class IncomingShare(
@@ -319,6 +320,7 @@ data class ActiveRunSnapshot(
     val submittedPrompt: String,
     val baselineAssistantSignature: String,
     val startedAtMillis: Long,
+    val workspacePath: String = "",
 )
 
 data class RecentArtifact(
@@ -331,6 +333,7 @@ data class RecentArtifact(
     val kind: String,
     val workspacePath: String = "",
     val seenAtMillis: Long = System.currentTimeMillis(),
+    val sourcePath: String = "",
 )
 
 data class SessionSearchResult(

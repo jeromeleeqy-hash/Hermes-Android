@@ -46,6 +46,20 @@ object AttachmentReader {
         }
     }
 
+    /** Remote files already exist on the server; binary documents remain real path attachments. */
+    fun fromWorkspaceDocument(document: com.qingyu.hermescompanion.model.WorkspaceDocument): PendingAttachment {
+        val mime = document.mimeType.substringBefore(';').lowercase()
+        val attachment = PendingAttachment(name = document.name, mimeType = mime, remotePath = document.path)
+        return when {
+            mime.startsWith("image/") && document.bytes.size <= MAX_IMAGE_BYTES -> attachment.copy(
+                dataUrl = "data:$mime;base64,${java.util.Base64.getEncoder().encodeToString(document.bytes)}",
+            )
+            (mime.startsWith("text/") || mime in textMimeTypes || isTextFileName(document.name)) &&
+                document.bytes.size <= MAX_TEXT_BYTES -> attachment.copy(textContent = document.bytes.toString(Charsets.UTF_8))
+            else -> attachment
+        }
+    }
+
     private fun readLimited(resolver: ContentResolver, uri: Uri, limit: Int): ByteArray {
         resolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "无法读取所选文件" }
@@ -72,7 +86,7 @@ object AttachmentReader {
 
     private fun isTextFileName(name: String): Boolean {
         return name.substringAfterLast('.', "").lowercase() in setOf(
-            "txt", "md", "csv", "tsv", "json", "xml", "yaml", "yml", "log",
+            "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "log",
             "kt", "java", "py", "js", "ts", "html", "css", "sh", "sql",
         )
     }

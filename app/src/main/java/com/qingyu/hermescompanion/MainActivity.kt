@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
 
             HermesCompanionTheme(themeMode = state.themeMode, skinMode = state.skinMode) {
                 BackHandler(
-                    enabled = state.route == AppRoute.CHAT ||
+                    enabled = state.route in setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE) || state.route == AppRoute.CHAT ||
                         state.route == AppRoute.SEARCH ||
                         state.route == AppRoute.VOICE_CHAT ||
                         state.route == AppRoute.SETTINGS ||
@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
                         (state.route == AppRoute.SETUP && state.hasSavedConnection),
                 ) {
                     when {
+                        state.route == AppRoute.WORKSPACE && state.workspaceAttachmentTarget != null -> viewModel.cancelWorkspaceAttachmentPicker()
+                        state.route in setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE) -> viewModel.showHome()
                         state.route == AppRoute.SEARCH -> viewModel.closeSessionSearch()
                         state.route == AppRoute.VOICE_CHAT -> viewModel.closeVoiceConversation()
                         state.route == AppRoute.SETTINGS -> viewModel.showProfile()

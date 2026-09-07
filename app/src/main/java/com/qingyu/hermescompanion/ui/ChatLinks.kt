@@ -19,13 +19,7 @@ private val absoluteMarkdownPath = Regex(
 private val imageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
 
 internal fun normalizeChatLinkTarget(rawTarget: String): String {
-    val unwrapped = rawTarget.trim().trim('`', '"', '\'').trim()
-    val withoutMediaPrefix = if (unwrapped.startsWith("MEDIA:", ignoreCase = true)) {
-        unwrapped.substring(6)
-    } else {
-        unwrapped
-    }
-    return withoutMediaPrefix.trim().trim('`', '"', '\'')
+    return com.qingyu.hermescompanion.data.normalizeArtifactTarget(rawTarget)
 }
 
 internal fun parseChatFileLinkLine(rawLine: String): ChatFileLink? {

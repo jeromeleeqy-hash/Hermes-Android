@@ -115,7 +115,7 @@ fun NotificationSettingsScreen(
             Button(onClick = onTest, enabled = preferences.enabled && permissionGranted, modifier = Modifier.weight(1f)) {
                 Text("发送测试通知")
             }
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 onClick = {
                     context.startActivity(
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -276,7 +276,7 @@ fun VoiceSettingsScreen(
                     ) { Text(if (state.settingsActionKey == "voice-tts-test") "合成中…" else "试听 TTS") }
                 }
                 if (settingsTestActive || (capture.target == VoiceCaptureTarget.SETTINGS_TEST && capture.phase == VoicePhase.ERROR)) {
-                    TextButton(onClick = onCancelAgentSttTest, modifier = Modifier.align(Alignment.End)) { Text("取消测试") }
+                    TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCancelAgentSttTest, modifier = Modifier.align(Alignment.End)) { Text("取消测试") }
                 }
             }
         }
@@ -330,7 +330,7 @@ fun VoiceSettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = {
                     val value = customValue.trim()
                     if (value.isNotBlank()) {
                         when (target) {
@@ -342,7 +342,7 @@ fun VoiceSettingsScreen(
                     customTarget = null
                 }) { Text("应用") }
             },
-            dismissButton = { TextButton(onClick = { customTarget = null }) { Text("取消") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { customTarget = null }) { Text("取消") } },
         )
     }
 }
@@ -519,7 +519,7 @@ private fun VoiceOptionDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("取消") } },
         containerColor = MaterialTheme.colorScheme.surface,
     )
 }
@@ -560,9 +560,38 @@ fun ChangeLogScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
     SettingsPage("更新日志", "Hermes 移动端版本记录", contentPadding, onBack) {
         if (BuildConfig.VERSION_CODE >= 300) {
             ChangeLogEntry(
+                version = "3.1.1-release",
+                date = "2026-09-07",
+                current = true,
+                items = listOf("首页按参考图重新排版，使用原画中的托腮女孩", "近期事项合并为一张卡片，输入条和导航恢复紧凑样式", "修复键盘弹出时导航占位导致的大块空白", "工作详情使用进度时间线、资料分组和调整/停止操作", "首页附件和语音按钮接入实际会话功能"),
+            )
+            ChangeLogEntry(
+                version = "3.1.0-release",
+                date = "2026-09-07",
+                items = listOf("新增助理首页：待确认、进行中和近期对话", "三栏导航：助理、回看、我的；保留任务与文件入口", "最新答复与完整对话切换，结果集中阅读", "独立决策面板，长选项滚动、确认按钮固定", "统一配色、留白、圆角与可读性"),
+            )
+            ChangeLogEntry(
+                version = "3.0.4a-release",
+                date = "2026-09-07",
+                items = listOf(
+                    "修复新建空对话时弹出 Session not found",
+                    "删除等普通操作提示缩短为约 1.5 秒",
+                    "运行状态栏不再遮挡会话列表的新建按钮",
+                ),
+            )
+            ChangeLogEntry(
+                version = "3.0.4-release",
+                date = "2026-09-07",
+                items = listOf(
+                    "新对话继承所选项目目录，历史会话继续使用原目录",
+                    "支持多会话同时运行，回复、停止、排队与恢复记录各自独立",
+                    "任务页展示全部运行会话，可分别查看和停止",
+                    "修复后台失败影响前台草稿，以及附件、项目切换的相关问题",
+                ),
+            )
+            ChangeLogEntry(
                 version = "3.0.3a-release",
                 date = "2026-08-22",
-                current = true,
                 items = listOf(
                     "用户头像与 Hermes 头像支持分别替换，互不覆盖",
                     "Hermes 头像会同步显示在会话列表、Hermes 回复和助理面板",

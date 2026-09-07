@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.model.WorkspaceDocument
 import com.qingyu.hermescompanion.model.WorkspaceEntry
 import com.qingyu.hermescompanion.model.RecentArtifact
+import com.qingyu.hermescompanion.model.scopedId
 import com.qingyu.hermescompanion.ui.AppUiState
 import com.qingyu.hermescompanion.ui.component.GlassPanel
 import com.qingyu.hermescompanion.ui.component.HermesIconKind
@@ -82,9 +85,14 @@ fun WorkspaceScreen(
     onExportDocument: (android.net.Uri) -> Unit,
     onShareDocument: () -> Unit,
     onUnsupportedFile: (String) -> Unit,
+    onChooseProject: () -> Unit = {},
+    onCancelAttachmentPicker: () -> Unit = {},
+    onSelectAttachment: (WorkspaceEntry) -> Unit = {},
+    onSelectRecentAttachment: (RecentArtifact) -> Unit = {},
 ) {
+    val picking = state.workspaceAttachmentTarget != null
     val document = state.workspaceDocument
-    if (document != null) {
+    if (document != null && !picking) {
         WorkspaceDocumentScreen(
             state = state,
             document = document,
@@ -104,17 +112,30 @@ fun WorkspaceScreen(
 
     val listing = state.workspaceListing
     val recentArtifacts = state.recentArtifacts.filter { it.profile == state.activeProfile }
-    var selectedTab by remember { mutableStateOf(if (recentArtifacts.isEmpty()) WorkspaceTab.FILES else WorkspaceTab.RECENT) }
+    var selectedTab by remember(state.workspaceAttachmentTarget?.scopedId) { mutableStateOf(if (recentArtifacts.isEmpty()) WorkspaceTab.FILES else WorkspaceTab.RECENT) }
     val canGoUp = listing?.parent != null && listing.path != state.workspaceRootPath
-    BackHandler(enabled = selectedTab == WorkspaceTab.FILES && canGoUp) {
-        listing?.parent?.let(onOpenDirectory)
+    BackHandler(enabled = picking || selectedTab == WorkspaceTab.FILES && canGoUp) {
+        if (selectedTab == WorkspaceTab.FILES && canGoUp && !state.isWorkspaceAttaching) {
+            listing?.parent?.let(onOpenDirectory)
+        } else if (picking) onCancelAttachmentPicker()
     }
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-        Column(modifier = Modifier.statusBarsPadding().padding(start = HermesSpacing.page, end = HermesSpacing.page, top = 4.dp, bottom = 4.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(contentPadding).then(if (picking) Modifier.navigationBarsPadding() else Modifier)) {
+        Column(modifier = Modifier.statusBarsPadding().padding(start = HermesSpacing.page, end = HermesSpacing.page, top = 12.dp, bottom = 12.dp)) {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text(if (picking) "选择附件" else "文件与成果",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
+                if (picking) TextButton(onClick=onCancelAttachmentPicker) { Text("取消") }
+                else TextButton(onClick=onChooseProject) { Text("切换项目") }
+            }
+            Text(state.activeProfile + (listing?.projectName?.let { " · $it" } ?: ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=4.dp,bottom=16.dp))
+            if (picking) Text(
+                "点击文件，添加到「${state.workspaceAttachmentTarget?.title?.ifBlank { "当前对话" }}」",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
             HermesSegmentedControl(
                 items = WorkspaceTab.entries.map(WorkspaceTab::label),
                 selectedIndex = selectedTab.ordinal,
-                onSelect = { selectedTab = WorkspaceTab.entries[it] },
+                onSelect = { if (!state.isWorkspaceAttaching) selectedTab = WorkspaceTab.entries[it] },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
                 compact = true,
             )
@@ -126,7 +147,7 @@ fun WorkspaceScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { listing?.parent?.let(onOpenDirectory) },
-                        enabled = canGoUp,
+                        enabled = canGoUp && !state.isWorkspaceAttaching,
                         modifier = Modifier.size(40.dp),
                     ) {
                         HermesMulticolorIcon(HermesIconKind.FOLDER_UP, contentDescription = "返回上级", iconSize = 18.dp)
@@ -143,22 +164,29 @@ fun WorkspaceScreen(
             }
         }
 
+        if (state.isWorkspaceAttaching) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text("正在添加附件…", Modifier.padding(horizontal = HermesSpacing.page, vertical = 8.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
         if (selectedTab == WorkspaceTab.RECENT) {
             PullToRefreshBox(
                 isRefreshing = state.isRecentArtifactsLoading,
-                onRefresh = onRefreshRecentArtifacts,
+                onRefresh = { if (!state.isWorkspaceAttaching) onRefreshRecentArtifacts() },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 RecentArtifactsList(
                     items = recentArtifacts,
                     isLoading = state.isRecentArtifactsLoading,
-                    onOpen = onOpenRecentArtifact,
+                    onOpen = if (picking) onSelectRecentAttachment else onOpenRecentArtifact,
                     onOpenSource = onOpenArtifactSource,
+                    picking = picking,
+                    enabled = !state.isWorkspaceAttaching,
                 )
             }
         } else PullToRefreshBox(
             isRefreshing = state.isWorkspaceLoading,
-            onRefresh = onRefresh,
+            onRefresh = { if (!state.isWorkspaceAttaching) onRefresh() },
             modifier = Modifier.fillMaxSize(),
         ) {
             when {
@@ -166,16 +194,17 @@ fun WorkspaceScreen(
                     CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.2.dp)
                 }
 
-                listing == null -> WorkspaceEmpty("无法读取工作区")
+                listing == null -> WorkspaceEmpty(if (picking) "未能打开对话目录，请下拉重试，或从最近产物选择文件" else "未能打开项目目录，请点击上方“切换项目”重新选择")
                 listing.entries.isEmpty() -> WorkspaceEmpty("这个文件夹是空的")
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 2.dp, bottom = 12.dp),
                 ) {
                     items(listing.entries, key = { it.path }) { entry ->
-                        WorkspaceEntryRow(entry) {
+                        WorkspaceEntryRow(entry, picking = picking, enabled = !state.isWorkspaceAttaching) {
                             when {
                                 entry.isDirectory -> onOpenDirectory(entry.path)
+                                picking -> onSelectAttachment(entry)
                                 entry.isImage -> onOpenImage(entry.path, entry.name)
                                 entry.isPreviewable -> onOpenDocument(entry.path)
                                 else -> onUnsupportedFile(entry.name)
@@ -247,6 +276,8 @@ private fun RecentArtifactsList(
     isLoading: Boolean,
     onOpen: (RecentArtifact) -> Unit,
     onOpenSource: (RecentArtifact) -> Unit,
+    picking: Boolean = false,
+    enabled: Boolean = true,
 ) {
     if (items.isEmpty()) {
         WorkspaceEmpty(if (isLoading) "正在整理最近对话产物…" else "对话中生成的文件会出现在这里")
@@ -260,7 +291,7 @@ private fun RecentArtifactsList(
             Column(Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                        .clickable { onOpen(item) }.padding(horizontal = 2.dp, vertical = 8.dp),
+                        .clickable(enabled = enabled) { onOpen(item) }.padding(horizontal = 6.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
@@ -287,10 +318,11 @@ private fun RecentArtifactsList(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    IconButton(onClick = { onOpenSource(item) }, modifier = Modifier.padding(start = 2.dp).size(36.dp)) {
+                    IconButton(onClick = { if (picking) onOpen(item) else onOpenSource(item) }, enabled = enabled,
+                        modifier = Modifier.padding(start = 2.dp).size(48.dp)) {
                         HermesMulticolorIcon(
-                            HermesIconKind.SOURCE_CHAT,
-                            contentDescription = "返回来源对话",
+                            if (picking) HermesIconKind.ADD_OUTLINE else HermesIconKind.SOURCE_CHAT,
+                            contentDescription = if (picking) "添加 ${item.name}" else "返回来源对话",
                             iconSize = 17.dp,
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -307,7 +339,7 @@ private fun RecentArtifactsList(
 }
 
 @Composable
-private fun WorkspaceEntryRow(entry: WorkspaceEntry, onClick: () -> Unit) {
+private fun WorkspaceEntryRow(entry: WorkspaceEntry, picking: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val icon = when {
         entry.isDirectory -> HermesIconKind.FOLDER_OPEN
         entry.isMarkdown -> HermesIconKind.MARKDOWN
@@ -316,7 +348,7 @@ private fun WorkspaceEntryRow(entry: WorkspaceEntry, onClick: () -> Unit) {
         else -> HermesIconKind.FILE
     }
     val wellColor = when {
-        entry.isDirectory -> MaterialTheme.colorScheme.secondaryContainer
+        entry.isDirectory -> MaterialTheme.colorScheme.primaryContainer
         entry.isMarkdown -> MaterialTheme.colorScheme.primaryContainer
         entry.isImage -> MaterialTheme.colorScheme.tertiaryContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
@@ -324,11 +356,11 @@ private fun WorkspaceEntryRow(entry: WorkspaceEntry, onClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onClick).padding(horizontal = 2.dp, vertical = 9.dp),
+                .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 6.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(wellColor.copy(alpha = 0.78f)),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(wellColor.copy(alpha = 0.78f)),
                 contentAlignment = Alignment.Center,
             ) {
                 HermesMulticolorIcon(icon, contentDescription = null, iconSize = 19.dp)
@@ -341,6 +373,9 @@ private fun WorkspaceEntryRow(entry: WorkspaceEntry, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (picking && !entry.isDirectory) HermesMulticolorIcon(HermesIconKind.ADD_OUTLINE,
+                contentDescription = "添加 ${entry.name}", iconSize = 18.dp, tint = MaterialTheme.colorScheme.primary)
+
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 46.dp),
@@ -398,8 +433,8 @@ private fun WorkspaceDocumentScreen(
                 )
             }
             if (state.isWorkspaceEditing) {
-                TextButton(onClick = { onEditingChange(false) }, enabled = !state.isWorkspaceSaving) { Text("取消") }
-                TextButton(onClick = onSave, enabled = !state.isWorkspaceSaving) {
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onEditingChange(false) }, enabled = !state.isWorkspaceSaving) { Text("取消") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onSave, enabled = !state.isWorkspaceSaving) {
                     if (state.isWorkspaceSaving) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
@@ -487,8 +522,8 @@ private fun WorkspaceDocumentScreen(
             onDismissRequest = { showDiscard = false },
             title = { Text("放弃未保存的修改？") },
             text = { Text("返回后，本次对文档的修改不会保存。") },
-            confirmButton = { TextButton(onClick = { showDiscard = false; onClose() }) { Text("放弃") } },
-            dismissButton = { TextButton(onClick = { showDiscard = false }) { Text("继续编辑") } },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false; onClose() }) { Text("放弃") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false }) { Text("继续编辑") } },
         )
     }
 }

@@ -136,7 +136,7 @@ fun ShareToHermesDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 enabled = canSend && !state.isShareSending && !state.isProfileSwitching,
                 onClick = { onSend(selectedSessionId) },
             ) {
@@ -144,7 +144,7 @@ fun ShareToHermesDialog(
                 else Text("发送")
             }
         },
-        dismissButton = { TextButton(enabled = !state.isShareSending, onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !state.isShareSending, onClick = onDismiss) { Text("取消") } },
     )
 }
 

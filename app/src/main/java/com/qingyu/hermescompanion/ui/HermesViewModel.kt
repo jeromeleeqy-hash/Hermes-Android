@@ -10,6 +10,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.core.content.FileProvider
 import com.qingyu.hermescompanion.data.ApiException
+import com.qingyu.hermescompanion.data.ArtifactFileReader
+import com.qingyu.hermescompanion.data.resolveRemoteArtifactPath
 import com.qingyu.hermescompanion.data.AttachmentReader
 import com.qingyu.hermescompanion.data.ChatInsightParser
 import com.qingyu.hermescompanion.data.HermesApiClient
@@ -89,7 +91,10 @@ import java.io.IOException
 import java.io.File
 import java.net.URI
 
+enum class ChatEntryAction { NONE, ATTACHMENTS, VOICE }
+
 enum class AppRoute {
+    HOME,
     SETUP,
     SESSIONS,
     SEARCH,
@@ -147,11 +152,13 @@ data class AppUiState(
     val sessions: List<HermesSession> = emptyList(),
     val sessionTotalCount: Int = 0,
     val projects: List<HermesProject> = emptyList(),
+    val selectedProjectId: String? = null,
     val profiles: List<HermesProfile> = emptyList(),
     val activeProfile: String = "default",
     val isProfilesLoading: Boolean = false,
     val isProfileSwitching: Boolean = false,
     val selectedSession: HermesSession? = null,
+    val chatEntryAction: ChatEntryAction = ChatEntryAction.NONE,
     val messages: List<ChatMessage> = emptyList(),
     val hasOlderMessages: Boolean = false,
     val isOlderMessagesLoading: Boolean = false,
@@ -169,6 +176,9 @@ data class AppUiState(
     val activeCouncilMode: CouncilMode = CouncilMode.OFF,
     val isBusy: Boolean = false,
     val isStreaming: Boolean = false,
+    val runningSessions: List<HermesSession> = emptyList(),
+    val runningRuns: List<RunUiState> = emptyList(),
+    val stoppingSessionKeys: Set<String> = emptySet(),
     val streamingSessionId: String? = null,
     val runStage: String = "",
     val runStartedAtMillis: Long = 0L,
@@ -211,6 +221,8 @@ data class AppUiState(
     val projectPickerListing: WorkspaceListing? = null,
     val isProjectPickerLoading: Boolean = false,
     val workspaceRootPath: String? = null,
+    val workspaceAttachmentTarget: HermesSession? = null,
+    val isWorkspaceAttaching: Boolean = false,
     val workspaceDocument: WorkspaceDocument? = null,
     val workspaceDocumentOrigin: AppRoute? = null,
     val imagePreview: ImagePreview? = null,
@@ -251,16 +263,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private val avatarStorage = AvatarStorage(application)
     private val cookieJar = SecureCookieJar(configStore)
     private var apiClient: HermesApiClient? = null
-    private var streamController: StreamController? = null
-    private var streamJob: Job? = null
-    private var streamRecoveryJob: Job? = null
-    private var streamWatchdogJob: Job? = null
-    private var streamRecoveryPrompt: String = ""
-    private var streamBaselineAssistantSignature: String = ""
-    private var activeSubmittedPrompt: String = ""
-    private var activeSubmittedAttachments: List<PendingAttachment> = emptyList()
-    private var activeUserMessageId: String? = null
-    private var titleRefreshJob: Job? = null
+    private val activeRuns = LinkedHashMap<String, SessionRun>()
+    private val titleRefreshJobs = mutableMapOf<String, Job>()
+    private val failedSends = mutableMapOf<String, FailedSend>()
+    private val attachmentDrafts = mutableMapOf<String, List<PendingAttachment>>()
     private var slashCommandJob: Job? = null
     private var sessionSearchJob: Job? = null
     private var agentUpdateJob: Job? = null
@@ -269,21 +275,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private var voiceLevelJob: Job? = null
     private var slashCommandQuery: String = ""
     private val commandCatalogCache = mutableMapOf<String, List<SlashCommand>>()
-    private val streamingDeltaBuffer = StringBuilder()
-    private var streamingDeltaFlushJob: Job? = null
     private val messageCache = LinkedHashMap<String, List<ChatMessage>>()
     private val oldestMessageOffsets = mutableMapOf<String, Int>()
     private val indexedArtifactProfiles = mutableSetOf<String>()
-    private var activeStreamSession: HermesSession? = null
-    private var activeStreamToolActivities: List<ToolActivity> = emptyList()
-    private var activeStreamArtifacts: List<ChatArtifact> = emptyList()
-    private var activeStreamTodos: List<ChatTodo> = emptyList()
     private val pendingTitleSessionIds = mutableSetOf<String>()
     private val chatScrollPositions = mutableMapOf<String, ChatScrollPosition>()
+    private var searchReturnRoute = AppRoute.SESSIONS
     private var chatReturnRoute: AppRoute = AppRoute.SESSIONS
     private var settingsReturnRoute: AppRoute = AppRoute.PROFILE
     private var pendingDeepLink: HermesDeepLink? = null
-    private var savedRunRecoveryAttempted = false
+    private val recoveredProfiles = mutableSetOf<String>()
     private val voiceRecorder = VoiceAudioRecorder(application)
     private val voicePlayback = VoicePlaybackController(application)
     private var voiceReturnRoute: AppRoute = AppRoute.CHAT
@@ -375,7 +376,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 messageCache.clear()
                 oldestMessageOffsets.clear()
                 uiState = uiState.copy(
-                    route = AppRoute.SESSIONS,
+                    route = AppRoute.HOME,
                     baseUrl = config.baseUrl,
                     username = config.username,
                     hasSavedConnection = true,
@@ -428,6 +429,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         uiState = uiState.copy(profiles = available, isProfilesLoading = false)
                     } else {
                         val fallback = available.firstOrNull(HermesProfile::isDefault) ?: available.first()
+                        invalidateWorkspace()
                         client.setProfile(fallback.name)
                         configStore.saveActiveHermesProfile(fallback.name)
                         messageCache.clear()
@@ -438,6 +440,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             isProfileSwitching = true,
                             sessions = emptyList(),
                             projects = emptyList(),
+            selectedProjectId = null,
                             noticeMessage = "原 Profile 已不存在，已切换到 ${fallback.name}",
                         )
                         refreshSessions()
@@ -452,14 +455,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectProfile(profile: HermesProfile) {
         val client = apiClient ?: return
-        if (uiState.isStreaming) {
+        if (uiState.isStreaming || uiState.stoppingSessionKeys.isNotEmpty()) {
             showNotice("当前回复仍在生成，请等待完成后再切换 Profile")
             return
         }
         if (profile.name == client.currentProfile()) return
-        titleRefreshJob?.cancel()
+        titleRefreshJobs.values.forEach { it.cancel() }
+        titleRefreshJobs.clear()
         slashCommandJob?.cancel()
         sessionSearchJob?.cancel()
+        invalidateWorkspace()
         client.setProfile(profile.name)
         configStore.saveActiveHermesProfile(profile.name)
         messageCache.clear()
@@ -468,6 +473,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(
             route = AppRoute.SESSIONS,
             activeProfile = profile.name,
+            selectedProjectId = configStore.readSelectedProject(profile.name),
             isProfileSwitching = true,
             isProfilesLoading = false,
             isProjectsLoading = false,
@@ -506,44 +512,55 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         refreshSessions()
     }
 
-    fun createSession() {
-        if (uiState.isStreaming) {
-            showNotice("当前回复仍在后台生成，请等待完成后再新建对话")
+    fun selectProject(projectId: String?) {
+        if (uiState.route == AppRoute.SESSIONS) saveCurrentChatDraft()
+        configStore.saveSelectedProject(uiState.activeProfile,projectId)
+        invalidateWorkspace()
+        uiState = uiState.copy(
+            selectedProjectId = projectId,
+            selectedSession = if (uiState.route == AppRoute.SESSIONS) null else uiState.selectedSession,
+        )
+        publishRuns()
+    }
+
+    fun createSession() = createSessionWithDraft(null)
+
+    fun startFromHome(text: String) = createSessionWithDraft(text)
+
+    fun startWithAttachmentsFromHome(text: String) = createSessionWithDraft(text, ChatEntryAction.ATTACHMENTS)
+    fun startWithVoiceFromHome(text: String) = createSessionWithDraft(text, ChatEntryAction.VOICE)
+    fun consumeChatEntryAction() { uiState = uiState.copy(chatEntryAction = ChatEntryAction.NONE) }
+
+    private fun createSessionWithDraft(initialDraft: String?, entryAction: ChatEntryAction = ChatEntryAction.NONE) {
+        val client = apiClient ?: return
+        if (uiState.isBusy || uiState.isProfileSwitching) return
+        val project = uiState.projects.firstOrNull { it.id == uiState.selectedProjectId }
+        if (uiState.selectedProjectId != null && project == null) {
+            showNotice("项目列表正在刷新，请稍后再试")
             return
         }
-        val client = apiClient ?: return
-        chatReturnRoute = AppRoute.SESSIONS
+        saveCurrentChatDraft()
+        val profile = uiState.activeProfile
+        chatReturnRoute = if (uiState.route == AppRoute.HOME) AppRoute.HOME else AppRoute.SESSIONS
         uiState = uiState.copy(isBusy = true, errorMessage = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.createSession() } }
+            runCatching { withContext(Dispatchers.IO) { client.createSession(project?.primaryPath) } }
                 .onSuccess { session ->
+                    if (uiState.activeProfile != profile || apiClient !== client) return@onSuccess
                     uiState = uiState.copy(
-                        route = AppRoute.CHAT,
-                        selectedSession = session,
-                        messages = emptyList(),
-                        toolActivities = emptyList(),
-                        chatArtifacts = emptyList(),
-                        chatTodos = emptyList(),
-                        inlineImagePreviews = emptyMap(),
-                        inlineImageLoading = emptySet(),
-                        inlineImageFailures = emptySet(),
-                        draft = configStore.readDraft(session.profile, session.id),
-                        failedSend = null,
-                        hasOlderMessages = false,
-                        isOlderMessagesLoading = false,
-                        councilMode = CouncilMode.OFF,
-                        chatScrollIndex = 0,
-                        chatScrollOffset = 0,
-                        hasSavedChatScroll = false,
+                        sessions = (listOf(session) + uiState.sessions).distinctBy(HermesSession::scopedId),
                         isBusy = false,
                     )
-                }
-                .onFailure(::handleFailure)
+                    cacheMessages(session.id, emptyList())
+                    openSessionInternal(session, null)
+                    if (initialDraft != null) updateDraft(initialDraft)
+                    uiState = uiState.copy(chatEntryAction = entryAction)
+                }.onFailure(::handleFailure)
         }
     }
 
     fun openSession(session: HermesSession) {
-        chatReturnRoute = AppRoute.SESSIONS
+        chatReturnRoute = if (uiState.route == AppRoute.HOME) AppRoute.HOME else AppRoute.SESSIONS
         openSessionInternal(session, targetMessageId = null)
     }
 
@@ -553,11 +570,15 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun openSessionInternal(session: HermesSession, targetMessageId: String?) {
+        invalidateWorkspaceAttachmentPicker()
         val client = apiClient ?: return
+        uiState = uiState.copy(chatEntryAction = ChatEntryAction.NONE)
+        saveCurrentChatDraft()
         markSessionRead(session.scopedId)
-        val cached = messageCache[session.scopedId]
+        val run = activeRuns[session.scopedId]
+        val cached = run?.messages ?: messageCache[session.scopedId]
         val cachedInsights = cached?.let(ChatInsightParser::fromMessages)
-        val isActiveStream = uiState.isStreaming && uiState.streamingSessionId == session.id
+        val isActiveStream = run != null
         val visibleCached = cached.visibleConversationMessages()
         val targetIndex = targetMessageId?.let { id -> visibleCached.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
         val savedScroll = targetIndex?.let { ChatScrollPosition(it, 0) } ?: chatScrollPositions[session.scopedId]
@@ -565,16 +586,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             ?: (session.messageCount - cached.orEmpty().size).coerceAtLeast(0)
         uiState = uiState.copy(
             route = AppRoute.CHAT,
-            selectedSession = session,
+            selectedSession = run?.session ?: session,
             messages = visibleCached,
             hasOlderMessages = cached != null && cachedOffset > 0,
             isOlderMessagesLoading = false,
-            toolActivities = if (isActiveStream) activeStreamToolActivities else emptyList(),
-            chatArtifacts = if (isActiveStream) activeStreamArtifacts else cachedInsights?.artifacts.orEmpty(),
-            chatTodos = if (isActiveStream) activeStreamTodos else cachedInsights?.todos.orEmpty(),
-            attachments = emptyList(),
+            toolActivities = run?.tools.orEmpty(),
+            chatArtifacts = run?.artifacts ?: cachedInsights?.artifacts.orEmpty(),
+            chatTodos = run?.todos ?: cachedInsights?.todos.orEmpty(),
+            attachments = attachmentDrafts[session.scopedId].orEmpty(),
             draft = configStore.readDraft(session.profile, session.id),
-            failedSend = null,
+            failedSend = failedSends[session.scopedId],
             councilMode = CouncilMode.OFF,
             chatScrollIndex = savedScroll?.index ?: 0,
             chatScrollOffset = savedScroll?.offset ?: 0,
@@ -586,7 +607,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             isBusy = cached == null && !isActiveStream,
             errorMessage = null,
         )
-        if (isActiveStream) return
+        publishRuns()
+        // session.create returns a live runtime before an empty session is
+        // necessarily stored. Its known-empty cache is authoritative until a
+        // first message is sent; fetching HTTP history here can return 404.
+        val isEmptyLiveSession = !session.runtimeId.isNullOrBlank() &&
+            session.messageCount == 0 && cached?.isEmpty() == true
+        if (isActiveStream || isEmptyLiveSession) return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -594,13 +621,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
                 .onSuccess { page ->
-                    if (uiState.route != AppRoute.CHAT || uiState.selectedSession?.id != session.id) {
+                    if (uiState.route != AppRoute.CHAT || uiState.selectedSession?.scopedId != session.scopedId || activeRuns.containsKey(session.scopedId)) {
                         return@onSuccess
                     }
                     val messages = page.messages
                     messageCache[session.scopedId] = messages
                     oldestMessageOffsets[session.scopedId] = page.offset
-                    while (messageCache.size > 8) messageCache.remove(messageCache.keys.first())
+                    trimMessageCache()
                     val insights = ChatInsightParser.fromMessages(messages)
                     val visibleMessages = messages.visibleConversationMessages()
                     val loadedTargetIndex = targetMessageId?.let { id ->
@@ -619,7 +646,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         isBusy = false,
                     )
                 }
-                .onFailure(::handleFailure)
+                .onFailure { error ->
+                    // A delayed history failure belongs only to the page that
+                    // requested it, never a newly opened conversation.
+                    if (apiClient === client && uiState.route == AppRoute.CHAT &&
+                        uiState.selectedSession?.scopedId == session.scopedId &&
+                        !activeRuns.containsKey(session.scopedId)
+                    ) handleFailure(error)
+                }
         }
     }
 
@@ -641,16 +675,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching {
                 withContext(Dispatchers.IO) { client.loadMessagePage(session, pageSize, nextOffset) }
             }.onSuccess { page ->
-                val merged = (page.messages + current).distinctBy(ChatMessage::id)
+                val latest = activeRuns[session.scopedId]?.messages ?: messageCache[session.scopedId].orEmpty()
+                val merged = (page.messages + latest).distinctBy(ChatMessage::id)
+                activeRuns[session.scopedId]?.messages = merged.visibleConversationMessages()
                 messageCache[session.scopedId] = merged
                 oldestMessageOffsets[session.scopedId] = page.offset
-                while (messageCache.size > 8) messageCache.remove(messageCache.keys.first())
+                trimMessageCache()
                 if (uiState.selectedSession?.scopedId == session.scopedId) {
                     val insights = ChatInsightParser.fromMessages(merged)
                     uiState = uiState.copy(
                         messages = merged.visibleConversationMessages(),
-                        chatArtifacts = insights.artifacts,
-                        chatTodos = insights.todos,
+                        chatArtifacts = activeRuns[session.scopedId]?.artifacts ?: insights.artifacts,
+                        chatTodos = activeRuns[session.scopedId]?.todos ?: insights.todos,
                         hasOlderMessages = page.offset > 0,
                         isOlderMessagesLoading = false,
                     )
@@ -676,6 +712,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun deleteSession(session: HermesSession) {
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
         val client = apiClient ?: return
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { client.deleteSession(session.id) } }
@@ -703,7 +740,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { withContext(Dispatchers.IO) { client.projectCatalog() } }
                 .onSuccess { projects ->
                     if (client.currentProfile() != expectedProfile) return@onSuccess
-                    uiState = uiState.copy(projects = projects, isProjectsLoading = false)
+                    uiState = uiState.copy(projects = projects, isProjectsLoading = false,
+                        selectedProjectId = (uiState.selectedProjectId ?: configStore.readSelectedProject(expectedProfile))?.takeIf { id -> projects.any { it.id == id } })
                 }
                 .onFailure {
                     if (client.currentProfile() == expectedProfile) {
@@ -730,6 +768,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     }.onSuccess { project ->
                         uiState = uiState.copy(
                             projects = (uiState.projects + project).distinctBy(HermesProject::id),
+                            selectedProjectId = project.id,
                             isProjectsLoading = false,
                             noticeMessage = "项目“${project.name}”已创建",
                         )
@@ -742,19 +781,23 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun loadProjectDirectoryPicker(path: String? = null) {
         val client = apiClient ?: return
         if (uiState.isProjectPickerLoading) return
+        val profile=uiState.activeProfile
+        val version=++workspaceRequestVersion
         uiState = uiState.copy(isProjectPickerLoading = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    if (path.isNullOrBlank()) client.initialWorkspace() else client.listWorkspace(path)
+                    client.listWorkspaceForProfile(path,profile)
                 }
             }.onSuccess { listing ->
+                if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
                 uiState = uiState.copy(projectPickerListing = listing, isProjectPickerLoading = false)
-            }.onFailure(::handleFailure)
+            }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFailure(it) }
         }
     }
 
     fun closeProjectDirectoryPicker() {
+        workspaceRequestVersion++
         uiState = uiState.copy(projectPickerListing = null, isProjectPickerLoading = false)
     }
 
@@ -830,6 +873,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun archiveSession(session: HermesSession) {
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
         val client = apiClient ?: return
         if (uiState.sessionActionId != null) return
         uiState = uiState.copy(sessionActionId = session.id, errorMessage = null)
@@ -851,6 +895,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun moveSessionToProject(session: HermesSession, project: HermesProject) {
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
         val client = apiClient ?: return
         if (uiState.sessionActionId != null) return
         uiState = uiState.copy(sessionActionId = session.id, errorMessage = null)
@@ -942,20 +987,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addAttachments(uris: List<Uri>) {
         if (uris.isEmpty()) return
+        val session = uiState.selectedSession ?: return
         val resolver = getApplication<Application>().contentResolver
         viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { uris.map { AttachmentReader.read(resolver, it) } }
-            }.onSuccess { attachments ->
-                uiState = uiState.copy(
-                    attachments = (uiState.attachments + attachments).take(MAX_ATTACHMENTS),
-                    noticeMessage = if (uiState.attachments.size + attachments.size > MAX_ATTACHMENTS) {
-                        "单次最多添加 $MAX_ATTACHMENTS 个附件"
-                    } else {
-                        null
-                    },
-                )
-            }.onFailure(::handleFailure)
+            runCatching { withContext(Dispatchers.IO) { uris.map { AttachmentReader.read(resolver, it) } } }
+                .onSuccess { attachments ->
+                    val visible = uiState.selectedSession?.scopedId == session.scopedId
+                    val existing = if (visible) uiState.attachments else attachmentDrafts[session.scopedId].orEmpty()
+                    val merged = (existing + attachments).take(MAX_ATTACHMENTS)
+                    attachmentDrafts[session.scopedId] = merged
+                    if (visible) uiState = uiState.copy(attachments = merged,
+                        noticeMessage = if (existing.size + attachments.size > MAX_ATTACHMENTS) "单次最多添加 $MAX_ATTACHMENTS 个附件" else null)
+                }.onFailure(::handleFailure)
         }
     }
 
@@ -1005,18 +1048,25 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun sendIncomingShare(sessionId: String?) {
         val client = apiClient ?: return showNotice("请先连接 Hermes，再发送分享内容")
         val payload = uiState.incomingShare ?: return
-        if (uiState.isStreaming) return showNotice("当前任务仍在执行，请完成后再发送分享内容")
+        val target = sessionId?.let { id -> uiState.sessions.firstOrNull { it.id == id } }
+        if (target != null && activeRuns.containsKey(target.scopedId)) return showNotice("这段对话正在运行，请选择其他对话")
+        saveCurrentChatDraft()
+        val project = uiState.projects.firstOrNull { it.id == uiState.selectedProjectId }
         if (uiState.isShareSending) return
         uiState = uiState.copy(isShareSending = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = sessionId?.let { id -> uiState.sessions.firstOrNull { it.id == id } }
-                        ?: client.createSession()
+                    val session = target ?: client.createSession(project?.primaryPath)
                     val history = if (session.messageCount > 0) client.loadMessages(session) else emptyList()
                     session to history
                 }
             }.onSuccess { (session, history) ->
+                if (activeRuns.containsKey(session.scopedId)) {
+                    uiState = uiState.copy(isShareSending = false)
+                    showNotice("这段对话已开始运行，请选择其他对话")
+                    return@onSuccess
+                }
                 messageCache[session.scopedId] = history
                 val insights = ChatInsightParser.fromMessages(history)
                 val prompt = buildString {
@@ -1049,6 +1099,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun removeAttachment(id: String) {
         uiState = uiState.copy(attachments = uiState.attachments.filterNot { it.id == id })
+        uiState.selectedSession?.let { attachmentDrafts[it.scopedId] = uiState.attachments }
     }
 
     fun loadModelCatalog() {
@@ -1067,14 +1118,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun switchModel(provider: String, model: String) {
         val client = apiClient ?: return
         val session = uiState.selectedSession ?: return
-        if (uiState.isStreaming || uiState.isModelSwitching) return
+        if (currentRun() != null || session.scopedId in uiState.stoppingSessionKeys || uiState.isModelSwitching) return
         uiState = uiState.copy(isModelSwitching = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) { client.switchSessionModel(session, provider, model) }
             }.onSuccess { updated ->
                 uiState = uiState.copy(
-                    selectedSession = updated,
+                    selectedSession = if (uiState.selectedSession?.scopedId == updated.scopedId) updated else uiState.selectedSession,
                     isModelSwitching = false,
                     noticeMessage = "当前会话已切换到 ${model.substringAfterLast('/')}",
                 )
@@ -1083,7 +1134,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setCouncilMode(mode: CouncilMode) {
-        if (uiState.isStreaming) return showNotice("请在当前任务完成后开启专家会审")
+        if (currentRun() != null) return showNotice("请在当前任务完成后开启专家会审")
         if (mode == CouncilMode.OFF || mode == CouncilMode.DEEP) {
             uiState = uiState.copy(councilMode = mode)
             return
@@ -1111,8 +1162,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.IO) { client.switchSessionModel(session, moaProvider.slug, moaModel) }
             }.onSuccess { updated ->
                 uiState = uiState.copy(
-                    selectedSession = updated,
-                    councilMode = CouncilMode.QUICK,
+                    selectedSession = if (uiState.selectedSession?.scopedId == updated.scopedId) updated else uiState.selectedSession,
+                    councilMode = if (uiState.selectedSession?.scopedId == updated.scopedId) CouncilMode.QUICK else uiState.councilMode,
                     isModelSwitching = false,
                     noticeMessage = "已切换到 MoA：${moaModel.substringAfterLast('/')}",
                 )
@@ -1159,7 +1210,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         isWorkspaceLoading = false,
                     )
                 }
-                .onFailure(::handleFailure)
+                .onFailure(::handleFileFailure)
         }
     }
 
@@ -1184,38 +1235,42 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    private fun artifactLoader(item: RecentArtifact): (() -> WorkspaceDocument)? {
+        val client = apiClient ?: return null
+        val source = uiState.selectedSession?.takeIf { it.id == item.sessionId && it.profile == item.profile }
+            ?: uiState.sessions.firstOrNull { it.id == item.sessionId && it.profile == item.profile }
+        val messages = if (source?.scopedId == uiState.selectedSession?.scopedId && source != null) uiState.messages
+            else messageCache["${item.profile}::${item.sessionId}"].orEmpty()
+        return { ArtifactFileReader(client).read(item, source, messages) }
+    }
+
     fun openRecentArtifact(item: RecentArtifact) {
-        val workspacePath = item.workspacePath.ifBlank {
-            uiState.sessions.firstOrNull { it.id == item.sessionId && it.profile == item.profile }?.workspacePath.orEmpty()
-        }
-        val resolvedPath = resolveArtifactPath(item.path, workspacePath)
-            ?: return showNotice("无法确定 ${item.name} 的绝对路径，请先回到来源会话再打开")
-        val artifact = ChatArtifact(resolvedPath, item.name, item.kind)
-        val resolvedItem = item.copy(path = resolvedPath, workspacePath = workspacePath)
-        if (resolvedPath.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")) {
-            openImage(resolvedPath, item.name)
-            return
-        }
-        if (!resolvedPath.isPreviewableArtifact()) {
-            showNotice("${item.name} 暂不支持在 APP 内预览，可保存到手机或回到来源对话继续处理")
-            return
-        }
-        val client = apiClient ?: return
+        if (item.profile != uiState.activeProfile) return showNotice("请先切换到档案：${item.profile}")
+        if (uiState.workspaceAttachmentTarget != null) { attachRecentArtifact(item); return }
+        val load = artifactLoader(item) ?: return
+        val version = ++workspaceRequestVersion
+        val origin = uiState.route
         uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.readWorkspaceDocument(artifact.path) } }
+            runCatching { withContext(Dispatchers.IO) { load() } }
                 .onSuccess { document ->
-                    uiState = uiState.copy(
-                        route = AppRoute.WORKSPACE,
-                        workspaceDocument = document,
-                        workspaceDocumentOrigin = null,
-                        workspaceSourceArtifact = resolvedItem,
-                        workspaceDraft = document.content,
-                        isWorkspaceEditing = false,
-                        isWorkspaceLoading = false,
-                    )
-                }
-                .onFailure(::handleFailure)
+                    if (!workspaceRequestIsCurrent(version, item.profile) || uiState.route != origin) return@onSuccess
+                    val resolved = item.copy(path = document.path, name = document.name)
+                    val merged = (listOf(resolved) + uiState.recentArtifacts.filterNot { it.profile == item.profile && it.path == item.path })
+                        .distinctBy { "${it.profile}::${it.path}" }.take(60)
+                    uiState = uiState.copy(recentArtifacts = merged, isWorkspaceLoading = false)
+                    configStore.saveRecentArtifacts(merged)
+                    when {
+                        document.mimeType.startsWith("image/") -> uiState = uiState.copy(
+                            imagePreview = ImagePreview(document.name, document.path, document.mimeType, document.bytes),
+                        )
+                        document.path.isPreviewableArtifact() -> uiState = uiState.copy(
+                            route = AppRoute.WORKSPACE, workspaceDocument = document, workspaceDocumentOrigin = null,
+                            workspaceSourceArtifact = resolved, workspaceDraft = document.content, isWorkspaceEditing = false,
+                        )
+                        else -> showNotice("${document.name} 暂不支持预览，可从对话的“+ → 空间”添加为附件")
+                    }
+                }.onFailure { if (workspaceRequestIsCurrent(version, item.profile) && uiState.route == origin) handleFileFailure(it) }
         }
     }
 
@@ -1243,7 +1298,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val prompt = uiState.draft.trim()
         val attachments = uiState.attachments
         if (prompt.isBlank() && attachments.isEmpty()) return
-        if (uiState.isStreaming) return
+        if (currentRun() != null) return
         if (uiState.isModelSwitching) return showNotice("模型正在切换，请稍后发送")
 
         val requestedMode = uiState.councilMode
@@ -1263,158 +1318,121 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         councilMode: CouncilMode = CouncilMode.OFF,
     ) {
         val client = apiClient ?: return
-        if (uiState.isStreaming) return
-
-        val submittedPrompt = submittedPromptOverride ?: prompt.ifBlank { "请查看我发送的附件。" }
-
-        val displayText = buildString {
-            if (prompt.isNotBlank()) append(prompt)
-            attachments.forEach { attachment ->
-                if (isNotEmpty()) append('\n')
-                append("📎 ").append(attachment.name)
-            }
+        if (activeRuns.containsKey(session.scopedId)) return
+        if (session.scopedId in uiState.stoppingSessionKeys) return showNotice("正在停止这段对话的上一轮，请稍后发送")
+        if (uiState.sessionActionId == session.id || uiState.isProfileSwitching) {
+            showNotice("会话正在更新，请稍后发送")
+            return
         }
+        val submittedPrompt = submittedPromptOverride ?: prompt.ifBlank { "请查看我发送的附件。" }
+        val baseMessages = if (uiState.selectedSession?.scopedId == session.scopedId) uiState.messages
+            else messageCache[session.scopedId].visibleConversationMessages()
         val userMessage = ChatMessage(
             role = MessageRole.USER,
-            content = displayText,
+            content = buildString {
+                if (prompt.isNotBlank()) append(prompt)
+                attachments.forEach {
+                    if (isNotEmpty()) append('\n')
+                    append("📎 ").append(it.name)
+                }
+            },
             images = attachments.mapNotNull { attachment ->
                 attachment.dataUrl?.let { ChatImage(attachment.name, it, attachment.mimeType) }
             },
         )
-        val assistantMessage = ChatMessage(
-            role = MessageRole.ASSISTANT,
-            content = "",
-            isStreaming = true,
+        val run = SessionRun(
+            session = session,
+            submittedPrompt = submittedPrompt,
+            originalPrompt = prompt,
+            submittedAttachments = attachments,
+            userMessageId = userMessage.id,
+            baselineSignature = baseMessages.lastOrNull { it.role == MessageRole.ASSISTANT }?.recoverySignature().orEmpty(),
+            councilMode = councilMode,
         )
-        if (session.messageCount == 0 || session.title == "新会话") {
-            pendingTitleSessionIds += session.id
-        }
-        streamRecoveryJob?.cancel()
-        streamingDeltaFlushJob?.cancel()
-        streamingDeltaFlushJob = null
-        streamingDeltaBuffer.clear()
-        streamRecoveryPrompt = submittedPrompt
-        activeSubmittedPrompt = prompt
-        activeSubmittedAttachments = attachments
-        activeUserMessageId = userMessage.id
-        streamBaselineAssistantSignature = uiState.messages
-            .lastOrNull { it.role == MessageRole.ASSISTANT }
-            ?.recoverySignature()
-            .orEmpty()
-        activeStreamSession = session
-        activeStreamToolActivities = emptyList()
-        activeStreamArtifacts = emptyList()
-        activeStreamTodos = emptyList()
-        val baseMessages = if (uiState.selectedSession?.scopedId == session.scopedId) {
-            uiState.messages
-        } else {
-            messageCache[session.scopedId].visibleConversationMessages()
-        }
-        val runningMessages = baseMessages + userMessage + assistantMessage
-        val startedAtMillis = System.currentTimeMillis()
-        configStore.saveActiveRunSnapshot(
-            ActiveRunSnapshot(
-                profile = session.profile,
-                sessionId = session.id,
-                title = session.title,
-                submittedPrompt = submittedPrompt,
-                baselineAssistantSignature = streamBaselineAssistantSignature,
-                startedAtMillis = startedAtMillis,
-            ),
-        )
-        val unreadSessionIds = uiState.unreadSessionIds - session.scopedId
-        configStore.saveUnreadSessionIds(unreadSessionIds)
-        configStore.clearDraft(session.profile, session.id)
+        run.messages = baseMessages + userMessage + ChatMessage(role = MessageRole.ASSISTANT, content = "", isStreaming = true)
+        activeRuns[session.scopedId] = run
+        if (session.messageCount == 0 || session.title == "新会话") pendingTitleSessionIds += session.id
+        configStore.saveActiveRunSnapshot(run.snapshot())
+        val consumeDraft = configStore.readDraft(session.profile, session.id).trim() == prompt.trim()
+        if (consumeDraft) configStore.clearDraft(session.profile, session.id)
+        if (attachmentDrafts[session.scopedId] == attachments) attachmentDrafts.remove(session.scopedId)
+        failedSends.remove(session.scopedId)
+        val unread = uiState.unreadSessionIds - session.scopedId
+        configStore.saveUnreadSessionIds(unread)
+        val isVisible = isVisible(run)
         uiState = uiState.copy(
-            draft = if (uiState.selectedSession?.scopedId == session.scopedId) "" else uiState.draft,
-            attachments = if (uiState.selectedSession?.scopedId == session.scopedId) emptyList() else uiState.attachments,
-            failedSend = if (uiState.selectedSession?.scopedId == session.scopedId) null else uiState.failedSend,
-            messages = if (uiState.selectedSession?.scopedId == session.scopedId) runningMessages else uiState.messages,
-            toolActivities = if (uiState.selectedSession?.scopedId == session.scopedId) emptyList() else uiState.toolActivities,
-            councilMode = CouncilMode.OFF,
-            activeCouncilMode = councilMode,
-            isStreaming = true,
-            streamingSessionId = session.id,
-            runStage = "正在连接 Hermes",
-            runStartedAtMillis = startedAtMillis,
-            runLastActivityAtMillis = startedAtMillis,
-            unreadSessionIds = unreadSessionIds,
-            isRecoveringConnection = false,
+            draft = if (isVisible && uiState.draft.trim() == prompt.trim()) "" else uiState.draft,
+            attachments = if (isVisible && uiState.attachments == attachments) emptyList() else uiState.attachments,
+            failedSend = if (isVisible) null else uiState.failedSend,
+            councilMode = if (isVisible) CouncilMode.OFF else uiState.councilMode,
+            unreadSessionIds = unread,
             errorMessage = null,
             noticeMessage = null,
         )
-        cacheMessages(session.id, runningMessages)
-
+        setRunMessages(run, run.messages)
+        publishRuns()
         val controller = StreamController()
-        streamController = controller
-        streamJob = viewModelScope.launch(Dispatchers.IO) {
+        run.controller = controller
+        run.streamJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                client.streamMessage(
-                    controller = controller,
-                    session = session,
-                    prompt = submittedPrompt,
-                    attachments = attachments,
-                    onEvent = { event ->
-                        viewModelScope.launch { handleStreamEvent(event) }
-                    },
-                )
+                client.streamMessage(controller, session, submittedPrompt, attachments) { event ->
+                    viewModelScope.launch { handleStreamEvent(run, event) }
+                }
             }.onFailure { throwable ->
                 if (!controller.isStopped() && !controller.wasDisconnected()) {
-                    withContext(Dispatchers.Main) { handleStreamFailure(throwable) }
+                    withContext(Dispatchers.Main) {
+                        if (isActive(run)) handleStreamFailure(run, throwable)
+                    }
                 }
             }
         }
-        startStreamWatchdog(session)
+        startStreamWatchdog(run)
     }
 
     fun steerCurrentRun() {
         val client = apiClient ?: return
-        val runtimeSessionId = streamController?.runtimeSessionId ?: return showNotice("Hermes 运行尚未就绪，请稍后再试")
+        val run = currentRun() ?: return
+        val runtimeId = run.controller?.runtimeSessionId ?: return showNotice("Hermes 运行尚未就绪，请稍后再试")
         val text = uiState.draft.trim()
-        if (text.isBlank()) return
-        if (uiState.attachments.isNotEmpty()) {
-            showNotice("追加要求暂不支持附件；可改用排队发送")
-            return
-        }
-        if (uiState.isSteering) return
-        uiState = uiState.copy(isSteering = true, errorMessage = null)
+        if (text.isBlank() || run.isSteering) return
+        if (uiState.attachments.isNotEmpty()) return showNotice("追加要求暂不支持附件；可改用排队发送")
+        run.isSteering = true
+        publishRuns()
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.steerSession(runtimeSessionId, text) } }
-                .onSuccess { status ->
-                    uiState.selectedSession?.let { configStore.clearDraft(it.profile, it.id) }
-                    uiState = uiState.copy(
-                        draft = "",
-                        isSteering = false,
-                        runStage = "已收到追加要求",
-                        runLastActivityAtMillis = System.currentTimeMillis(),
-                        noticeMessage = if (status.equals("queued", true)) "追加要求已送达 Hermes" else "Hermes 已接收追加要求",
-                    )
-                }
-                .onFailure {
-                    uiState = uiState.copy(isSteering = false)
-                    handleFailure(it)
-                }
+            runCatching { withContext(Dispatchers.IO) { client.steerSession(runtimeId, text) } }
+                .onSuccess {
+                    // Do not clear another chat, or newer text typed while awaiting acknowledgement.
+                    if (configStore.readDraft(run.session.profile, run.session.id) == text) {
+                        configStore.clearDraft(run.session.profile, run.session.id)
+                    }
+                    if (isVisible(run) && uiState.draft.trim() == text) uiState = uiState.copy(draft = "")
+                    run.touch("已收到追加要求")
+                    uiState = uiState.copy(noticeMessage = "追加要求已送达 Hermes")
+                }.onFailure(::handleFailure)
+            run.isSteering = false
+            publishRuns()
         }
     }
 
     fun queueCurrentMessage() {
-        val session = activeStreamSession ?: return
-        if (uiState.selectedSession?.scopedId != session.scopedId) return
+        val run = currentRun() ?: return
         val prompt = uiState.draft.trim()
         val attachments = uiState.attachments
         if (prompt.isBlank() && attachments.isEmpty()) return
-        val queued = QueuedRunMessage(session, prompt.ifBlank { "请查看我发送的附件。" }, attachments)
-        configStore.clearDraft(session.profile, session.id)
-        uiState = uiState.copy(
-            draft = "",
-            attachments = emptyList(),
-            queuedRunMessage = queued,
-            noticeMessage = if (uiState.queuedRunMessage == null) "消息已排队，将在本轮完成后发送" else "已替换排队中的消息",
-        )
+        val replacing = run.queued != null
+        run.queued = QueuedRunMessage(run.session, prompt.ifBlank { "请查看我发送的附件。" }, attachments)
+        configStore.clearDraft(run.session.profile, run.session.id)
+        attachmentDrafts.remove(run.session.scopedId)
+        uiState = uiState.copy(draft = "", attachments = emptyList(),
+            noticeMessage = if (replacing) "已替换这段对话的排队消息" else "消息已排队，将在这段对话本轮完成后发送")
+        publishRuns()
     }
 
     fun cancelQueuedMessage() {
-        uiState = uiState.copy(queuedRunMessage = null, noticeMessage = "已取消排队消息")
+        val run = currentRun() ?: return
+        run.queued = null
+        publishRuns()
+        uiState = uiState.copy(noticeMessage = "已取消这段对话的排队消息")
     }
 
     fun respondToAgentRequest(request: AgentRequest, answer: String) {
@@ -1422,7 +1440,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         if (answer.isBlank() || request.isResponding) return
         uiState = uiState.copy(
             pendingAgentRequests = uiState.pendingAgentRequests.map {
-                if (it.requestId == request.requestId) it.copy(isResponding = true) else it
+                if (it.requestId == request.requestId && it.runtimeSessionId == request.runtimeSessionId) it.copy(isResponding = true) else it
             },
             errorMessage = null,
         )
@@ -1431,9 +1449,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { withContext(Dispatchers.IO) { client.respondAgentRequest(request, answer) } }
                 .onSuccess {
                     uiState = uiState.copy(
-                        pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.requestId == request.requestId },
-                        runStage = "已处理，Hermes 正在继续",
-                        runLastActivityAtMillis = System.currentTimeMillis(),
+                        pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.requestId == request.requestId && it.runtimeSessionId == request.runtimeSessionId },
                         noticeMessage = "已提交给 Hermes",
                     )
                     configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
@@ -1442,7 +1458,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 .onFailure { throwable ->
                     uiState = uiState.copy(
                         pendingAgentRequests = uiState.pendingAgentRequests.map {
-                            if (it.requestId == request.requestId) it.copy(isResponding = false) else it
+                            if (it.requestId == request.requestId && it.runtimeSessionId == request.runtimeSessionId) it.copy(isResponding = false) else it
                         },
                     )
                     configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
@@ -1452,55 +1468,61 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun retryFailedMessage() {
-        if (uiState.isStreaming || uiState.failedSend == null) return
-        sendMessage()
+        if (currentRun() != null) return
+        val failure = uiState.failedSend ?: return
+        val session = uiState.selectedSession ?: return
+        startMessage(session, failure.prompt, failure.attachments)
     }
 
     fun stopGeneration() {
-        flushStreamingDelta()
-        val controller = streamController
-        val runtimeSessionId = controller?.runtimeSessionId
-        val sessionId = uiState.streamingSessionId
+        val run = currentRun() ?: focusedRun().takeIf { uiState.selectedSession == null } ?: return
+        stopRun(run)
+    }
+
+    fun stopActiveRun() {
+        focusedRun()?.let(::stopRun)
+    }
+
+    fun stopSessionRun(session: HermesSession) {
+        activeRuns[session.scopedId]?.let(::stopRun)
+    }
+
+    private fun stopRun(run: SessionRun) {
+        if (!isActive(run)) return
+        flushStreamingDelta(run)
+        val controller = run.controller
         controller?.stop()
-        streamJob?.cancel()
-        streamRecoveryJob?.cancel()
-        streamRecoveryJob = null
-        streamWatchdogJob?.cancel()
-        streamWatchdogJob = null
-        streamRecoveryPrompt = ""
-        streamBaselineAssistantSignature = ""
-        val stoppedMessages = activeStreamMessages().mapNotNull { message ->
-            if (!message.isStreaming) return@mapNotNull message
-            message.takeIf { it.content.isNotBlank() || it.images.isNotEmpty() }
-                ?.copy(isStreaming = false)
-        }
-        if (sessionId != null) cacheMessages(sessionId, stoppedMessages)
-        uiState = uiState.copy(
-            isStreaming = false,
-            streamingSessionId = null,
-            runStage = "",
-            activeCouncilMode = CouncilMode.OFF,
-            isSteering = false,
-            queuedRunMessage = null,
-            pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.conversationId == sessionId },
-            isRecoveringConnection = false,
-            messages = if (uiState.selectedSession?.id == sessionId) stoppedMessages else uiState.messages,
-            noticeMessage = "已请求停止",
-        )
-        configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-        clearActiveStreamState()
-        if (!runtimeSessionId.isNullOrBlank()) {
-            val client = apiClient ?: return consumePendingDeepLink()
-            viewModelScope.launch(Dispatchers.IO) {
-                runCatching { client.stopRun(runtimeSessionId) }
-                withContext(Dispatchers.Main) { consumePendingDeepLink() }
+        run.streamJob?.cancel()
+        restoreQueuedDraft(run)
+        val stopped = run.messages.filter { !it.isStreaming || it.content.isNotBlank() || it.images.isNotEmpty() }
+            .map { it.copy(isStreaming = false) }
+        setRunMessages(run, stopped)
+        removeRunRequests(run)
+        uiState = uiState.copy(stoppingSessionKeys = uiState.stoppingSessionKeys + run.session.scopedId)
+        removeRun(run)
+        uiState = uiState.copy(noticeMessage = "已请求停止这段对话")
+        val client = apiClient
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val runtimeId = controller?.runtimeSessionId ?: run.session.runtimeId
+                    if (runtimeId != null) client?.stopRun(runtimeId, run.session.profile)
+                }
+                // A submit already in flight also sends its interrupt after acknowledgement.
+                // Wait for it before accepting the next turn in this same conversation.
+                run.streamJob?.join()
+            } finally {
+                uiState = uiState.copy(stoppingSessionKeys = uiState.stoppingSessionKeys - run.session.scopedId)
             }
-        } else {
-            consumePendingDeepLink()
         }
     }
 
+    private fun stopAllRuns() {
+        activeRuns.values.toList().forEach(::stopRun)
+    }
+
     fun backToSessions() {
+        saveCurrentChatDraft()
         uiState.selectedSession?.id?.let { sessionId ->
             if (uiState.messages.isNotEmpty()) cacheMessages(sessionId, uiState.messages)
         }
@@ -1519,17 +1541,26 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             inlineImageLoading = emptySet(),
             inlineImageFailures = emptySet(),
         )
+        publishRuns()
         if (returnRoute == AppRoute.TASKS) refreshTasks() else refreshSessions()
     }
 
+    fun showHome() {
+        invalidateWorkspaceAttachmentPicker()
+        saveCurrentChatDraft()
+        uiState = uiState.copy(route = AppRoute.HOME, errorMessage = null, noticeMessage = null)
+        refreshSessions()
+    }
+
     fun showSessions() {
+        invalidateWorkspaceAttachmentPicker()
         if (uiState.route == AppRoute.SESSIONS) return
         uiState = uiState.copy(route = AppRoute.SESSIONS, errorMessage = null, noticeMessage = null)
         refreshSessions()
     }
 
     fun openActiveRun() {
-        val session = activeStreamSession ?: return
+        val session = focusedRun()?.session ?: return
         openTaskSession(session)
     }
 
@@ -1594,6 +1625,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun showSessionSearch() {
+        searchReturnRoute = if (uiState.route == AppRoute.HOME) AppRoute.HOME else AppRoute.SESSIONS
         uiState = uiState.copy(
             route = AppRoute.SEARCH,
             searchQuery = "",
@@ -1608,7 +1640,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         sessionSearchJob?.cancel()
         sessionSearchJob = null
         uiState = uiState.copy(
-            route = AppRoute.SESSIONS,
+            route = searchReturnRoute,
             searchQuery = "",
             searchResults = emptyList(),
             isSearchLoading = false,
@@ -1664,16 +1696,108 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         openSessionInternal(result.session, result.messageId)
     }
 
+    private var workspaceRequestVersion = 0L
+    private var workspaceContextKey: String? = null
+    private var workspaceChatRoot: String? = null
+
+    private fun invalidateWorkspace() {
+        invalidateWorkspaceAttachmentPicker()
+        workspaceRequestVersion++
+        workspaceContextKey = null
+        workspaceChatRoot = null
+        uiState = uiState.copy(workspaceListing=null,workspaceRootPath=null,workspaceDocument=null,
+            workspaceDocumentOrigin=null,workspaceSourceArtifact=null,workspaceDraft="",isWorkspaceEditing=false,
+            isWorkspaceLoading=false,isWorkspaceSaving=false,projectPickerListing=null,isProjectPickerLoading=false)
+    }
+
     fun showWorkspace() {
-        uiState = uiState.copy(
-            route = AppRoute.WORKSPACE,
-            workspaceDocumentOrigin = null,
-            workspaceSourceArtifact = null,
-            errorMessage = null,
-            noticeMessage = null,
-        )
-        if (uiState.workspaceListing == null) refreshWorkspace(resetToRoot = true)
-        indexRecentArtifacts(force = false)
+        invalidateWorkspaceAttachmentPicker()
+        val fromChat = uiState.route == AppRoute.CHAT
+        workspaceChatRoot = if(fromChat) uiState.selectedSession
+            ?.takeIf { it.profile == uiState.activeProfile }?.workspacePath?.takeIf(String::isNotBlank) else null
+        val desiredRoot = selectedWorkspaceRoot()
+        val context = "${uiState.activeProfile}::${desiredRoot.orEmpty()}"
+        val reset = workspaceContextKey != context || uiState.workspaceListing == null
+        uiState = uiState.copy(route=AppRoute.WORKSPACE, workspaceDocument=null,
+            workspaceDocumentOrigin=null,workspaceSourceArtifact=null,errorMessage=null,noticeMessage=null)
+        if(reset) {
+            workspaceContextKey = context
+            uiState=uiState.copy(workspaceListing=null,workspaceRootPath=null)
+            refreshWorkspace(resetToRoot=true)
+        }
+        indexRecentArtifacts(force=false)
+    }
+
+    private var workspaceAttachmentRequest = 0L
+
+    private fun invalidateWorkspaceAttachmentPicker() {
+        workspaceAttachmentRequest++
+        uiState = uiState.copy(workspaceAttachmentTarget = null, isWorkspaceAttaching = false)
+    }
+
+    fun showWorkspaceAttachmentPicker() {
+        val target = uiState.selectedSession ?: return
+        if (uiState.route != AppRoute.CHAT || target.profile != uiState.activeProfile) return
+        saveCurrentChatDraft()
+        showWorkspace()
+        uiState = uiState.copy(workspaceAttachmentTarget = target)
+    }
+
+    fun cancelWorkspaceAttachmentPicker() {
+        val target = uiState.workspaceAttachmentTarget ?: return
+        invalidateWorkspaceAttachmentPicker()
+        workspaceRequestVersion++
+        uiState = uiState.copy(isWorkspaceLoading = false, errorMessage = null, noticeMessage = null)
+        if (uiState.selectedSession?.scopedId == target.scopedId && uiState.activeProfile == target.profile) {
+            uiState = uiState.copy(route = AppRoute.CHAT)
+        }
+    }
+
+    fun attachWorkspaceFile(entry: com.qingyu.hermescompanion.model.WorkspaceEntry) {
+        val target = uiState.workspaceAttachmentTarget ?: return
+        if (entry.isDirectory) return
+        val client = apiClient ?: return
+        prepareWorkspaceAttachment { client.readWorkspaceDocumentForProfile(entry.path, target.profile) }
+    }
+
+    fun attachRecentArtifact(item: RecentArtifact) {
+        val target = uiState.workspaceAttachmentTarget ?: return
+        if (item.profile != target.profile) return showNotice("请选择当前档案内的文件")
+        val load = artifactLoader(item) ?: return
+        prepareWorkspaceAttachment(load)
+    }
+
+    private fun prepareWorkspaceAttachment(load: () -> WorkspaceDocument) {
+        val target = uiState.workspaceAttachmentTarget ?: return
+        if (uiState.isWorkspaceAttaching) return
+        if (uiState.attachments.size >= MAX_ATTACHMENTS) return showNotice("单次最多添加 $MAX_ATTACHMENTS 个附件")
+        val version = ++workspaceAttachmentRequest
+        uiState = uiState.copy(isWorkspaceAttaching = true, errorMessage = null, noticeMessage = null)
+        fun isCurrent() = version == workspaceAttachmentRequest && uiState.route == AppRoute.WORKSPACE &&
+            uiState.workspaceAttachmentTarget?.scopedId == target.scopedId &&
+            uiState.selectedSession?.scopedId == target.scopedId && uiState.activeProfile == target.profile
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { AttachmentReader.fromWorkspaceDocument(load()) } }
+                .onSuccess { attachment ->
+                    if (!isCurrent()) return@onSuccess
+                    if (uiState.attachments.size >= MAX_ATTACHMENTS) {
+                        uiState = uiState.copy(isWorkspaceAttaching = false)
+                        showNotice("单次最多添加 $MAX_ATTACHMENTS 个附件")
+                        return@onSuccess
+                    }
+                    val merged = uiState.attachments + attachment
+                    attachmentDrafts[target.scopedId] = merged
+                    workspaceRequestVersion++
+                    invalidateWorkspaceAttachmentPicker()
+                    uiState = uiState.copy(route = AppRoute.CHAT, attachments = merged, isWorkspaceLoading = false,
+                        workspaceDocument = null, noticeMessage = "已添加 ${attachment.name}")
+                }.onFailure {
+                    if (isCurrent()) {
+                        uiState = uiState.copy(isWorkspaceAttaching = false)
+                        handleFileFailure(it)
+                    }
+                }
+        }
     }
 
     fun refreshRecentArtifacts() {
@@ -1741,68 +1865,78 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun selectedWorkspaceRoot(): String? = workspaceChatRoot
+        ?: uiState.projects.firstOrNull { it.id == uiState.selectedProjectId }?.primaryPath?.takeIf(String::isNotBlank)
+
+    private fun workspaceRequestIsCurrent(version: Long, profile: String): Boolean =
+        version == workspaceRequestVersion && profile == uiState.activeProfile
+
     fun refreshWorkspace(resetToRoot: Boolean = false) {
         val client = apiClient ?: return
         val existing = uiState.workspaceListing
-        uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
+        val desiredRoot = selectedWorkspaceRoot()
+        if (uiState.selectedProjectId != null && desiredRoot == null) {
+            showError("所选项目已不可用，请重新选择项目")
+            return
+        }
+        val profile=uiState.activeProfile
+        val version=++workspaceRequestVersion
+        val root=uiState.workspaceRootPath
+        uiState=uiState.copy(isWorkspaceLoading=true,errorMessage=null)
         viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    if (resetToRoot || existing == null) client.initialWorkspace()
-                    else client.listWorkspace(existing.path).copy(projectName = existing.projectName)
+            runCatching { withContext(Dispatchers.IO) {
+                if(resetToRoot || existing==null) {
+                    if(desiredRoot!=null) client.listWorkspaceForProfile(desiredRoot,profile)
+                    else client.initialWorkspaceForProfile(profile)
+                } else client.listWorkspaceForProfile(existing.path,profile).copy(projectName=existing.projectName)
+            } }.onSuccess { listing ->
+                if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
+                val expected = if(resetToRoot || existing==null) desiredRoot else existing.path
+                if(expected!=null && listing.path.trimEnd('/')!=expected.trimEnd('/')) {
+                    uiState=uiState.copy(isWorkspaceLoading=false)
+                    showError("服务器返回了其他目录，请检查当前 Profile 的工作目录设置")
+                    return@onSuccess
                 }
-            }.onSuccess { listing ->
-                uiState = uiState.copy(
-                    workspaceListing = listing,
-                    workspaceRootPath = if (resetToRoot || uiState.workspaceRootPath == null) listing.path else uiState.workspaceRootPath,
-                    workspaceDocument = null,
-                    workspaceDocumentOrigin = null,
-                    workspaceSourceArtifact = null,
-                    workspaceDraft = "",
-                    isWorkspaceEditing = false,
-                    isWorkspaceLoading = false,
-                )
-            }.onFailure(::handleFailure)
+                uiState=uiState.copy(workspaceListing=listing,
+                    workspaceRootPath=if(resetToRoot || root==null) listing.path else root,
+                    workspaceDocument=null,workspaceDocumentOrigin=null,workspaceSourceArtifact=null,
+                    workspaceDraft="",isWorkspaceEditing=false,isWorkspaceLoading=false)
+            }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFileFailure(it) }
         }
     }
 
     fun openWorkspaceDirectory(path: String) {
-        val client = apiClient ?: return
-        val current = uiState.workspaceListing ?: return
-        val root = uiState.workspaceRootPath ?: current.path
-        if (!pathIsWithin(root, path)) {
-            showError("不能离开当前 Hermes 项目目录")
-            return
-        }
-        uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
+        val client=apiClient ?: return
+        val current=uiState.workspaceListing ?: return
+        val root=uiState.workspaceRootPath ?: current.path
+        if(!pathIsWithin(root,path)) { showError("不能离开当前 Hermes 项目目录"); return }
+        val profile=uiState.activeProfile
+        val version=++workspaceRequestVersion
+        uiState=uiState.copy(isWorkspaceLoading=true,errorMessage=null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.listWorkspace(path) } }
+            runCatching { withContext(Dispatchers.IO) { client.listWorkspaceForProfile(path,profile) } }
                 .onSuccess { listing ->
-                    uiState = uiState.copy(
-                        workspaceListing = listing.copy(projectName = current.projectName),
-                        isWorkspaceLoading = false,
-                    )
-                }
-                .onFailure(::handleFailure)
+                    if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
+                    if(listing.path.trimEnd('/')!=path.trimEnd('/') || !pathIsWithin(root,listing.path)) {
+                        uiState=uiState.copy(isWorkspaceLoading=false)
+                        showError("服务器返回了其他目录，已保留当前项目位置")
+                    } else uiState=uiState.copy(workspaceListing=listing.copy(projectName=current.projectName),isWorkspaceLoading=false)
+                }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFileFailure(it) }
         }
     }
 
     fun openWorkspaceDocument(path: String) {
-        val client = apiClient ?: return
-        uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
+        val client=apiClient ?: return
+        val profile=uiState.activeProfile
+        val version=++workspaceRequestVersion
+        uiState=uiState.copy(isWorkspaceLoading=true,errorMessage=null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.readWorkspaceDocument(path) } }
+            runCatching { withContext(Dispatchers.IO) { client.readWorkspaceDocumentForProfile(path,profile) } }
                 .onSuccess { document ->
-                    uiState = uiState.copy(
-                        workspaceDocument = document,
-                        workspaceDocumentOrigin = null,
-                        workspaceSourceArtifact = null,
-                        workspaceDraft = document.content,
-                        isWorkspaceEditing = false,
-                        isWorkspaceLoading = false,
-                    )
-                }
-                .onFailure(::handleFailure)
+                    if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
+                    uiState=uiState.copy(workspaceDocument=document,workspaceDocumentOrigin=null,
+                        workspaceSourceArtifact=null,workspaceDraft=document.content,isWorkspaceEditing=false,isWorkspaceLoading=false)
+                }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFileFailure(it) }
         }
     }
 
@@ -1862,6 +1996,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun closeWorkspaceDocument() {
+        workspaceRequestVersion++
         val returnRoute = uiState.workspaceDocumentOrigin
         uiState = uiState.copy(
             route = returnRoute ?: uiState.route,
@@ -1930,13 +2065,17 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val client = apiClient ?: return
         val document = uiState.workspaceDocument ?: return
         if (uiState.isWorkspaceSaving) return
+        val profile=uiState.activeProfile
+        val version=++workspaceRequestVersion
+        val draft=uiState.workspaceDraft
         uiState = uiState.copy(isWorkspaceSaving = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    client.saveWorkspaceDocument(document.path, uiState.workspaceDraft)
+                    client.saveWorkspaceDocumentForProfile(document.path, draft, profile)
                 }
             }.onSuccess { saved ->
+                if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
                 uiState = uiState.copy(
                     workspaceDocument = saved,
                     workspaceDraft = saved.content,
@@ -1944,7 +2083,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     isWorkspaceSaving = false,
                     noticeMessage = "文档已保存到 Hermes 工作区",
                 )
-            }.onFailure(::handleFailure)
+            }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFailure(it) }
         }
     }
 
@@ -1990,6 +2129,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun showTasks() {
+        invalidateWorkspaceAttachmentPicker()
         uiState = uiState.copy(route = AppRoute.TASKS, errorMessage = null, noticeMessage = null)
         refreshTasks()
     }
@@ -2131,6 +2271,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun showProfile() {
+        invalidateWorkspaceAttachmentPicker()
         uiState = uiState.copy(route = AppRoute.PROFILE, errorMessage = null, noticeMessage = null)
     }
 
@@ -2489,7 +2630,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun startVoiceCapture(target: VoiceCaptureTarget) {
         if (!uiState.voicePreferences.enabled) return showNotice("请先启用语音功能")
-        if (target == VoiceCaptureTarget.CHAT_INPUT && uiState.isStreaming) {
+        if (target == VoiceCaptureTarget.CHAT_INPUT && currentRun() != null) {
             return showNotice("请等待 Hermes 完成当前回复后再录音")
         }
         voicePlaybackJob?.cancel()
@@ -2611,8 +2752,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             voiceCapture = VoiceCaptureState(),
             voiceConversation = uiState.voiceConversation.copy(
                 active = true,
-                phase = if (uiState.isStreaming) VoicePhase.THINKING else VoicePhase.IDLE,
-                message = if (uiState.isStreaming) "Hermes 正在处理当前问题" else "点按按钮开始说话",
+                phase = if (currentRun() != null) VoicePhase.THINKING else VoicePhase.IDLE,
+                message = if (currentRun() != null) "Hermes 正在处理当前问题" else "点按按钮开始说话",
             ),
             errorMessage = null,
         )
@@ -2631,7 +2772,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun startVoiceListening() {
-        if (uiState.isStreaming) return showNotice("请等待 Hermes 完成当前回复")
+        if (currentRun() != null) return showNotice("请等待 Hermes 完成当前回复")
         voicePlaybackJob?.cancel()
         voicePlayback.stop()
         runCatching { voiceRecorder.start() }
@@ -2735,7 +2876,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun submitVoiceConversationText(text: String) {
         val transcript = normalizeVoiceTranscript(text, uiState.voicePreferences.transcriptScript).trim()
-        if (transcript.isBlank() || uiState.isStreaming) return
+        if (transcript.isBlank() || currentRun() != null) return
         uiState = uiState.copy(
             draft = transcript,
             voiceConversation = uiState.voiceConversation.copy(
@@ -2908,7 +3049,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun openConnectionSettings() {
-        if (uiState.isStreaming) stopGeneration()
+        if (uiState.isStreaming) stopAllRuns()
         settingsReturnRoute = uiState.route.takeIf {
             it in setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS, AppRoute.VOICE_CHAT)
         }
@@ -3002,7 +3143,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun disconnect() {
-        if (uiState.isStreaming) stopGeneration()
+        if (uiState.isStreaming) stopAllRuns()
         agentUpdateJob?.cancel()
         voicePlaybackJob?.cancel()
         voiceCaptureJob?.cancel()
@@ -3017,6 +3158,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         messageCache.clear()
         oldestMessageOffsets.clear()
         apiClient = null
+        attachmentDrafts.clear()
+        failedSends.clear()
+        recoveredProfiles.clear()
         uiState = AppUiState(
             route = AppRoute.SETUP,
             themeMode = uiState.themeMode,
@@ -3046,290 +3190,189 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(noticeMessage = message, errorMessage = null)
     }
 
-    private fun handleStreamEvent(event: StreamEvent) {
+    private fun handleStreamEvent(run: SessionRun, event: StreamEvent) {
+        // A stopped/completed turn may still have callbacks queued on the main thread.
+        if (!isActive(run) || run.recovering) return
         when (event) {
-            is StreamEvent.RunStarted -> uiState = uiState.copy(
-                runStage = "Hermes 正在执行",
-                runLastActivityAtMillis = System.currentTimeMillis(),
-            )
+            is StreamEvent.RunStarted -> {
+                run.session = run.session.copy(runtimeId = event.runId)
+                updateSession(run.session.id) { it.copy(runtimeId = event.runId) }
+                run.touch("Hermes 正在执行")
+            }
             is StreamEvent.ReasoningDelta -> {
-                updateStreamingReasoning { current -> current + event.text }
-                uiState = uiState.copy(
-                    runStage = "Hermes 正在思考",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
+                updateStreamingReasoning(run) { it + event.text }
+                run.touch("Hermes 正在思考")
             }
             is StreamEvent.ReasoningAvailable -> {
-                updateStreamingReasoning { current -> current.ifBlank { event.text } }
-                uiState = uiState.copy(runLastActivityAtMillis = System.currentTimeMillis())
+                updateStreamingReasoning(run) { it.ifBlank { event.text } }
+                run.touch()
             }
-            is StreamEvent.AssistantDelta -> {
-                enqueueStreamingDelta(event.text)
-            }
+            is StreamEvent.AssistantDelta -> enqueueStreamingDelta(run, event.text)
             is StreamEvent.AssistantInterim -> {
-                flushStreamingDelta()
-                updateStreamingMessage { current -> mergeInterimAssistantText(current, event.content) }
-                uiState = uiState.copy(
-                    runStage = "Hermes 正在处理",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
+                flushStreamingDelta(run)
+                updateStreamingMessage(run) { mergeInterimAssistantText(it, event.content) }
+                run.touch("Hermes 正在处理")
             }
             is StreamEvent.AssistantCompleted -> {
-                flushStreamingDelta()
+                flushStreamingDelta(run)
                 if (event.content.isNotBlank()) {
-                    updateStreamingMessage { current ->
-                        mergeCompletedAssistantText(current, event.content, event.responsePreviewed)
-                    }
+                    updateStreamingMessage(run) { mergeCompletedAssistantText(it, event.content, event.responsePreviewed) }
                 }
-                uiState = uiState.copy(runLastActivityAtMillis = System.currentTimeMillis())
+                run.touch()
             }
             is StreamEvent.ToolStarted -> {
-                flushStreamingDelta()
-                val toolName = councilToolName(event.name)
-                uiState = uiState.copy(
-                    runStage = "正在使用 $toolName",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
-                updateTool(toolName, event.preview, ToolStatus.RUNNING, event.todos)
+                flushStreamingDelta(run)
+                val name = councilToolName(event.name)
+                run.touch("正在使用 $name")
+                updateTool(run, name, event.preview, ToolStatus.RUNNING, event.todos)
             }
             is StreamEvent.ToolProgress -> {
-                val toolName = councilToolName(event.name)
-                uiState = uiState.copy(
-                    runStage = event.preview.ifBlank { "正在使用 $toolName" }.take(80),
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
-                updateTool(toolName, event.preview, ToolStatus.RUNNING)
+                val name = councilToolName(event.name)
+                run.touch(event.preview.ifBlank { "正在使用 $name" }.take(80))
+                updateTool(run, name, event.preview, ToolStatus.RUNNING)
             }
             is StreamEvent.ToolCompleted -> {
-                flushStreamingDelta()
-                val toolName = councilToolName(event.name)
-                uiState = uiState.copy(
-                    runStage = "$toolName 已完成",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
-                updateTool(toolName, event.preview, ToolStatus.COMPLETED, event.todos)
+                flushStreamingDelta(run)
+                val name = councilToolName(event.name)
+                run.touch("$name 已完成")
+                updateTool(run, name, event.preview, ToolStatus.COMPLETED, event.todos)
             }
             is StreamEvent.ToolFailed -> {
-                uiState = uiState.copy(
-                    runStage = "${councilToolName(event.name)} 执行失败",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
-                updateTool(councilToolName(event.name), event.preview, ToolStatus.FAILED)
+                val name = councilToolName(event.name)
+                run.touch("$name 执行失败")
+                updateTool(run, name, event.preview, ToolStatus.FAILED)
             }
             is StreamEvent.AgentRequestPending -> {
-                val request = event.request.copy(conversationId = activeStreamSession?.id.orEmpty())
-                uiState = uiState.copy(
-                    pendingAgentRequests = (uiState.pendingAgentRequests.filterNot { it.requestId == request.requestId } + request),
-                    runStage = "等待你的处理",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
+                val request = event.request.copy(conversationId = run.session.id)
+                uiState = uiState.copy(pendingAgentRequests = uiState.pendingAgentRequests.filterNot {
+                    it.runtimeSessionId == request.runtimeSessionId && it.requestId == request.requestId
+                } + request)
                 configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
+                run.touch("等待你的处理")
                 val action = if (request.type == AgentRequestType.APPROVAL) "需要确认一项操作" else "需要你补充信息"
-                HermesNotifications.showAgentRequest(
-                    getApplication(),
-                    "Hermes $action",
-                    request.title,
-                    profile = activeStreamSession?.profile,
-                    sessionId = activeStreamSession?.id,
-                )
+                HermesNotifications.showAgentRequest(getApplication(), "Hermes $action", request.title,
+                    profile = run.session.profile, sessionId = run.session.id)
             }
             is StreamEvent.AgentRequestExpired -> {
-                uiState = uiState.copy(
-                    pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.requestId == event.requestId },
-                    runStage = "请求已过期，Hermes 正在继续",
-                    runLastActivityAtMillis = System.currentTimeMillis(),
-                )
+                uiState = uiState.copy(pendingAgentRequests = uiState.pendingAgentRequests.filterNot {
+                    it.conversationId == run.session.id && it.requestId == event.requestId
+                })
                 configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
+                run.touch("请求已过期，Hermes 正在继续")
             }
             is StreamEvent.ConnectionInterrupted -> {
-                flushStreamingDelta()
-                recoverInterruptedStream(event.message)
+                flushStreamingDelta(run)
+                recoverInterruptedStream(run, event.message)
             }
-            is StreamEvent.Error -> {
-                flushStreamingDelta()
-                handleStreamFailure(IllegalStateException(event.message))
-            }
+            is StreamEvent.Error -> handleStreamFailure(run, IllegalStateException(event.message))
             StreamEvent.Completed -> {
-                flushStreamingDelta()
-                finishStreaming()
+                flushStreamingDelta(run)
+                finishStreaming(run)
             }
         }
+        publishRuns()
     }
 
-    private fun enqueueStreamingDelta(text: String) {
+    private fun enqueueStreamingDelta(run: SessionRun, text: String) {
         if (text.isEmpty()) return
-        streamingDeltaBuffer.append(text)
-        if (streamingDeltaFlushJob?.isActive == true) return
-        streamingDeltaFlushJob = viewModelScope.launch {
+        run.touch("正在组织回复")
+        run.deltaBuffer.append(text)
+        if (run.deltaFlushJob?.isActive == true) return
+        run.deltaFlushJob = viewModelScope.launch {
             delay(STREAM_DELTA_FRAME_MILLIS)
-            streamingDeltaFlushJob = null
-            flushStreamingDelta()
+            run.deltaFlushJob = null
+            if (isActive(run)) flushStreamingDelta(run)
         }
     }
 
-    private fun flushStreamingDelta() {
-        if (streamingDeltaBuffer.isEmpty()) return
-        val text = streamingDeltaBuffer.toString()
-        streamingDeltaBuffer.clear()
+    private fun flushStreamingDelta(run: SessionRun) {
+        if (run.deltaBuffer.isEmpty()) return
+        val text = run.deltaBuffer.toString()
+        run.deltaBuffer.clear()
+        updateStreamingMessage(run) { it + text }
+    }
+
+    private fun updateStreamingMessage(run: SessionRun, transform: (String) -> String) {
+        setRunMessages(run, run.messages.map { if (it.isStreaming) it.copy(content = transform(it.content)) else it })
+    }
+
+    private fun updateStreamingReasoning(run: SessionRun, transform: (String) -> String) {
+        setRunMessages(run, run.messages.map { if (it.isStreaming) it.copy(reasoning = transform(it.reasoning)) else it })
+    }
+
+    private fun updateTool(run: SessionRun, name: String, preview: String, status: ToolStatus, todos: List<ChatTodo> = emptyList()) {
+        val existing = run.tools.indexOfLast { it.name == name && it.status == ToolStatus.RUNNING }
+        val updated = run.tools.toMutableList()
+        if (existing >= 0) updated[existing] = updated[existing].copy(preview = preview.ifBlank { updated[existing].preview }, status = status)
+        else updated += ToolActivity(name = name, preview = preview, status = status)
+        run.tools = updated
+        if (todos.isNotEmpty()) run.todos = todos
+        run.artifacts = (run.artifacts + ChatInsightParser.artifactsFromText(preview)).distinctBy(ChatArtifact::path)
+    }
+
+    private fun finishStreaming(run: SessionRun) {
+        if (!isActive(run)) return
+        val session = run.session
+        val completed = run.messages.filter { !it.isStreaming || it.content.isNotBlank() || it.images.isNotEmpty() }
+            .map { it.copy(isStreaming = false) }
+        setRunMessages(run, completed)
+        val reply = completed.lastOrNull { it.role == MessageRole.ASSISTANT }
+        val text = reply?.content.orEmpty().replace(Regex("\\s+"), " ").trim()
+        val hasReply = text.isNotBlank() || reply?.images?.isNotEmpty() == true
+        rememberRecentArtifacts(session, completed, run.artifacts)
+        val needsAttention = hasReply && replyNeedsAttention(uiState.route, uiState.selectedSession?.id, session.id, isAppInForeground())
+        val unread = if (needsAttention) uiState.unreadSessionIds + session.scopedId else uiState.unreadSessionIds
+        configStore.saveUnreadSessionIds(unread)
+        val completion = RunCompletionSummary(sessionId = session.id, title = session.title.ifBlank { "Hermes 已完成" },
+            summary = text.take(240).ifBlank { "本轮执行已完成" }, artifacts = run.artifacts)
+        val recent = (listOf(completion) + uiState.recentCompletions).take(29)
+        val queued = run.queued
         uiState = uiState.copy(
-            runStage = "正在组织回复",
-            runLastActivityAtMillis = System.currentTimeMillis(),
-        )
-        updateStreamingMessage { current -> current + text }
-    }
-
-    private fun updateStreamingMessage(transform: (String) -> String) {
-        val updated = activeStreamMessages().map { message ->
-            if (message.isStreaming) message.copy(content = transform(message.content)) else message
-        }
-        setActiveStreamMessages(updated)
-    }
-
-    private fun updateStreamingReasoning(transform: (String) -> String) {
-        val updated = activeStreamMessages().map { message ->
-            if (message.isStreaming) message.copy(reasoning = transform(message.reasoning)) else message
-        }
-        setActiveStreamMessages(updated)
-    }
-
-    private fun updateTool(
-        name: String,
-        preview: String,
-        status: ToolStatus,
-        todos: List<ChatTodo> = emptyList(),
-    ) {
-        val existing = activeStreamToolActivities.indexOfLast { it.name == name && it.status == ToolStatus.RUNNING }
-        val updated = activeStreamToolActivities.toMutableList()
-        if (existing >= 0) {
-            updated[existing] = updated[existing].copy(
-                preview = preview.ifBlank { updated[existing].preview },
-                status = status,
-            )
-        } else {
-            updated += ToolActivity(name = name, preview = preview, status = status)
-        }
-        val newArtifacts = ChatInsightParser.artifactsFromText(preview)
-        activeStreamToolActivities = updated
-        if (todos.isNotEmpty()) activeStreamTodos = todos
-        activeStreamArtifacts = (activeStreamArtifacts + newArtifacts).distinctBy(ChatArtifact::path)
-        if (uiState.selectedSession?.id == uiState.streamingSessionId) {
-            uiState = uiState.copy(
-                toolActivities = activeStreamToolActivities,
-                chatTodos = activeStreamTodos,
-                chatArtifacts = activeStreamArtifacts,
-            )
-        }
-    }
-
-    private fun finishStreaming() {
-        val sessionId = uiState.streamingSessionId ?: activeStreamSession?.id
-        val session = activeStreamSession ?: uiState.sessions.firstOrNull { it.id == sessionId }
-        val completedMessages = activeStreamMessages().mapNotNull { message ->
-            if (!message.isStreaming) return@mapNotNull message
-            message.takeIf { it.content.isNotBlank() || it.images.isNotEmpty() }
-                ?.copy(isStreaming = false)
-        }
-        if (sessionId != null) cacheMessages(sessionId, completedMessages)
-        val completedMessage = completedMessages.lastOrNull { it.role == MessageRole.ASSISTANT }
-        if (session != null) rememberRecentArtifacts(session, completedMessages, activeStreamArtifacts)
-        val completedText = completedMessage?.content.orEmpty().replace(Regex("\\s+"), " ").trim()
-        val hasReply = completedText.isNotBlank() || completedMessage?.images?.isNotEmpty() == true
-        val needsAttention = sessionId != null && hasReply && replyNeedsAttention(
-            route = uiState.route,
-            selectedSessionId = uiState.selectedSession?.id,
-            completedSessionId = sessionId,
-            appInForeground = isAppInForeground(),
-        )
-        val unreadKey = session?.scopedId ?: "${uiState.activeProfile}::$sessionId"
-        val unreadSessionIds = if (needsAttention) uiState.unreadSessionIds + unreadKey else uiState.unreadSessionIds
-        val queued = uiState.queuedRunMessage?.takeIf { it.session.id == sessionId }
-        val completion = sessionId?.let {
-            RunCompletionSummary(
-                sessionId = it,
-                title = session?.title?.ifBlank { "Hermes 已完成" } ?: "Hermes 已完成",
-                summary = completedText.take(240).ifBlank {
-                    if (activeStreamArtifacts.isNotEmpty()) "已生成 ${activeStreamArtifacts.size} 个产物" else "本轮执行已完成"
-                },
-                artifacts = activeStreamArtifacts,
-            )
-        }
-        val recentCompletions = completion?.let { item ->
-            (listOf(item) + uiState.recentCompletions.filterNot {
-                it.sessionId == item.sessionId && it.completedAtMillis == item.completedAtMillis
-            }).take(29)
-        } ?: uiState.recentCompletions
-        if (needsAttention) configStore.saveUnreadSessionIds(unreadSessionIds)
-        uiState = uiState.copy(
-            isStreaming = false,
-            streamingSessionId = null,
-            runStage = "",
-            activeCouncilMode = CouncilMode.OFF,
-            isSteering = false,
-            queuedRunMessage = if (queued != null) null else uiState.queuedRunMessage,
-            pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.conversationId == sessionId },
-            latestCompletion = completion ?: uiState.latestCompletion,
-            recentCompletions = recentCompletions,
-            isRecoveringConnection = false,
-            messages = if (uiState.selectedSession?.id == sessionId) completedMessages else uiState.messages,
-            toolActivities = if (uiState.selectedSession?.id == sessionId) activeStreamToolActivities else uiState.toolActivities,
-            chatArtifacts = if (uiState.selectedSession?.id == sessionId) activeStreamArtifacts else uiState.chatArtifacts,
-            chatTodos = if (uiState.selectedSession?.id == sessionId) activeStreamTodos else uiState.chatTodos,
-            unreadSessionIds = unreadSessionIds,
-            sessions = uiState.sessions.map { item ->
-                if (item.id == sessionId && hasReply) {
-                    item.copy(preview = completedText.ifBlank { "Hermes 已发送图片" })
-                } else item
+            latestCompletion = completion, recentCompletions = recent, unreadSessionIds = unread,
+            toolActivities = if (isVisible(run)) run.tools else uiState.toolActivities,
+            chatArtifacts = if (isVisible(run)) run.artifacts else uiState.chatArtifacts,
+            chatTodos = if (isVisible(run)) run.todos else uiState.chatTodos,
+            sessions = uiState.sessions.map {
+                if (it.scopedId == session.scopedId) it.copy(preview = text.ifBlank { "Hermes 已发送图片" },
+                    messageCount = maxOf(it.messageCount + 2, completed.size), runtimeId = session.runtimeId) else it
             },
         )
-        configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-        configStore.saveRecentCompletions(recentCompletions)
-        if (hasReply) speakVoiceReply(completedText)
+        configStore.saveRecentCompletions(recent)
+        updateSession(session.id) { it.copy(messageCount = maxOf(it.messageCount, completed.size), runtimeId = session.runtimeId) }
+        removeRunRequests(run)
+        // Voice playback belongs to the conversation being viewed, never a background completion.
+        if (hasReply && isVisible(run)) speakVoiceReply(text)
         if (needsAttention) {
-            val hermesName = uiState.userProfile.hermesDisplayName.ifBlank { "Hermes" }
-            HermesNotifications.showMessage(
-                getApplication(),
-                "$hermesName 已回复",
-                listOfNotNull(
-                    session?.title?.takeIf(String::isNotBlank),
-                    completedText.take(120).ifBlank { "回复中包含图片" },
-                ).joinToString(" · "),
-                profile = session?.profile,
-                sessionId = sessionId,
-                route = "chat",
-            )
+            val name = uiState.userProfile.hermesDisplayName.ifBlank { "Hermes" }
+            HermesNotifications.showMessage(getApplication(), "$name 已回复",
+                "${session.title} · ${text.take(120).ifBlank { "回复中包含图片" }}",
+                profile = session.profile, sessionId = session.id, route = "chat")
         }
-        if (sessionId != null) scheduleTitleRefresh(sessionId)
-        clearActiveStreamState()
-        if (queued != null) {
-            viewModelScope.launch {
-                delay(180)
-                startMessage(queued.session, queued.prompt, queued.attachments)
-            }
-        } else {
-            consumePendingDeepLink()
-        }
+        scheduleTitleRefresh(session)
+        removeRun(run)
+        if (queued != null) startMessage(run.session, queued.prompt, queued.attachments)
+        else consumePendingDeepLink()
     }
 
-    private fun startStreamWatchdog(session: HermesSession) {
-        streamWatchdogJob?.cancel()
-        streamWatchdogJob = viewModelScope.launch {
+    private fun startStreamWatchdog(run: SessionRun) {
+        run.watchdogJob?.cancel()
+        run.watchdogJob = viewModelScope.launch {
             delay(STREAM_IDLE_POLL_AFTER_MILLIS)
-            while (uiState.isStreaming && uiState.streamingSessionId == session.id) {
-                val hasPendingRequest = uiState.pendingAgentRequests.any { it.conversationId == session.id }
-                val idleFor = System.currentTimeMillis() - uiState.runLastActivityAtMillis
-                if (!hasPendingRequest && !uiState.isRecoveringConnection && idleFor >= STREAM_IDLE_POLL_AFTER_MILLIS) {
+            while (isActive(run)) {
+                val pending = uiState.pendingAgentRequests.any { it.conversationId == run.session.id }
+                val idleFor = System.currentTimeMillis() - run.lastActivityAtMillis
+                if (!pending && !run.recovering && idleFor >= STREAM_IDLE_POLL_AFTER_MILLIS) {
                     val client = apiClient ?: return@launch
-                    val result = runCatching { withContext(Dispatchers.IO) { client.loadLatestMessages(session) } }
+                    val result = runCatching { withContext(Dispatchers.IO) { client.loadLatestMessages(run.session) } }
+                    if (!isActive(run)) return@launch
                     val failure = result.exceptionOrNull()?.let(::unwrapFailure)
                     if (failure is ApiException && failure.statusCode in setOf(401, 403)) {
-                        handleStreamFailure(failure)
+                        handleStreamFailure(run, failure)
                         return@launch
                     }
-                    // Do not infer completion from unchanged persisted text. Long-running tools
-                    // and background sub-agents can legitimately leave the transcript unchanged.
-                    // The live path settles only on this turn's message.complete event.
+                    // Preserve 3.0.3a's completion boundary: saved text alone cannot end a live run.
                     if (failure != null && idleFor >= STREAM_CONNECTION_STALE_MILLIS) {
-                        recoverInterruptedStream("实时连接暂时没有响应，正在自动取回结果")
+                        recoverInterruptedStream(run, "实时连接暂时没有响应，正在自动取回结果")
                         return@launch
                     }
                 }
@@ -3339,153 +3382,92 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun resumeRecoveryAfterAgentResponse(request: AgentRequest) {
-        if (uiState.isStreaming && streamController != null && streamRecoveryJob?.isActive != true) return
-        if (streamRecoveryJob?.isActive == true) return
-        val session = activeStreamSession
-            ?: uiState.sessions.firstOrNull { it.id == request.conversationId }
-            ?: uiState.selectedSession?.takeIf { it.id == request.conversationId }
-            ?: return
-        val snapshot = configStore.readActiveRunSnapshot()
-        activeStreamSession = session
-        streamRecoveryPrompt = snapshot?.takeIf { it.sessionId == session.id }?.submittedPrompt.orEmpty()
-        streamBaselineAssistantSignature = snapshot?.takeIf { it.sessionId == session.id }?.baselineAssistantSignature
-            ?: activeStreamMessages().lastOrNull { it.role == MessageRole.ASSISTANT }?.recoverySignature().orEmpty()
-        val startedAt = snapshot?.takeIf { it.sessionId == session.id }?.startedAtMillis ?: System.currentTimeMillis()
-        uiState = uiState.copy(
-            isStreaming = true,
-            streamingSessionId = session.id,
-            runStage = "已处理，Hermes 正在继续",
-            runStartedAtMillis = startedAt,
-            runLastActivityAtMillis = System.currentTimeMillis(),
-            isRecoveringConnection = true,
-        )
-        recoverInterruptedStream("已提交处理结果，正在继续取回回复")
-    }
-
-    private fun completeRecoveredStream(session: HermesSession, messages: List<ChatMessage>, notice: String) {
-        val visibleMessages = messages.visibleConversationMessages()
-        cacheMessages(session.id, visibleMessages)
-        val insights = ChatInsightParser.fromMessages(messages)
-        activeStreamArtifacts = insights.artifacts
-        activeStreamTodos = insights.todos
-        uiState = uiState.copy(
-            messages = if (uiState.selectedSession?.id == session.id) visibleMessages else uiState.messages,
-            chatArtifacts = if (uiState.selectedSession?.id == session.id) insights.artifacts else uiState.chatArtifacts,
-            chatTodos = if (uiState.selectedSession?.id == session.id) insights.todos else uiState.chatTodos,
-            noticeMessage = notice,
-            errorMessage = null,
-        )
-        finishStreaming()
-    }
-
-    private fun recoverInterruptedStream(message: String) {
-        if (streamRecoveryJob?.isActive == true) return
-        val client = apiClient ?: return finishInterruptedRecovery()
-        val session = activeStreamSession
-            ?: uiState.sessions.firstOrNull { it.id == uiState.streamingSessionId }
-            ?: return finishInterruptedRecovery()
-        val prompt = streamRecoveryPrompt
-        val baselineSignature = streamBaselineAssistantSignature
-
-        streamWatchdogJob?.cancel()
-        streamWatchdogJob = null
-        streamController?.stop()
-        streamJob?.cancel()
-        streamController = null
-        streamJob = null
-        uiState = uiState.copy(
-            isStreaming = true,
-            isRecoveringConnection = true,
-            errorMessage = null,
-            noticeMessage = message,
-            toolActivities = activeStreamToolActivities.map { activity ->
-                if (activity.status == ToolStatus.RUNNING) activity.copy(status = ToolStatus.FAILED) else activity
-            },
-        )
-        activeStreamToolActivities = activeStreamToolActivities.map { activity ->
-            if (activity.status == ToolStatus.RUNNING) activity.copy(status = ToolStatus.FAILED) else activity
+        val key = "${uiState.activeProfile}::${request.conversationId}"
+        var run = activeRuns[key]
+        if (run != null) {
+            run.touch("已处理，Hermes 正在继续")
+            publishRuns()
+            if (run.controller != null && run.recoveryJob?.isActive != true) return
+            if (run.recoveryJob?.isActive == true) return
+        } else {
+            val session = uiState.sessions.firstOrNull { it.id == request.conversationId }
+                ?: uiState.selectedSession?.takeIf { it.id == request.conversationId } ?: return
+            val snapshot = configStore.readActiveRunSnapshots().firstOrNull { it.profile == session.profile && it.sessionId == session.id }
+            run = restoredRun(session, snapshot)
+            activeRuns[session.scopedId] = run
         }
+        recoverInterruptedStream(run, "已提交处理结果，正在继续取回回复")
+    }
 
-        streamRecoveryJob = viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.reconnectGateway() } }
-
-            val retryDelays = listOf(0L, 1_000L, 2_000L, 4_000L, 7_000L, 10_000L, 15_000L, 20_000L, 30_000L, 30_000L, 45_000L, 60_000L)
-            for (waitMillis in retryDelays) {
-                if (waitMillis > 0) delay(waitMillis)
-                if (!uiState.isStreaming || uiState.streamingSessionId != session.id) return@launch
-                if (uiState.pendingAgentRequests.any { it.conversationId == session.id }) {
-                    streamRecoveryJob = null
-                    uiState = uiState.copy(
-                        isRecoveringConnection = false,
-                        runStage = "等待你的处理",
-                        noticeMessage = "处理下方请求后，Hermes 会继续运行",
-                    )
+    private fun recoverInterruptedStream(run: SessionRun, message: String) {
+        if (!isActive(run) || run.recoveryJob?.isActive == true) return
+        val client = apiClient ?: return finishInterruptedRecovery(run)
+        run.watchdogJob?.cancel()
+        run.controller?.stop()
+        run.streamJob?.cancel()
+        run.controller = null
+        run.recovering = true
+        run.touch("正在取回回复")
+        run.tools = run.tools.map { if (it.status == ToolStatus.RUNNING) it.copy(status = ToolStatus.FAILED) else it }
+        publishRuns()
+        uiState = uiState.copy(noticeMessage = message)
+        run.recoveryJob = viewModelScope.launch {
+            // Reuse a healthy socket. Reconnecting each run would interrupt all its peers.
+            runCatching { withContext(Dispatchers.IO) { client.ensureConnected() } }
+            val waits = listOf(0L, 1_000L, 2_000L, 4_000L, 7_000L, 10_000L, 15_000L, 20_000L, 30_000L, 30_000L, 45_000L, 60_000L)
+            for (wait in waits) {
+                if (wait > 0) delay(wait)
+                if (!isActive(run)) return@launch
+                if (uiState.pendingAgentRequests.any { it.conversationId == run.session.id }) {
+                    run.recoveryJob = null
+                    run.recovering = false
+                    run.touch("等待你的处理")
+                    publishRuns()
                     return@launch
                 }
-
-                val result = runCatching { withContext(Dispatchers.IO) { client.loadLatestMessages(session) } }
+                val result = runCatching { withContext(Dispatchers.IO) { client.loadLatestMessages(run.session) } }
+                if (!isActive(run)) return@launch
                 val failure = result.exceptionOrNull()?.let(::unwrapFailure)
                 if (failure is ApiException && failure.statusCode in setOf(401, 403)) {
-                    handleStreamFailure(failure)
+                    handleStreamFailure(run, failure)
                     return@launch
                 }
-
                 val messages = result.getOrNull() ?: continue
-                val recoveredAssistant = findRecoveredAssistant(messages, prompt, baselineSignature)
-                if (recoveredAssistant != null) {
-                    completeRecoveredStream(session, messages, "连接已恢复，回复已同步")
+                if (findRecoveredAssistant(messages, run.submittedPrompt, run.baselineSignature) != null) {
+                    val insights = ChatInsightParser.fromMessages(messages)
+                    run.artifacts = insights.artifacts
+                    run.todos = insights.todos
+                    setRunMessages(run, messages.visibleConversationMessages())
+                    uiState = uiState.copy(noticeMessage = "${run.session.title}：回复已同步")
+                    finishStreaming(run)
                     return@launch
                 }
             }
-            finishInterruptedRecovery()
+            finishInterruptedRecovery(run)
         }
     }
 
-    private fun finishInterruptedRecovery() {
-        val sessionId = uiState.streamingSessionId
-        if (uiState.pendingAgentRequests.any { it.conversationId == sessionId }) {
-            streamRecoveryJob = null
-            uiState = uiState.copy(
-                isRecoveringConnection = false,
-                runStage = "等待你的处理",
-                noticeMessage = "处理待确认请求后，Hermes 会继续运行",
-            )
+    private fun finishInterruptedRecovery(run: SessionRun) {
+        if (!isActive(run)) return
+        if (uiState.pendingAgentRequests.any { it.conversationId == run.session.id }) {
+            run.recoveryJob = null
+            run.recovering = false
+            run.touch("等待你的处理")
+            publishRuns()
             return
         }
-        val stoppedMessages = preserveFailedSend(sessionId)
-        streamRecoveryJob = null
-        streamController = null
-        streamJob = null
-        streamRecoveryPrompt = ""
-        streamBaselineAssistantSignature = ""
-        uiState = uiState.copy(
-            isStreaming = false,
-            streamingSessionId = null,
-            runStage = "",
-            activeCouncilMode = CouncilMode.OFF,
-            isSteering = false,
-            pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.conversationId == sessionId },
-            isRecoveringConnection = false,
-            messages = if (uiState.selectedSession?.id == sessionId) stoppedMessages else uiState.messages,
-            toolActivities = uiState.toolActivities.map { activity ->
-                if (activity.status == ToolStatus.RUNNING) activity.copy(status = ToolStatus.FAILED) else activity
-            },
-            noticeMessage = null,
-            errorMessage = "网络仍不稳定，未能自动取回完整回复。请稍后重新打开当前对话确认结果。",
-        )
-        configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-        clearActiveStreamState()
+        preserveFailedSend(run)
+        restoreQueuedDraft(run)
+        removeRun(run)
+        uiState = uiState.copy(errorMessage = "${run.session.title}：未能自动取回完整回复，请稍后重新打开这段对话确认结果。")
     }
 
-    private fun scheduleTitleRefresh(sessionId: String) {
-        val session = activeStreamSession?.takeIf { it.id == sessionId }
-            ?: uiState.selectedSession?.takeIf { it.id == sessionId }
-            ?: uiState.sessions.firstOrNull { it.id == sessionId }
-            ?: return
+    private fun scheduleTitleRefresh(session: HermesSession) {
+        val sessionId = session.id
         if (sessionId !in pendingTitleSessionIds) return
         val client = apiClient ?: return
-        titleRefreshJob?.cancel()
-        titleRefreshJob = viewModelScope.launch {
+        titleRefreshJobs.remove(session.scopedId)?.cancel()
+        titleRefreshJobs[session.scopedId] = viewModelScope.launch {
             val waits = listOf(700L, 1_400L, 2_800L)
             for (wait in waits) {
                 delay(wait)
@@ -3530,26 +3512,79 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    private fun activeStreamMessages(): List<ChatMessage> {
-        val sessionId = uiState.streamingSessionId ?: activeStreamSession?.id ?: return emptyList()
-        return if (uiState.selectedSession?.id == sessionId && uiState.messages.isNotEmpty()) {
-            uiState.messages
-        } else {
-            messageCache[cacheKey(sessionId)].orEmpty()
-        }
+    private fun currentRun(): SessionRun? = uiState.selectedSession?.scopedId?.let(activeRuns::get)
+
+    private fun focusedRun(): SessionRun? = currentRun() ?: activeRuns.values.firstOrNull()
+
+    private fun isActive(run: SessionRun): Boolean = activeRuns[run.session.scopedId] === run
+
+    private fun isVisible(run: SessionRun): Boolean = uiState.selectedSession?.scopedId == run.session.scopedId
+
+    private fun publishRuns() {
+        val focused = focusedRun()
+        val current = currentRun()
+        uiState = uiState.copy(
+            isStreaming = activeRuns.isNotEmpty(),
+            runningSessions = activeRuns.values.map { it.session },
+            runningRuns = activeRuns.values.map { RunUiState(it.session, it.stage, it.startedAtMillis, it.recovering) },
+            streamingSessionId = focused?.session?.id,
+            runStage = focused?.stage.orEmpty(),
+            runStartedAtMillis = focused?.startedAtMillis ?: 0L,
+            runLastActivityAtMillis = focused?.lastActivityAtMillis ?: 0L,
+            activeCouncilMode = current?.councilMode ?: CouncilMode.OFF,
+            isSteering = current?.isSteering ?: false,
+            queuedRunMessage = current?.queued,
+            isRecoveringConnection = focused?.recovering ?: false,
+            toolActivities = current?.tools ?: uiState.toolActivities,
+            chatArtifacts = current?.artifacts ?: uiState.chatArtifacts,
+            chatTodos = current?.todos ?: uiState.chatTodos,
+        )
     }
 
-    private fun setActiveStreamMessages(messages: List<ChatMessage>) {
-        val sessionId = uiState.streamingSessionId ?: activeStreamSession?.id ?: return
-        cacheMessages(sessionId, messages)
-        if (uiState.selectedSession?.id == sessionId) {
-            uiState = uiState.copy(messages = messages)
-        }
+    private fun setRunMessages(run: SessionRun, messages: List<ChatMessage>) {
+        run.messages = messages
+        messageCache[run.session.scopedId] = messages
+        trimMessageCache()
+        if (isVisible(run)) uiState = uiState.copy(messages = messages)
     }
 
     private fun cacheMessages(sessionId: String, messages: List<ChatMessage>) {
         messageCache[cacheKey(sessionId)] = messages
-        while (messageCache.size > 8) messageCache.remove(messageCache.keys.first())
+        trimMessageCache()
+    }
+
+    private fun trimMessageCache() {
+        // Never evict an active transcript; inactive history can be reloaded from the server.
+        while (messageCache.size > 8) {
+            val key = messageCache.keys.firstOrNull {
+                it !in activeRuns && it != uiState.selectedSession?.scopedId
+            } ?: break
+            messageCache.remove(key)
+        }
+    }
+
+    private fun saveCurrentChatDraft() {
+        val session = uiState.selectedSession ?: return
+        configStore.saveDraft(session.profile, session.id, uiState.draft)
+        attachmentDrafts[session.scopedId] = uiState.attachments
+    }
+
+    private fun removeRunRequests(run: SessionRun) {
+        uiState = uiState.copy(pendingAgentRequests = uiState.pendingAgentRequests.filterNot {
+            it.conversationId == run.session.id
+        })
+        configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
+    }
+
+    private fun removeRun(run: SessionRun) {
+        if (!isActive(run)) return
+        activeRuns.remove(run.session.scopedId)
+        run.deltaFlushJob?.cancel()
+        run.watchdogJob?.cancel()
+        run.recoveryJob?.cancel()
+        run.deltaBuffer.clear()
+        configStore.clearActiveRunSnapshot(run.session.profile, run.session.id)
+        publishRuns()
     }
 
     private fun rememberRecentArtifacts(
@@ -3579,6 +3614,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     name = artifact.name,
                     kind = artifact.kind,
                     workspacePath = session.workspacePath,
+                    sourcePath = artifact.path,
                     seenAtMillis = now,
                 )
             }
@@ -3595,6 +3631,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 name = artifact.name,
                 kind = artifact.kind,
                 workspacePath = session.workspacePath,
+                sourcePath = artifact.path,
                 seenAtMillis = now,
             )
         }
@@ -3658,7 +3695,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun cacheKey(sessionId: String): String =
-        "${activeStreamSession?.profile ?: uiState.activeProfile}::$sessionId"
+        "${uiState.activeProfile}::$sessionId"
 
     private fun markSessionRead(sessionId: String) {
         if (sessionId !in uiState.unreadSessionIds) return
@@ -3667,102 +3704,81 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(unreadSessionIds = unreadSessionIds)
     }
 
-    private fun clearActiveStreamState() {
-        streamingDeltaFlushJob?.cancel()
-        streamingDeltaFlushJob = null
-        streamingDeltaBuffer.clear()
-        configStore.clearActiveRunSnapshot()
-        streamController = null
-        streamJob = null
-        streamRecoveryJob = null
-        streamWatchdogJob?.cancel()
-        streamWatchdogJob = null
-        streamRecoveryPrompt = ""
-        streamBaselineAssistantSignature = ""
-        activeSubmittedPrompt = ""
-        activeSubmittedAttachments = emptyList()
-        activeUserMessageId = null
-        activeStreamSession = null
-        activeStreamToolActivities = emptyList()
-        activeStreamArtifacts = emptyList()
-        activeStreamTodos = emptyList()
-    }
-
     private fun restoreSavedRunIfNeeded(sessions: List<HermesSession>) {
-        if (savedRunRecoveryAttempted || uiState.isStreaming) return
-        val snapshot = configStore.readActiveRunSnapshot() ?: return
-        savedRunRecoveryAttempted = true
-        if (System.currentTimeMillis() - snapshot.startedAtMillis > 24 * 60 * 60 * 1_000L || snapshot.profile != uiState.activeProfile) {
-            configStore.clearActiveRunSnapshot()
-            return
+        val profile = uiState.activeProfile
+        if (!recoveredProfiles.add(profile)) return
+        val snapshots = configStore.readActiveRunSnapshots().filter { it.profile == profile }
+        snapshots.forEach { snapshot ->
+            if (System.currentTimeMillis() - snapshot.startedAtMillis > 24 * 60 * 60 * 1_000L) {
+                configStore.clearActiveRunSnapshot(snapshot.profile, snapshot.sessionId)
+                return@forEach
+            }
+            val session = sessions.firstOrNull { it.id == snapshot.sessionId }
+                ?: HermesSession(id = snapshot.sessionId, title = snapshot.title.ifBlank { "Hermes 对话" },
+                    profile = profile, workspacePath = snapshot.workspacePath)
+            if (activeRuns.containsKey(session.scopedId)) return@forEach
+            val run = restoredRun(session, snapshot)
+            activeRuns[session.scopedId] = run
+            publishRuns()
+            recoverInterruptedStream(run, "正在恢复上次运行的对话")
         }
-        val session = sessions.firstOrNull { it.id == snapshot.sessionId }
-            ?: HermesSession(
-                id = snapshot.sessionId,
-                title = snapshot.title.ifBlank { "Hermes 对话" },
-                profile = snapshot.profile,
-            )
-        activeStreamSession = session
-        streamRecoveryPrompt = snapshot.submittedPrompt
-        streamBaselineAssistantSignature = snapshot.baselineAssistantSignature
-        activeStreamToolActivities = emptyList()
-        activeStreamArtifacts = emptyList()
-        activeStreamTodos = emptyList()
-        uiState = uiState.copy(
-            isStreaming = true,
-            streamingSessionId = session.id,
-            runStage = "正在恢复上次运行",
-            runStartedAtMillis = snapshot.startedAtMillis,
-            runLastActivityAtMillis = System.currentTimeMillis(),
-            isRecoveringConnection = true,
-            noticeMessage = "检测到上次未完成的 Agent 运行，正在自动取回结果",
-        )
-        recoverInterruptedStream("正在重新连接 Hermes")
     }
 
-    private fun handleStreamFailure(throwable: Throwable) {
-        flushStreamingDelta()
-        val sessionId = uiState.streamingSessionId ?: activeStreamSession?.id
-        val stoppedMessages = preserveFailedSend(sessionId)
-        uiState = uiState.copy(
-            isStreaming = false,
-            streamingSessionId = null,
-            runStage = "",
-            activeCouncilMode = CouncilMode.OFF,
-            isSteering = false,
-            pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.conversationId == sessionId },
-            isRecoveringConnection = false,
-            messages = if (uiState.selectedSession?.id == sessionId) stoppedMessages else uiState.messages,
-        )
-        configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-        clearActiveStreamState()
+    private fun restoredRun(session: HermesSession, snapshot: ActiveRunSnapshot?): SessionRun = SessionRun(
+        session = session,
+        submittedPrompt = snapshot?.submittedPrompt.orEmpty(),
+        originalPrompt = snapshot?.submittedPrompt.orEmpty(),
+        baselineSignature = snapshot?.baselineAssistantSignature.orEmpty(),
+        startedAtMillis = snapshot?.startedAtMillis ?: System.currentTimeMillis(),
+    ).also { it.messages = messageCache[session.scopedId].visibleConversationMessages() }
+
+    private fun handleStreamFailure(run: SessionRun, throwable: Throwable) {
+        if (!isActive(run)) return
+        flushStreamingDelta(run)
+        run.controller?.stop()
+        run.streamJob?.cancel()
+        preserveFailedSend(run)
+        restoreQueuedDraft(run)
+        removeRunRequests(run)
+        removeRun(run)
         handleFailure(throwable)
     }
 
-    private fun preserveFailedSend(sessionId: String?): List<ChatMessage> {
-        val currentMessages = activeStreamMessages()
-        val partialReply = currentMessages.lastOrNull { it.isStreaming }
-            ?.let { it.content.isNotBlank() || it.images.isNotEmpty() }
-            ?: false
-        val stopped = currentMessages.mapNotNull { item ->
-            if (!item.isStreaming) return@mapNotNull item
-            item.takeIf { it.content.isNotBlank() || it.images.isNotEmpty() }
-                ?.copy(isStreaming = false)
+    private fun preserveFailedSend(run: SessionRun) {
+        val partialReply = run.messages.any { it.isStreaming && (it.content.isNotBlank() || it.images.isNotEmpty()) }
+        val stopped = run.messages.mapNotNull { message ->
+            when {
+                !partialReply && message.id == run.userMessageId -> null
+                !message.isStreaming -> message
+                message.content.isNotBlank() || message.images.isNotEmpty() -> message.copy(isStreaming = false)
+                else -> null
+            }
         }
-        val cleaned = if (!partialReply && activeUserMessageId != null) {
-            stopped.filterNot { it.id == activeUserMessageId }
-        } else stopped
-        if (sessionId != null) cacheMessages(sessionId, cleaned)
+        setRunMessages(run, stopped)
+        if (run.originalPrompt.isBlank() && run.submittedAttachments.isEmpty()) return
+        val failure = FailedSend(run.originalPrompt, run.submittedAttachments)
+        failedSends[run.session.scopedId] = failure
+        // Keep anything the user has already typed for the next turn.
+        val draft = configStore.readDraft(run.session.profile, run.session.id)
+        if (draft.isBlank()) {
+            configStore.saveDraft(run.session.profile, run.session.id, run.originalPrompt)
+            attachmentDrafts[run.session.scopedId] = run.submittedAttachments
+            if (isVisible(run) && uiState.draft.isBlank() && uiState.attachments.isEmpty()) {
+                uiState = uiState.copy(draft = run.originalPrompt, attachments = run.submittedAttachments)
+            }
+        }
+        if (isVisible(run)) uiState = uiState.copy(failedSend = failure)
+    }
 
-        val failure = FailedSend(activeSubmittedPrompt, activeSubmittedAttachments)
-        val session = activeStreamSession ?: uiState.selectedSession?.takeIf { it.id == sessionId }
-        if (session != null) configStore.saveDraft(session.profile, session.id, activeSubmittedPrompt)
-        uiState = uiState.copy(
-            draft = if (uiState.selectedSession?.id == sessionId) activeSubmittedPrompt else uiState.draft,
-            attachments = if (uiState.selectedSession?.id == sessionId) activeSubmittedAttachments else uiState.attachments,
-            failedSend = if (uiState.selectedSession?.id == sessionId) failure else uiState.failedSend,
-        )
-        return cleaned
+    private fun restoreQueuedDraft(run: SessionRun) {
+        val queued = run.queued ?: return
+        val existing = configStore.readDraft(run.session.profile, run.session.id)
+        val draft = listOf(existing, queued.prompt).filter(String::isNotBlank).distinct().joinToString("\n\n")
+        val attachments = (attachmentDrafts[run.session.scopedId].orEmpty() + queued.attachments).distinctBy { it.id }
+        configStore.saveDraft(run.session.profile, run.session.id, draft)
+        attachmentDrafts[run.session.scopedId] = attachments
+        if (isVisible(run)) uiState = uiState.copy(draft = draft, attachments = attachments)
+        run.queued = null
     }
 
     private fun updateDiagnostic(key: String, detail: String, status: DiagnosticStatus) {
@@ -3785,6 +3801,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             is IOException -> "网络不可达或连接被中断"
             null -> "未知错误"
             else -> root.message?.takeIf(String::isNotBlank) ?: "连接失败"
+        }
+    }
+
+    private fun handleFileFailure(throwable: Throwable) {
+        val root = unwrapFailure(throwable)
+        if (root is ApiException && root.statusCode == 403) {
+            uiState = uiState.copy(isWorkspaceLoading = false, isWorkspaceSaving = false,
+                isWorkspaceAttaching = false, isImageLoading = false)
+            showError("没有读取或操作该文件的权限，请检查当前档案的文件权限。${root.message.takeIf { it.isNotBlank() }?.let { "\n$it" }.orEmpty()}")
+        } else {
+            if (root is ApiException && root.statusCode == 401) invalidateWorkspaceAttachmentPicker()
+            handleFailure(throwable)
         }
     }
 
@@ -3839,6 +3867,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun pathIsWithin(root: String, target: String): Boolean {
+        if (target.replace('\\', '/').split('/').any { it == ".." }) return false
         val cleanRoot = root.trimEnd('/', '\\')
         if (target == cleanRoot || target == root) return true
         return target.startsWith("$cleanRoot/") || target.startsWith("$cleanRoot\\")
@@ -3856,7 +3885,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { withContext(Dispatchers.IO) { client.checkSavedSession() } }
                 .onSuccess { signedInAs ->
                     uiState = uiState.copy(
-                        route = AppRoute.SESSIONS,
+                        route = AppRoute.HOME,
                         isBusy = false,
                         noticeMessage = "已恢复登录：$signedInAs",
                     )
@@ -3949,8 +3978,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
-        streamRecoveryJob?.cancel()
-        streamWatchdogJob?.cancel()
+        activeRuns.values.forEach { run ->
+            run.controller?.stop()
+            run.streamJob?.cancel()
+            run.recoveryJob?.cancel()
+            run.watchdogJob?.cancel()
+            run.deltaFlushJob?.cancel()
+        }
         agentUpdateJob?.cancel()
         voicePlaybackJob?.cancel()
         voiceCaptureJob?.cancel()
@@ -4010,7 +4044,7 @@ private const val STREAM_IDLE_POLL_INTERVAL_MILLIS = 30_000L
 private const val STREAM_CONNECTION_STALE_MILLIS = 90_000L
 
 internal fun artifactIndexFingerprint(session: HermesSession): String =
-    listOf(session.updatedAt, session.messageCount.toString(), session.preview.hashCode().toString()).joinToString("|")
+    listOf("paths-v2", session.workspacePath, session.updatedAt, session.messageCount.toString(), session.preview.hashCode().toString()).joinToString("|")
 
 internal fun updateAvatarUri(
     profile: UserProfilePreferences,
@@ -4123,18 +4157,9 @@ internal fun mergeCompletedAssistantText(
 
 private fun String.normalizeStreamText(): String = replace(Regex("\\s+"), " ").trim()
 
-internal fun resolveArtifactPath(path: String, workspacePath: String): String? {
-    val cleanPath = normalizeChatLinkTarget(path)
-    if (cleanPath.isBlank()) return null
-    val isAbsolute = cleanPath.startsWith('/') ||
-        cleanPath.startsWith("\\\\") ||
-        Regex("^[A-Za-z]:[\\\\/]").containsMatchIn(cleanPath)
-    if (isAbsolute) return cleanPath
-    val cleanWorkspace = workspacePath.trim().trimEnd('/', '\\')
-    if (cleanWorkspace.isBlank()) return null
-    val separator = if ('\\' in cleanWorkspace && '/' !in cleanWorkspace) '\\' else '/'
-    return "$cleanWorkspace$separator${cleanPath.trimStart('/', '\\')}"
-}
+internal fun resolveArtifactPath(path: String, workspacePath: String): String? =
+    resolveRemoteArtifactPath(path, workspacePath)
+
 
 internal fun findRecoveredAssistant(
     messages: List<ChatMessage>,

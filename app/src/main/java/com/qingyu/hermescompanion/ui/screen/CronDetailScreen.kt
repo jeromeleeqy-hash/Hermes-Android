@@ -175,11 +175,11 @@ fun CronDetailScreen(
             title = { Text("删除定时任务？") },
             text = { Text("“${job.name}”将停止自动执行，已有会话记录不会删除。") },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete(job) }) {
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { confirmDelete = false; onDelete(job) }) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { confirmDelete = false }) { Text("取消") } },
         )
     }
 }

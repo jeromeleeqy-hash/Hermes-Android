@@ -45,6 +45,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import com.qingyu.hermescompanion.ui.format.projectForWorkspace
 import com.qingyu.hermescompanion.model.HermesProject
 import com.qingyu.hermescompanion.model.HermesProfile
 import com.qingyu.hermescompanion.model.HermesSession
@@ -105,6 +107,7 @@ fun SessionsScreen(
     contentPadding: PaddingValues,
     onRefresh: () -> Unit,
     onNewSession: () -> Unit,
+    onSelectProject: (String?) -> Unit,
     onSearch: () -> Unit,
     onOpenSession: (HermesSession) -> Unit,
     onDeleteSession: (HermesSession) -> Unit,
@@ -125,14 +128,8 @@ fun SessionsScreen(
     var deleteTarget by remember { mutableStateOf<HermesSession?>(null) }
     var archiveTarget by remember { mutableStateOf<HermesSession?>(null) }
     var showCreateProject by remember { mutableStateOf(false) }
-    var selectedProjectId by remember(state.activeProfile) { mutableStateOf<String?>(null) }
+    val selectedProjectId = state.selectedProjectId
     var timeFilter by remember(state.activeProfile) { mutableStateOf(SessionTimeFilter.ALL) }
-
-    LaunchedEffect(state.projects, selectedProjectId) {
-        if (selectedProjectId != null && state.projects.none { it.id == selectedProjectId }) {
-            selectedProjectId = null
-        }
-    }
 
     val regularSessions = remember(state.sessions) {
         val regular = state.sessions.filterNot(HermesSession::isCron)
@@ -141,14 +138,14 @@ fun SessionsScreen(
     val filteredRegularSessions = remember(regularSessions, state.projects, selectedProjectId, timeFilter) {
         regularSessions.filter { session ->
             val projectMatches = selectedProjectId == null ||
-                state.projects.firstOrNull { it.owns(session.workspacePath) }?.id == selectedProjectId
+                projectForWorkspace(state.projects, session.workspacePath)?.id == selectedProjectId
             projectMatches && sessionMatchesTime(session.updatedAt, timeFilter)
         }
     }
     val projectGroups = remember(filteredRegularSessions, state.projects, selectedProjectId) {
         state.projects.map { project ->
             project to filteredRegularSessions.filter { session ->
-                state.projects.firstOrNull { it.owns(session.workspacePath) }?.id == project.id
+                projectForWorkspace(state.projects, session.workspacePath)?.id == project.id
             }
         }.filter { (project, _) -> selectedProjectId == null || project.id == selectedProjectId }
     }
@@ -163,7 +160,7 @@ fun SessionsScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(0.dp),
-                color = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.background,
                 shadowElevation = 0.dp,
                 tonalElevation = 0.dp,
             ) {
@@ -189,7 +186,7 @@ fun SessionsScreen(
                             listMode = it
                             if (it == SessionListMode.PROJECTS) onLoadProjects()
                         },
-                        onProjectChange = { selectedProjectId = it },
+                        onProjectChange = onSelectProject,
                         onTimeChange = { timeFilter = it },
                     )
                 }
@@ -283,20 +280,10 @@ fun SessionsScreen(
                 }
             }
         }
-        FloatingActionButton(
-            onClick = onNewSession,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 16.dp).size(48.dp),
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ) {
-            HermesMulticolorIcon(
-                HermesIconKind.NEW_CHAT,
-                contentDescription = "新建对话",
-                iconSize = 20.dp,
-                tint = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
+        com.qingyu.hermescompanion.ui.component.AssistantCreateButton(
+            label="新建对话",onClick=onNewSession,large=true,
+            modifier=Modifier.align(Alignment.BottomEnd).padding(end=18.dp,bottom=18.dp).testTag("new_conversation"),
+        )
     }
 
     actionTarget?.let { session ->
@@ -347,11 +334,11 @@ fun SessionsScreen(
             title = { Text("删除这段会话？") },
             text = { Text("“${ellipsizeSessionTitle(session.title)}”将从 Hermes 会话记录中永久删除。") },
             confirmButton = {
-                TextButton(onClick = { onDeleteSession(session); deleteTarget = null }) {
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDeleteSession(session); deleteTarget = null }) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text("取消") } },
         )
     }
 
@@ -362,9 +349,9 @@ fun SessionsScreen(
             title = { Text("归档这段会话？") },
             text = { Text("归档后会从手机首页移除，仍可在 Hermes 电脑端恢复。") },
             confirmButton = {
-                TextButton(onClick = { onArchiveSession(session); archiveTarget = null }) { Text("归档") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onArchiveSession(session); archiveTarget = null }) { Text("归档") }
             },
-            dismissButton = { TextButton(onClick = { archiveTarget = null }) { Text("取消") } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { archiveTarget = null }) { Text("取消") } },
         )
     }
 
@@ -662,7 +649,7 @@ private fun SessionRow(
             ),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SessionAvatar(palette, isCron, session.title)
@@ -676,7 +663,7 @@ private fun SessionRow(
                         }
                         Text(
                             ellipsizeSessionTitle(session.title),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -808,13 +795,13 @@ private fun SessionAvatar(palette: AvatarPalette, isCron: Boolean, title: String
             1 -> HermesColors.extended.successContainer
             2 -> MaterialTheme.colorScheme.secondaryContainer
             3 -> MaterialTheme.colorScheme.tertiaryContainer
-            4 -> MaterialTheme.colorScheme.errorContainer
+            4 -> MaterialTheme.colorScheme.primaryContainer
             else -> HermesColors.extended.warningContainer
         }
     }
     Box(
         modifier = Modifier
-            .size(if (skin.glass) 40.dp else 36.dp)
+            .size(40.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(background.copy(alpha = skin.iconWellAlpha)),
         contentAlignment = Alignment.Center,
@@ -827,7 +814,7 @@ private fun SessionAvatar(palette: AvatarPalette, isCron: Boolean, title: String
                 1 -> HermesColors.extended.success
                 2 -> MaterialTheme.colorScheme.secondary
                 3 -> MaterialTheme.colorScheme.tertiary
-                4 -> MaterialTheme.colorScheme.error
+                4 -> MaterialTheme.colorScheme.primary
                 else -> HermesColors.extended.warning
             }
             Text(
@@ -944,12 +931,12 @@ private fun CreateProjectDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 enabled = !busy && name.isNotBlank() && !listing?.path.isNullOrBlank(),
                 onClick = { onCreate(name, listing?.path.orEmpty()) },
             ) { Text("创建") }
         },
-        dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = onDismiss) { Text("取消") } },
     )
 }
 
@@ -1092,13 +1079,6 @@ private val HermesSession.isCron: Boolean
     get() = source.equals("cron", ignoreCase = true)
 
 private fun paletteFor(session: HermesSession): AvatarPalette {
-    val conversationLength = session.messageCount + session.preview.length / 48
-    return AvatarPalettes[conversationLength.coerceAtLeast(0) % AvatarPalettes.size]
-}
-
-private fun HermesProject.owns(rawPath: String): Boolean {
-    if (rawPath.isBlank()) return false
-    val path = rawPath.replace('\\', '/').trimEnd('/')
-    return (paths + primaryPath).asSequence().filter(String::isNotBlank).map { it.replace('\\', '/').trimEnd('/') }
-        .any { root -> path == root || path.startsWith("$root/") }
+    val identity = (session.profile + "::" + session.id).hashCode() and Int.MAX_VALUE
+    return AvatarPalettes[identity % AvatarPalettes.size]
 }

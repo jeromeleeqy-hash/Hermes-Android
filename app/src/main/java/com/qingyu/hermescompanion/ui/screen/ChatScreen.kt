@@ -74,17 +74,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.qingyu.hermescompanion.ui.ChatEntryAction
+import com.qingyu.hermescompanion.ui.component.AssistantGlyph
+import com.qingyu.hermescompanion.ui.component.AssistantIconWell
+import com.qingyu.hermescompanion.ui.component.AssistantPanel
+import com.qingyu.hermescompanion.ui.component.AssistantBlue
+import com.qingyu.hermescompanion.ui.component.AssistantPurple
+import com.qingyu.hermescompanion.ui.component.AssistantMint
+import com.qingyu.hermescompanion.model.scopedId
 import com.qingyu.hermescompanion.model.ChatMessage
 import com.qingyu.hermescompanion.model.AgentRequest
 import com.qingyu.hermescompanion.model.AgentRequestChoice
 import com.qingyu.hermescompanion.model.AgentRequestType
-import com.qingyu.hermescompanion.model.scopedId
 import com.qingyu.hermescompanion.model.MessageRole
 import com.qingyu.hermescompanion.model.PendingAttachment
 import com.qingyu.hermescompanion.model.SlashCommand
 import com.qingyu.hermescompanion.model.ToolStatus
 import com.qingyu.hermescompanion.model.VoiceCaptureState
 import com.qingyu.hermescompanion.model.VoicePhase
+import com.qingyu.hermescompanion.ui.format.projectForWorkspace
 import com.qingyu.hermescompanion.ui.AppUiState
 import com.qingyu.hermescompanion.ui.voiceRecognitionLanguage
 import com.qingyu.hermescompanion.ui.CouncilMode
@@ -118,6 +134,7 @@ import androidx.core.content.ContextCompat
 @Composable
 fun ChatScreen(
     state: AppUiState,
+    onEntryHandled: () -> Unit,
     contentPadding: PaddingValues,
     onBack: () -> Unit,
     onDraftChange: (String) -> Unit,
@@ -198,18 +215,32 @@ fun ChatScreen(
     val showJumpToBottom by remember {
         derivedStateOf { listState.canScrollForward }
     }
+    var showHistory by remember(sessionKey) { mutableStateOf(state.highlightedMessageId != null) }
+    val composerFocusRequester = remember { FocusRequester() }
+    val softwareKeyboard = LocalSoftwareKeyboardController.current
+    var topMenuVisible by remember { mutableStateOf(false) }
+    var fullTitleVisible by remember(sessionKey) { mutableStateOf(false) }
     var assistantSheetVisible by remember { mutableStateOf(false) }
     var composerToolsVisible by remember { mutableStateOf(false) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
     var councilSheetVisible by remember { mutableStateOf(false) }
     var councilOpenedFromAssistant by remember { mutableStateOf(false) }
-    var linkDialogVisible by remember { mutableStateOf(false) }
-    var linkDraft by remember { mutableStateOf("") }
+    LaunchedEffect(sessionKey, state.chatEntryAction) {
+        if (sessionKey.isNotEmpty() && state.chatEntryAction != ChatEntryAction.NONE) {
+            when (state.chatEntryAction) {
+                ChatEntryAction.ATTACHMENTS -> composerToolsVisible = true
+                ChatEntryAction.VOICE -> voiceInputAction()
+                else -> Unit
+            }
+            onEntryHandled()
+        }
+    }
     val hermesName = state.userProfile.hermesDisplayName.ifBlank { "Hermes" }
     val isCurrentSessionStreaming = state.isStreaming &&
         state.streamingSessionId == state.selectedSession?.id
     val isCurrentSessionRecovering = state.isRecoveringConnection && isCurrentSessionStreaming
-    val composerEnabled = (!state.isStreaming || isCurrentSessionStreaming) && !state.isModelSwitching
+    val composerEnabled = !state.isModelSwitching && !state.isBusy && state.sessionActionId != state.selectedSession?.id &&
+        state.selectedSession?.scopedId !in state.stoppingSessionKeys
     val historyHeaderCount = if (state.hasOlderMessages || state.isOlderMessagesLoading) 1 else 0
     val modelLabel = state.selectedSession?.model.orEmpty()
         .substringAfterLast(':')
@@ -225,7 +256,7 @@ fun ChatScreen(
     )
     DisposableEffect(sessionKey) {
         onDispose {
-            onScrollPositionChange(sessionKey, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+            if (showHistory) onScrollPositionChange(sessionKey, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
         }
     }
 
@@ -267,12 +298,13 @@ fun ChatScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .imePadding()
             .padding(contentPadding),
     ) {
         CenterAlignedTopAppBar(
             title = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.clickable { fullTitleVisible = true }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = state.selectedSession?.title ?: "新会话",
                         color = MaterialTheme.colorScheme.onSurface,
@@ -280,23 +312,7 @@ fun ChatScreen(
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        HermesStatusIcon(if (isCurrentSessionStreaming) HermesStatusKind.BUSY else HermesStatusKind.CONNECTED)
-                        Text(
-                            text = when {
-                                isCurrentSessionRecovering && modelLabel != null -> "$modelLabel · 正在重连"
-                                isCurrentSessionRecovering -> "$hermesName · 正在重连"
-                                isCurrentSessionStreaming && state.runStage.isNotBlank() -> state.runStage
-                                isCurrentSessionStreaming && modelLabel != null -> "$modelLabel · 正在处理"
-                                isCurrentSessionStreaming -> "$hermesName · 正在处理"
-                                modelLabel != null -> "$modelLabel · 在线"
-                                else -> "$hermesName 在线"
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 5.dp),
-                        )
-                    }
+
                 }
             },
             navigationIcon = {
@@ -305,26 +321,84 @@ fun ChatScreen(
                 }
             },
             actions = {
-                if (state.voicePreferences.enabled) {
-                    IconButton(onClick = onVoiceConversation) {
-                        HermesMulticolorIcon(HermesIconKind.WAVEFORM, contentDescription = "语音对话", iconSize = 22.dp)
+                Box {
+                    IconButton(onClick = { topMenuVisible = true }, modifier = Modifier.semantics { contentDescription="对话菜单" }) { AssistantGlyph("more") }
+                    DropdownMenu(expanded = topMenuVisible, onDismissRequest = { topMenuVisible = false }) {
+                        DropdownMenuItem(text = { Text(if(showHistory) "查看最新进展" else "查看完整对话") }, onClick = { showHistory = !showHistory; topMenuVisible = false })
+                        DropdownMenuItem(text = { Text("助理与模型设置") }, onClick = { assistantSheetVisible = true; topMenuVisible = false })
+                        if(state.voicePreferences.enabled) DropdownMenuItem(text = { Text("连续语音对话") }, onClick = { onVoiceConversation(); topMenuVisible = false })
                     }
-                }
-                Box(
-                    modifier = Modifier.padding(end = 12.dp).size(40.dp).clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer).clickable { assistantSheetVisible = true },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    HermesMulticolorIcon(HermesIconKind.SKILLS, contentDescription = "$hermesName 助理面板", iconSize = 20.dp)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
+                containerColor = MaterialTheme.colorScheme.background,
             ),
         )
 
+        if (fullTitleVisible) {
+            AlertDialog(onDismissRequest = { fullTitleVisible = false },
+                title = { Text("对话详情") },
+                text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(state.selectedSession?.title.orEmpty())
+                    state.selectedSession?.workspacePath?.takeIf { it.isNotBlank() }?.let { Text(it, Modifier.padding(top = 12.dp)) }
+                } },
+                confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { fullTitleVisible = false }) { Text("关闭") } })
+        }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
+                !showHistory && state.messages.isNotEmpty() -> {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        item {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                val project = state.selectedSession?.workspacePath?.let { projectForWorkspace(state.projects, it) }
+                                Text(project?.name?.let { "$it · 当前对话" } ?: "${state.activeProfile} · 当前对话", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if(isCurrentSessionStreaming) state.chatTodos.firstOrNull { it.status == com.qingyu.hermescompanion.model.TodoStatus.IN_PROGRESS }?.content ?: "正在处理，\n你交给我的这件事" else "最近一次答复", fontSize = 25.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
+                                Row(Modifier.padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    UserAvatar(state.userProfile.hermesAvatarUri, hermesName, 42.dp, hermesFallback = true, shape = CircleShape)
+                                    Text(if(isCurrentSessionRecovering) "$hermesName 正在重连" else if(isCurrentSessionStreaming) "$hermesName 正在处理" else "$hermesName 的回复", Modifier.weight(1f).padding(start = 12.dp), fontSize = 15.sp)
+                                    if(isCurrentSessionStreaming) CircularProgressIndicator(Modifier.size(15.dp), color = AssistantBlue, strokeWidth = 2.dp)
+                                }
+                            }
+                        }
+                        state.pendingAgentRequests.filter { it.conversationId == state.selectedSession?.id }.forEach { request ->
+                            item(key = "focus-request-${request.requestId}") { AgentRequestCard(request, onRespondRequest) }
+                        }
+                        if(state.chatTodos.isNotEmpty() || state.toolActivities.isNotEmpty()) item {
+                            WorkProgress(state.chatTodos, state.toolActivities)
+                        }
+                        val answer = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT }
+                        if (answer != null) {
+                            item(key = "focus-answer-${answer.id}") {
+                                Surface(shape = RoundedCornerShape(22.dp), color = if(isCurrentSessionStreaming) AssistantBlue.copy(alpha = .06f) else MaterialTheme.colorScheme.surface) {
+                                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                        MessageItem(answer, true, false, onOpenImage, onOpenLink,
+                                            state.userProfile.displayName, state.userProfile.avatarUri,
+                                            hermesName, state.userProfile.hermesAvatarUri, state.inlineImagePreviews,
+                                            state.toolActivities.count { it.status == ToolStatus.RUNNING }, readerMode = true)
+                                    }
+                                }
+                            }
+                        }
+                        if(state.chatArtifacts.isNotEmpty()) item {
+                            AssistantPanel(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("本次资料", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    state.chatArtifacts.forEach { artifact ->
+                                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.background,
+                                            modifier = Modifier.fillMaxWidth().clickable { onOpenArtifact(artifact) }) {
+                                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                AssistantIconWell("file", AssistantMint, Modifier.size(38.dp))
+                                                Text(artifact.name, Modifier.weight(1f).padding(horizontal = 12.dp), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                AssistantGlyph("chevron", Modifier.size(18.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        item { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showHistory = true }) { Text("查看完整对话与上下文 →") } }
+                    }
+                }
                 state.isBusy && state.messages.isEmpty() -> {
                     ChatLoadingState(modifier = Modifier.align(Alignment.Center))
                 }
@@ -351,7 +425,7 @@ fun ChatScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.Center,
                                     ) {
-                                        TextButton(
+                                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                                             onClick = onLoadOlderMessages,
                                             enabled = !state.isOlderMessagesLoading,
                                         ) {
@@ -397,8 +471,8 @@ fun ChatScreen(
                                         }
                                     }
                             }
-                            state.latestCompletion
-                                ?.takeIf { it.sessionId == state.selectedSession?.id && !isCurrentSessionStreaming }
+                            state.recentCompletions.firstOrNull { it.sessionId == state.selectedSession?.id }
+                                ?.takeIf { !isCurrentSessionStreaming }
                                 ?.let { completion ->
                                     item(key = "completion-${completion.completedAtMillis}") {
                                         CompletionCard()
@@ -437,7 +511,16 @@ fun ChatScreen(
             }
         }
 
+        if(isCurrentSessionStreaming && !showHistory) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeChoice("调整要求", "tune", AssistantPurple, Modifier.weight(1f)) { composerFocusRequester.requestFocus(); softwareKeyboard?.show() }
+                HomeChoice("停止这项工作", "stop", HermesColors.extended.warning, Modifier.weight(1f), onStop)
+            }
+        }
+        com.qingyu.hermescompanion.ui.component.FixedRegionDivider()
         Composer(
+            inputFocusRequester = composerFocusRequester,
+            inlineStop = showHistory,
             draft = state.draft,
             attachments = state.attachments,
             assistantName = hermesName,
@@ -500,7 +583,7 @@ fun ChatScreen(
                 fileLauncher.launch(arrayOf("text/*", "application/json", "application/xml", "application/x-yaml"))
             },
             onPickImages = { imageLauncher.launch(arrayOf("image/*")) },
-            onAddLink = { linkDialogVisible = true },
+            onOpenCommands = { commandPaletteVisible = true; onLoadCommandCatalog() },
             onOpenWorkspace = onOpenWorkspace,
             onInsertPrompt = { snippet ->
                 onDraftChange(listOf(state.draft, snippet).filter(String::isNotBlank).joinToString("\n"))
@@ -539,36 +622,7 @@ fun ChatScreen(
             },
         )
     }
-    if (linkDialogVisible) {
-        AlertDialog(
-            onDismissRequest = { linkDialogVisible = false },
-            shape = RoundedCornerShape(22.dp),
-            title = { Text("添加链接") },
-            text = {
-                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)) {
-                    BasicTextField(
-                        value = linkDraft,
-                        onValueChange = { linkDraft = it },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
-                        decorationBox = { inner -> Box { if (linkDraft.isBlank()) Text("https://…", color = MaterialTheme.colorScheme.onSurfaceVariant); inner() } },
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = linkDraft.isNotBlank(),
-                    onClick = {
-                        onDraftChange(listOf(state.draft, "请查看这个链接：${linkDraft.trim()}").filter(String::isNotBlank).joinToString("\n"))
-                        linkDraft = ""
-                        linkDialogVisible = false
-                    },
-                ) { Text("添加") }
-            },
-            dismissButton = { TextButton(onClick = { linkDialogVisible = false }) { Text("取消") } },
-        )
-    }
+
 }
 
 internal fun bottomScrollOffset(itemSize: Int, viewportSize: Int): Int =
@@ -622,6 +676,7 @@ private fun MessageItem(
     hermesAvatarUri: String,
     inlineImagePreviews: Map<String, com.qingyu.hermescompanion.model.ImagePreview>,
     runningToolCount: Int,
+    readerMode: Boolean = false,
 ) {
     val skin = HermesSkin.current
     val councilMessages = remember(message.content) { parseCouncilAgentMessages(message.content) }
@@ -718,7 +773,7 @@ private fun MessageItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
         ) {
-            Box(Modifier.padding(top = 1.dp).size(32.dp)) {
+            if (!readerMode) Box(Modifier.padding(top = 1.dp).size(32.dp)) {
                 if (showIdentity && hermesAvatarUri.isNotBlank()) {
                     UserAvatar(
                         uri = hermesAvatarUri,
@@ -730,7 +785,7 @@ private fun MessageItem(
                     HermesMark(compact = true)
                 }
             }
-            Column(modifier = Modifier.weight(1f).padding(start = 10.dp, end = 4.dp, top = if (showIdentity) 3.dp else 0.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(start = if (readerMode) 0.dp else 10.dp, end = if (readerMode) 0.dp else 4.dp, top = if (showIdentity) 3.dp else 0.dp)) {
                 if (showIdentity) {
                     Text(
                         hermesName,
@@ -1017,125 +1072,8 @@ private fun CitationSourcesCard(
 }
 
 @Composable
-private fun AgentRequestCard(
-    request: AgentRequest,
-    onRespond: (AgentRequest, String) -> Unit,
-) {
-    var answer by remember(request.requestId) { mutableStateOf("") }
-    var selectedValues by remember(request.requestId) { mutableStateOf(emptySet<String>()) }
-    val actions = if (request.type == AgentRequestType.APPROVAL) {
-        buildList {
-            add(AgentRequestChoice("仅本次允许", "once"))
-            if (request.allowSession) add(AgentRequestChoice("本次会话允许", "session"))
-            if (request.allowPermanent) add(AgentRequestChoice("始终允许", "always"))
-            add(AgentRequestChoice("拒绝", "deny"))
-        }
-    } else {
-        request.choices
-    }
-    val isMultipleChoice = request.type == AgentRequestType.CLARIFICATION && request.allowMultiple
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(start = 43.dp, end = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = HermesColors.extended.warningContainer,
-        border = BorderStroke(0.8.dp, HermesColors.extended.warning.copy(alpha = 0.24f)),
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HermesMulticolorIcon(
-                    if (request.type == AgentRequestType.APPROVAL) HermesIconKind.LOCK else HermesIconKind.IDEA,
-                    contentDescription = null,
-                    iconSize = 20.dp,
-                )
-                Text(
-                    if (request.type == AgentRequestType.APPROVAL) "Hermes 需要你的确认" else "Hermes 需要补充信息",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
-            Text(request.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            if (request.detail.isNotBlank()) {
-                Text(request.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            actions.forEach { choice ->
-                val selected = choice.value in selectedValues
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) {
-                        if (isMultipleChoice) {
-                            selectedValues = if (selected) selectedValues - choice.value else selectedValues + choice.value
-                        } else {
-                            onRespond(request, choice.value)
-                        }
-                    },
-                    shape = RoundedCornerShape(11.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isMultipleChoice) {
-                            HermesMulticolorIcon(
-                                if (selected) HermesIconKind.CHECKBOX_CHECKED else HermesIconKind.CHECKBOX_EMPTY,
-                                contentDescription = if (selected) "已选择" else "未选择",
-                                iconSize = 20.dp,
-                            )
-                            Spacer(Modifier.width(9.dp))
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(choice.label, style = MaterialTheme.typography.bodyMedium)
-                            if (choice.description.isNotBlank()) {
-                                Text(
-                                    choice.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (request.type == AgentRequestType.CLARIFICATION && (actions.isEmpty() || isMultipleChoice)) {
-                Surface(shape = RoundedCornerShape(11.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)) {
-                    BasicTextField(
-                        value = answer,
-                        onValueChange = { answer = it },
-                        enabled = !request.isResponding,
-                        maxLines = 4,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp, max = 120.dp).padding(11.dp),
-                        decorationBox = { inner ->
-                            Box {
-                                if (answer.isBlank()) {
-                                    Text(
-                                        if (isMultipleChoice) "其他回答（可选）" else "输入你的回答…",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                inner()
-                            }
-                        },
-                    )
-                }
-                val response = buildAgentRequestAnswer(request, selectedValues, answer)
-                TextButton(
-                    enabled = response.isNotBlank() && !request.isResponding,
-                    onClick = { onRespond(request, response) },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(
-                        when {
-                            request.isResponding -> "提交中…"
-                            isMultipleChoice -> "确认并继续"
-                            else -> "提交回答"
-                        },
-                    )
-                }
-            }
-            if (request.isResponding) LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-    }
+private fun AgentRequestCard(request: AgentRequest, onRespond: (AgentRequest, String) -> Unit) {
+    DecisionCard(request, onRespond)
 }
 
 internal fun buildAgentRequestAnswer(
@@ -1174,6 +1112,8 @@ private fun CompletionCard() {
 
 @Composable
 private fun Composer(
+    inputFocusRequester: FocusRequester,
+    inlineStop: Boolean,
     draft: String,
     attachments: List<PendingAttachment>,
     assistantName: String,
@@ -1210,7 +1150,7 @@ private fun Composer(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(start = HermesSpacing.sm, end = HermesSpacing.sm, top = 5.dp, bottom = 5.dp),
+                .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 8.dp),
         ) {
             AnimatedVisibility(visible = councilMode != CouncilMode.OFF) {
                 Surface(
@@ -1229,7 +1169,7 @@ private fun Composer(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        TextButton(onClick = onDisableCouncil) { Text("关闭") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDisableCouncil) { Text("关闭") }
                     }
                 }
             }
@@ -1244,7 +1184,7 @@ private fun Composer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("已有一条消息排队中", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = onCancelQueued) { Text("取消") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCancelQueued) { Text("取消") }
                     }
                 }
             }
@@ -1289,7 +1229,7 @@ private fun Composer(
                                 maxLines = 2,
                             )
                         }
-                        TextButton(onClick = onCancelVoice) {
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCancelVoice) {
                             Text(if (voiceCapture.phase == VoicePhase.ERROR) "关闭" else "取消")
                         }
                     }
@@ -1306,7 +1246,7 @@ private fun Composer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("发送失败，内容已保留", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetryFailed, enabled = enabled && !isStreaming) { Text("重新发送") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onRetryFailed, enabled = enabled && !isStreaming) { Text("重新发送") }
                     }
                 }
             }
@@ -1345,108 +1285,27 @@ private fun Composer(
                 }
             }
 
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(if (skin.glass) skin.shadowElevation.dp else 2.dp, RoundedCornerShape(18.dp)),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha),
-                tonalElevation = 0.dp,
-                border = BorderStroke(
-                    if (skin.glass) 0.9.dp else 0.7.dp,
-                    if (skin.glass) Color.White.copy(alpha = 0.42f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-                ),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
-                    BasicTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        enabled = enabled,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                        maxLines = 5,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp, max = 96.dp).padding(horizontal = 4.dp, vertical = 3.dp),
-                        decorationBox = { inner ->
-                            Box(contentAlignment = Alignment.TopStart) {
-                                if (draft.isBlank()) {
-                                    Text(
-                                        when {
-                                            isStreaming -> "追加要求，或排队到下一轮…"
-                                            enabled -> "给 $assistantName 发消息…"
-                                            else -> "另一段对话正在后台生成…"
-                                        },
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+            AssistantPanel(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
+                    Row(Modifier.heightIn(min = 50.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onTools, enabled = enabled, modifier=Modifier.semantics {contentDescription="添加内容"}) { AssistantIconWell("plus", MaterialTheme.colorScheme.onSurfaceVariant, Modifier.size(30.dp)) }
+                        BasicTextField(value = draft, onValueChange = onDraftChange, enabled = enabled,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface), maxLines = 5,
+                            modifier = Modifier.weight(1f).focusRequester(inputFocusRequester).padding(horizontal = 4.dp, vertical = 8.dp),
+                            decorationBox = { inner -> Box {
+                                if(draft.isBlank()) Text(if(enabled) "补充一句，或直接说…" else "正在加载对话…", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f), fontSize = 16.sp)
                                 inner()
-                            }
-                        },
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ComposerAction(
-                            icon = HermesIconKind.ATTACHMENT,
-                            description = "添加内容",
-                            background = Color.Transparent,
-                            enabled = enabled,
-                            onClick = onTools,
-                        )
-                        Spacer(Modifier.width(3.dp))
-                        ComposerAction(
-                            icon = HermesIconKind.COMMAND,
-                            description = "打开命令面板",
-                            background = Color.Transparent,
-                            enabled = enabled && !isStreaming,
-                            onClick = onCommands,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        if (isStreaming && (draft.isNotBlank() || attachments.isNotEmpty())) {
-                            TextButton(
-                                enabled = !isSteering && draft.isNotBlank() && attachments.isEmpty(),
-                                onClick = onSteer,
-                            ) { Text(if (isSteering) "追加中" else "追加") }
-                            TextButton(onClick = onQueue) { Text(if (hasQueuedMessage) "替换" else "排队") }
-                        }
-                        if (!isStreaming && draft.isBlank() && attachments.isEmpty()) {
-                            ComposerAction(
-                                icon = HermesIconKind.MICROPHONE,
-                                description = when (voiceCapture.phase) {
-                                    VoicePhase.LISTENING -> "结束录音"
-                                    VoicePhase.TRANSCRIBING -> "正在识别"
-                                    else -> "单次语音输入"
-                                },
-                                background = if (voiceCapture.phase == VoicePhase.LISTENING) {
-                                    MaterialTheme.colorScheme.errorContainer
-                                } else {
-                                    Color.Transparent
-                                },
-                                enabled = enabled && voiceCapture.phase != VoicePhase.TRANSCRIBING,
-                                onClick = onVoice,
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.size(38.dp).clip(CircleShape)
-                                    .background(
-                                        if (isStreaming) {
-                                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.error))
-                                        } else {
-                                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary))
-                                        },
-                                    )
-                                    .clickable(
-                                        enabled = isStreaming || (enabled && (draft.isNotBlank() || attachments.isNotEmpty())),
-                                        onClick = if (isStreaming) onStop else onSend,
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                HermesMulticolorIcon(
-                                    kind = if (isStreaming) HermesIconKind.STOP else HermesIconKind.SEND,
-                                    contentDescription = if (isStreaming) "停止" else "发送",
-                                    iconSize = 19.dp,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                )
-                            }
-                        }
+                            } })
+                        if(isStreaming && inlineStop) IconButton(onClick = onStop) { AssistantGlyph("stop", tint = MaterialTheme.colorScheme.error) }
+                        else if(!isStreaming && (draft.isNotBlank() || attachments.isNotEmpty())) IconButton(onClick = onSend, enabled = enabled, modifier=Modifier.semantics {contentDescription="发送"}) { AssistantGlyph("arrow", tint = AssistantBlue) }
+                        else IconButton(onClick = onVoice, enabled = enabled && voiceCapture.phase != VoicePhase.TRANSCRIBING) { AssistantGlyph("wave", tint = if(voiceCapture.phase == VoicePhase.LISTENING) MaterialTheme.colorScheme.error else AssistantBlue) }
+                    }
+                    if(isStreaming && (draft.isNotBlank() || attachments.isNotEmpty())) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !isSteering && draft.isNotBlank() && attachments.isEmpty(), onClick = onSteer) { Text(if(isSteering) "追加中" else "追加要求") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onQueue) { Text(if(hasQueuedMessage) "替换排队消息" else "排队发送") }
                     }
                 }
+
             }
         }
     }
@@ -1670,7 +1529,7 @@ private fun ExpertCouncilSheet(
                     Text("正在切换会审模型…", modifier = Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 onClick = { onSelect(CouncilMode.OFF) },
                 modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
             ) { Text("关闭会审") }

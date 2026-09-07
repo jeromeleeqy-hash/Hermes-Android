@@ -12,6 +12,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -38,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.ui.component.AmbientBackground
 import com.qingyu.hermescompanion.ui.component.HermesBottomDock
+import com.qingyu.hermescompanion.ui.screen.AssistantHomeScreen
 import com.qingyu.hermescompanion.ui.screen.ChatScreen
 import com.qingyu.hermescompanion.ui.screen.ConnectionScreen
 import com.qingyu.hermescompanion.ui.screen.CronDetailScreen
@@ -66,31 +70,53 @@ import com.qingyu.hermescompanion.ui.component.ImagePreviewDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
+    val homeKeyboardVisible = state.route == AppRoute.HOME && WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val snackbarHostState = remember { SnackbarHostState() }
     val message = state.errorMessage ?: state.noticeMessage
 
     LaunchedEffect(message) {
         if (!message.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(
-                message = message,
-                duration = if (state.errorMessage != null) SnackbarDuration.Long else SnackbarDuration.Short,
-            )
+            if (state.errorMessage != null) {
+                snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
+            } else {
+                // Material's Short duration is still several seconds. Ordinary
+                // confirmations should disappear promptly without queuing overlays.
+                withTimeoutOrNull(1_500L) {
+                    snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Indefinite)
+                }
+            }
             viewModel.clearTransientMessage()
         }
     }
 
-    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+    CompositionLocalProvider(LocalRippleConfiguration provides androidx.compose.material3.RippleConfiguration()) {
         AmbientBackground {
             Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (state.route in setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
+            // Reserve layout space for running tasks; a snackbar overlay obscures
+            // the sessions screen's new-chat button on compact phones.
+            Column {
+                if (state.workspaceAttachmentTarget == null && !homeKeyboardVisible && state.route in
+                    setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
+                    com.qingyu.hermescompanion.ui.component.FixedRegionDivider()
+                }
+                if (state.workspaceAttachmentTarget == null && state.isStreaming && state.route !in setOf(AppRoute.SETUP, AppRoute.HOME, AppRoute.CHAT, AppRoute.VOICE_CHAT)) {
+                    GlobalRunStatusPill(
+                        state = state,
+                        onOpen = { if (state.runningRuns.size > 1) viewModel.showTasks() else viewModel.openActiveRun() },
+                        onStop = viewModel::stopActiveRun,
+                    )
+                }
+            if (state.workspaceAttachmentTarget == null && !homeKeyboardVisible && state.route in setOf(AppRoute.HOME, AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
                 HermesBottomDock(
-                    selected = if (state.route == AppRoute.SETTINGS) AppRoute.PROFILE else state.route,
+                    showDivider = false,
+                    selected = when (state.route) { AppRoute.SETTINGS -> AppRoute.PROFILE; AppRoute.TASKS -> AppRoute.HOME; else -> state.route },
                     hasUnreadConversations = state.unreadSessionIds.isNotEmpty(),
                     onSelect = { route ->
                         when (route) {
+                            AppRoute.HOME -> viewModel.showHome()
                             AppRoute.SESSIONS -> viewModel.showSessions()
                             AppRoute.WORKSPACE -> viewModel.showWorkspace()
                             AppRoute.TASKS -> viewModel.showTasks()
@@ -100,16 +126,10 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                     },
                 )
             }
+            }
         },
         snackbarHost = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (state.isStreaming && state.route !in setOf(AppRoute.SETUP, AppRoute.CHAT, AppRoute.VOICE_CHAT)) {
-                    GlobalRunStatusPill(
-                        state = state,
-                        onOpen = viewModel::openActiveRun,
-                        onStop = viewModel::stopGeneration,
-                    )
-                }
                 SnackbarHost(
                     hostState = snackbarHostState,
                     snackbar = { data ->
@@ -132,7 +152,14 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         },
         contentColor = MaterialTheme.colorScheme.onBackground,
             ) { padding ->
+                com.qingyu.hermescompanion.ui.component.AssistantPageTransition(state.route) {
                 when (state.route) {
+            AppRoute.HOME -> AssistantHomeScreen(
+                state, padding, viewModel::startFromHome, viewModel::openSession,
+                viewModel::showSessions, viewModel::showTasks, viewModel::showWorkspace,
+                viewModel::refreshSessions, viewModel::respondToAgentRequest,
+                viewModel::showSessionSearch, viewModel::startWithAttachmentsFromHome, viewModel::startWithVoiceFromHome,
+            )
             AppRoute.SETUP -> ConnectionScreen(
                 state = state,
                 contentPadding = padding,
@@ -149,6 +176,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 contentPadding = padding,
                 onRefresh = viewModel::refreshSessions,
                 onNewSession = viewModel::createSession,
+                onSelectProject = viewModel::selectProject,
                 onSearch = viewModel::showSessionSearch,
                 onOpenSession = viewModel::openSession,
                 onDeleteSession = viewModel::deleteSession,
@@ -173,6 +201,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             )
 
             AppRoute.CHAT -> ChatScreen(
+                onEntryHandled = viewModel::consumeChatEntryAction,
                 state = state,
                 contentPadding = padding,
                 onBack = viewModel::backToSessions,
@@ -197,7 +226,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onLoadCommandCatalog = { viewModel.loadCommandCatalog() },
                 onSetCouncilMode = viewModel::setCouncilMode,
                 onOpenArtifact = viewModel::openChatArtifact,
-                onOpenWorkspace = viewModel::showWorkspace,
+                onOpenWorkspace = viewModel::showWorkspaceAttachmentPicker,
                 onOpenImage = viewModel::openImage,
                 onOpenLink = viewModel::openChatLink,
                 onLoadInlineImages = viewModel::loadInlineChatImages,
@@ -209,6 +238,10 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 state = state,
                 contentPadding = padding,
                 onRefresh = viewModel::refreshWorkspace,
+                onChooseProject = viewModel::showSessions,
+                onCancelAttachmentPicker = viewModel::cancelWorkspaceAttachmentPicker,
+                onSelectAttachment = viewModel::attachWorkspaceFile,
+                onSelectRecentAttachment = viewModel::attachRecentArtifact,
                 onOpenDirectory = viewModel::openWorkspaceDirectory,
                 onOpenDocument = viewModel::openWorkspaceDocument,
                 onOpenImage = viewModel::openImage,
@@ -228,8 +261,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 state = state,
                 contentPadding = padding,
                 onStartConversation = viewModel::createSession,
-                onOpenActiveRun = viewModel::openActiveRun,
-                onStopActiveRun = viewModel::stopGeneration,
+                onOpenActiveRun = viewModel::openTaskSession,
+                onStopActiveRun = viewModel::stopSessionRun,
                 onRespondRequest = viewModel::respondToAgentRequest,
                 onOpenCompletion = viewModel::openRunCompletion,
                 onOpenCronSession = viewModel::openTaskSession,
@@ -417,6 +450,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             )
         }
         }
+        }
         if (state.isImageLoading) ImageLoadingDialog()
         state.imagePreview?.let { image ->
             ImagePreviewDialog(image = image, onDismiss = viewModel::closeImagePreview)
@@ -457,7 +491,7 @@ private fun GlobalRunStatusPill(
         ) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.2.dp)
             Text(
-                "后台执行 · ${state.runStage.ifBlank { "Hermes 正在处理当前任务" }}",
+                "${state.runningRuns.size} 段对话运行中 · ${state.runStage.ifBlank { "Hermes 正在处理当前任务" }}",
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -466,7 +500,7 @@ private fun GlobalRunStatusPill(
             if (state.pendingAgentRequests.isNotEmpty()) {
                 Text("待处理 ${state.pendingAgentRequests.size}", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
             }
-            TextButton(onClick = onStop) { Text("停止") }
+            if (state.runningRuns.size == 1) TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text("停止") }
         }
     }
 }
@@ -497,7 +531,7 @@ private fun CrashReportDialog(report: String, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                 onClick = {
                     clipboard.setText(AnnotatedString(report))
                     onDismiss()
@@ -505,7 +539,7 @@ private fun CrashReportDialog(report: String, onDismiss: () -> Unit) {
             ) { Text("复制并关闭") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("关闭") }
         },
     )
 }

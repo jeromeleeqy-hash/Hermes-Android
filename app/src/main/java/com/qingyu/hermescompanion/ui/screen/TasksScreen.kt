@@ -78,8 +78,8 @@ fun TasksScreen(
     state: AppUiState,
     contentPadding: PaddingValues,
     onStartConversation: () -> Unit,
-    onOpenActiveRun: () -> Unit,
-    onStopActiveRun: () -> Unit,
+    onOpenActiveRun: (HermesSession) -> Unit,
+    onStopActiveRun: (HermesSession) -> Unit,
     onRespondRequest: (AgentRequest, String) -> Unit,
     onOpenCompletion: (RunCompletionSummary) -> Unit,
     onOpenCronSession: (HermesSession) -> Unit,
@@ -113,7 +113,7 @@ fun TasksScreen(
     val regularCompletions = remember(state.recentCompletions, cronSessionIds) {
         state.recentCompletions.filterNot { it.sessionId in cronSessionIds }
     }
-    val runningCount = (if (state.isStreaming) 1 else 0) + runningCronJobs.size
+    val runningCount = state.runningRuns.size + runningCronJobs.size
     val completedJobs = regularCompletions.size + cronSessions.size
     LaunchedEffect(state.pendingAgentRequests.size) {
         if (state.pendingAgentRequests.isNotEmpty()) selectedTab = TaskTab.PENDING
@@ -141,7 +141,7 @@ fun TasksScreen(
                 items = TaskTab.entries.map(TaskTab::label),
                 selectedIndex = selectedTab.ordinal,
                 onSelect = { selectedTab = TaskTab.entries[it] },
-                modifier = Modifier.fillMaxWidth().padding(top = 9.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                 compact = true,
             )
 
@@ -160,15 +160,14 @@ fun TasksScreen(
             TaskTab.RUNNING -> {
                 if (state.isStreaming || runningCronJobs.isNotEmpty()) {
                     Text("当前运行", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
-                    if (state.isStreaming) {
+                    state.runningRuns.forEach { run ->
                         ActiveRunCard(
-                            title = state.sessions.firstOrNull { it.id == state.streamingSessionId }?.title
-                                ?: state.selectedSession?.title.orEmpty().ifBlank { "Hermes 任务" },
-                            stage = state.runStage,
-                            recovering = state.isRecoveringConnection,
-                            startedAtMillis = state.runStartedAtMillis,
-                            onOpen = onOpenActiveRun,
-                            onStop = onStopActiveRun,
+                            title = run.session.title.ifBlank { "Hermes 任务" },
+                            stage = run.stage,
+                            recovering = run.recovering,
+                            startedAtMillis = run.startedAtMillis,
+                            onOpen = { onOpenActiveRun(run.session) },
+                            onStop = { onStopActiveRun(run.session) },
                         )
                     }
                     activeTools.takeLast(8).forEach { activity -> ToolRunCard(activity.name, activity.preview, activity.status) }
@@ -257,8 +256,8 @@ fun TasksScreen(
             onDismissRequest = { deleteTarget = null },
             title = { Text("删除定时任务？") },
             text = { Text("“${job.name}”将停止自动执行，已有会话记录不会删除。") },
-            confirmButton = { TextButton(onClick = { onDeleteCron(job); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDeleteCron(job); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text("取消") } },
         )
     }
 }
@@ -295,25 +294,8 @@ private fun TaskPageHeader(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Surface(
-            onClick = onCreate,
-            modifier = Modifier.size(32.dp).semantics { contentDescription = "新建任务" },
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 3.dp,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier.size(15.dp, 2.5.dp)
-                        .background(MaterialTheme.colorScheme.onPrimary, RoundedCornerShape(2.dp)),
-                )
-                Box(
-                    Modifier.size(2.5.dp, 15.dp)
-                        .background(MaterialTheme.colorScheme.onPrimary, RoundedCornerShape(2.dp)),
-                )
-            }
-        }
+        com.qingyu.hermescompanion.ui.component.AssistantCreateButton("新建任务",onCreate)
+
     }
 }
 
@@ -345,8 +327,8 @@ private fun ActiveRunCard(
                 Text(if (elapsedMinutes < 1) "刚刚" else "${elapsedMinutes} 分钟", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             Row(Modifier.align(Alignment.End).padding(top = 4.dp)) {
-                TextButton(onClick = onOpen) { Text("打开会话") }
-                TextButton(onClick = onStop) { Text("停止", color = MaterialTheme.colorScheme.error) }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpen) { Text("打开会话") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text("停止", color = MaterialTheme.colorScheme.error) }
             }
         }
     }
@@ -354,100 +336,7 @@ private fun ActiveRunCard(
 
 @Composable
 private fun TaskAgentRequestCard(request: AgentRequest, onRespond: (AgentRequest, String) -> Unit) {
-    var answer by remember(request.requestId) { mutableStateOf("") }
-    var selectedValues by remember(request.requestId) { mutableStateOf(emptySet<String>()) }
-    val actions = if (request.type == AgentRequestType.APPROVAL) {
-        buildList {
-            add(AgentRequestChoice("仅本次允许", "once"))
-            if (request.allowSession) add(AgentRequestChoice("本次会话允许", "session"))
-            if (request.allowPermanent) add(AgentRequestChoice("始终允许", "always"))
-            add(AgentRequestChoice("拒绝", "deny"))
-        }
-    } else request.choices
-    val isMultipleChoice = request.type == AgentRequestType.CLARIFICATION && request.allowMultiple
-    GlassPanel(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = RoundedCornerShape(15.dp)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HermesMulticolorIcon(
-                    if (request.type == AgentRequestType.APPROVAL) HermesIconKind.LOCK else HermesIconKind.IDEA,
-                    null,
-                    iconSize = 20.dp,
-                )
-                Text(
-                    if (request.type == AgentRequestType.APPROVAL) "操作确认" else "补充信息",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 7.dp),
-                )
-            }
-            Text(request.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (request.detail.isNotBlank()) Text(request.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            actions.forEach { choice ->
-                val selected = choice.value in selectedValues
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = !request.isResponding) {
-                        if (isMultipleChoice) {
-                            selectedValues = if (selected) selectedValues - choice.value else selectedValues + choice.value
-                        } else {
-                            onRespond(request, choice.value)
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isMultipleChoice) {
-                            HermesMulticolorIcon(
-                                if (selected) HermesIconKind.CHECKBOX_CHECKED else HermesIconKind.CHECKBOX_EMPTY,
-                                if (selected) "已选择" else "未选择",
-                                iconSize = 20.dp,
-                            )
-                            Spacer(Modifier.size(9.dp))
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(choice.label)
-                            if (choice.description.isNotBlank()) {
-                                Text(
-                                    choice.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (request.type == AgentRequestType.CLARIFICATION && (actions.isEmpty() || isMultipleChoice)) {
-                OutlinedTextField(
-                    value = answer,
-                    onValueChange = { answer = it },
-                    enabled = !request.isResponding,
-                    placeholder = { Text(if (isMultipleChoice) "其他回答（可选）" else "输入回答") },
-                    minLines = 2,
-                    maxLines = 4,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                val response = buildAgentRequestAnswer(request, selectedValues, answer)
-                TextButton(
-                    enabled = response.isNotBlank() && !request.isResponding,
-                    onClick = { onRespond(request, response) },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(
-                        when {
-                            request.isResponding -> "提交中…"
-                            isMultipleChoice -> "确认并继续"
-                            else -> "提交回答"
-                        },
-                    )
-                }
-            }
-            if (request.isResponding) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        }
-    }
+    DecisionCard(request, onRespond)
 }
 
 @Composable
@@ -458,7 +347,7 @@ private fun RunCompletionCard(
 ) {
     GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable(onClick = onOpen),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -473,7 +362,7 @@ private fun RunCompletionCard(
                     shape = RoundedCornerShape(9.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                 ) {
-                    Text("打开产物 · ${artifact.name}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(9.dp))
+                    Text("打开产物 · ${artifact.name}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(9.dp))
                 }
             }
         }
@@ -495,13 +384,13 @@ private fun CronJobCard(
 ) {
     GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable(onClick = onOpen),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
-                        .background(if (job.enabled) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant),
+                        .background(if (job.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) { HermesMulticolorIcon(HermesIconKind.RECENT, contentDescription = null, iconSize = 20.dp) }
                 Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
@@ -509,7 +398,7 @@ private fun CronJobCard(
                     Text(
                         job.schedule.display.ifBlank { job.schedule.expression.ifBlank { "未设置计划" } },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -643,26 +532,26 @@ private fun CronDetailDialog(
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        TextButton(onClick = onTrigger, enabled = !busy) { Text("立即运行") }
-                        TextButton(onClick = onToggle, enabled = !busy) { Text(if (job.enabled) "暂停" else "启用") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onTrigger, enabled = !busy) { Text("立即运行") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onToggle, enabled = !busy) { Text(if (job.enabled) "暂停" else "启用") }
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDelete, enabled = !busy) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDelete, enabled = !busy) { Text("删除", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
         },
         confirmButton = {
             if (editing) {
-                TextButton(
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                     enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(),
                     onClick = { onSave(name, prompt, schedule) },
                 ) { Text("保存") }
             } else {
-                TextButton(enabled = !busy, onClick = { editing = true }) { Text("编辑") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = { editing = true }) { Text("编辑") }
             }
         },
         dismissButton = {
-            TextButton(enabled = !busy, onClick = { if (editing) editing = false else onDismiss() }) {
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = { if (editing) editing = false else onDismiss() }) {
                 Text(if (editing) "取消编辑" else "关闭")
             }
         },
@@ -693,11 +582,11 @@ private fun CreateCronDialog(busy: Boolean, onDismiss: () -> Unit, onCreate: (St
             }
         },
         confirmButton = {
-            TextButton(enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(), onClick = { onCreate(name, prompt, schedule) }) {
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(), onClick = { onCreate(name, prompt, schedule) }) {
                 Text("创建")
             }
         },
-        dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = onDismiss) { Text("取消") } },
     )
 }
 
@@ -739,7 +628,7 @@ private fun TaskSummaryMetric(label: String, value: String, modifier: Modifier =
 private fun ToolRunCard(name: String, preview: String, status: ToolStatus) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = HermesSkin.current.panelAlpha),
         tonalElevation = 0.dp,
     ) {

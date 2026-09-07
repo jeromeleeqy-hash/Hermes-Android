@@ -12,6 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.R
+import com.qingyu.hermescompanion.ui.theme.HermesColors
 
 internal enum class HermesIconTone { NEUTRAL, PRIMARY, CYAN, VIOLET, SUCCESS, WARNING, ERROR }
 
@@ -92,7 +93,7 @@ enum class HermesIconKind(
     CONNECTION(R.drawable.hermes_refined_profile_gateway_outline, HermesIconTone.PRIMARY),
     INFORMATION(R.drawable.hermes_refined_profile_about_outline, HermesIconTone.PRIMARY),
     STORAGE(R.drawable.hermes_refined_workspace_download_outline, HermesIconTone.PRIMARY),
-    VERIFIED(R.drawable.hermes_refined_profile_approval_filled, HermesIconTone.SUCCESS),
+    VERIFIED(R.drawable.hermes_approval_outline, HermesIconTone.SUCCESS),
     MODEL(R.drawable.hermes_refined_profile_model_outline, HermesIconTone.CYAN),
     TODO(R.drawable.hermes_refined_utility_todo_outline),
     COUNCIL(R.drawable.hermes_refined_utility_council_outline, HermesIconTone.VIOLET),
@@ -154,11 +155,11 @@ fun HermesMulticolorIcon(
 ) {
     val effectiveTint = tint ?: when (kind.tone) {
         HermesIconTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-        HermesIconTone.PRIMARY -> MaterialTheme.colorScheme.primary
-        HermesIconTone.CYAN -> Color(0xFF16A7B8)
-        HermesIconTone.VIOLET -> Color(0xFF7666E8)
-        HermesIconTone.SUCCESS -> Color(0xFF20B889)
-        HermesIconTone.WARNING -> Color(0xFFE39A27)
+        HermesIconTone.PRIMARY -> AssistantBlue
+        HermesIconTone.CYAN -> HermesColors.extended.cyan
+        HermesIconTone.VIOLET -> HermesColors.extended.purple
+        HermesIconTone.SUCCESS -> HermesColors.extended.success
+        HermesIconTone.WARNING -> HermesColors.extended.warning
         HermesIconTone.ERROR -> MaterialTheme.colorScheme.error
     }
     Image(

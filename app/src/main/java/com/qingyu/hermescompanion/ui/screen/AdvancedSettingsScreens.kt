@@ -153,9 +153,9 @@ fun SkillsToolsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = onCloseSkill) { Text("关闭") } },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCloseSkill) { Text("关闭") } },
             dismissButton = {
-                TextButton(onClick = { onSkillToggle(skill) }) { Text(if (skill.enabled) "停用技能" else "启用技能") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onSkillToggle(skill) }) { Text(if (skill.enabled) "停用技能" else "启用技能") }
             },
         )
     }
@@ -239,7 +239,7 @@ fun ModelSettingsScreen(
                     references.removeAt(index)
                 }
             }
-            TextButton(onClick = { pickerTarget = ModelPickerTarget("reference", "new") }) {
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { pickerTarget = ModelPickerTarget("reference", "new") }) {
                 HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text("添加参考模型", modifier = Modifier.padding(start = 6.dp))
             }
             SelectRow("聚合模型", aggregator.ifBlank { "未指定" }) { pickerTarget = ModelPickerTarget("aggregator") }
@@ -250,11 +250,11 @@ fun ModelSettingsScreen(
                     fallbacks.removeAt(index)
                 }
             }
-            TextButton(onClick = { pickerTarget = ModelPickerTarget("fallback", "new") }) {
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { pickerTarget = ModelPickerTarget("fallback", "new") }) {
                 HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text("添加备用模型", modifier = Modifier.padding(start = 6.dp))
             }
         }
-        OutlinedButton(onClick = { showProviderDialog = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("增加模型提供商") }
+        OutlinedButton(colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showProviderDialog = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("增加模型提供商") }
         Button(
             onClick = {
                 onSave(
@@ -424,7 +424,7 @@ fun ArchivedSessionsScreen(
                                 Text(ellipsizeSessionTitle(session.title), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(sessionTimeLabel(session.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            TextButton(onClick = { onRestore(session) }, enabled = state.settingsActionKey == null) { Text("恢复") }
+                            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onRestore(session) }, enabled = state.settingsActionKey == null) { Text("恢复") }
                             IconButton(onClick = { deleteTarget = session }, enabled = state.settingsActionKey == null) { HermesMulticolorIcon(HermesIconKind.DELETE, "删除") }
                         }
                     }
@@ -437,8 +437,8 @@ fun ArchivedSessionsScreen(
             onDismissRequest = { deleteTarget = null },
             title = { Text("永久删除归档会话？") },
             text = { Text("“${ellipsizeSessionTitle(session.title)}”及消息记录将无法恢复。") },
-            confirmButton = { TextButton(onClick = { onDelete(session); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDelete(session); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text("取消") } },
         )
     }
 }
@@ -593,8 +593,8 @@ private fun ModelPickerDialog(catalog: ModelCatalog, allowAutomatic: Boolean, on
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        dismissButton = if (provider != null) ({ TextButton(onClick = { provider = null }) { Text("返回") } }) else null,
+        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("取消") } },
+        dismissButton = if (provider != null) ({ TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { provider = null }) { Text("返回") } }) else null,
     )
 }
 
@@ -604,7 +604,7 @@ private fun ChoiceDialog(title: String, values: List<String>, selected: String, 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { LazyColumn(Modifier.heightIn(max = 500.dp)) { items(values) { value -> ChoiceRow(if (value == selected) "✓ ${choiceLabel(value)}" else choiceLabel(value)) { onSelect(value) } } } },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("取消") } },
     )
 }
 
@@ -641,8 +641,8 @@ private fun AddProviderDialog(busy: Boolean, onDismiss: () -> Unit, onAdd: (Stri
                 Text("密钥会写入 Hermes .env，界面不会保存明文。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { TextButton(onClick = { onAdd(id, name, url, model, key) }, enabled = !busy && id.isNotBlank() && url.isNotBlank() && model.isNotBlank()) { Text("添加") } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } },
+        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onAdd(id, name, url, model, key) }, enabled = !busy && id.isNotBlank() && url.isNotBlank() && model.isNotBlank()) { Text("添加") } },
+        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss, enabled = !busy) { Text("取消") } },
     )
 }
 

@@ -137,8 +137,7 @@ class HermesApiClient(
     @Volatile
     private var gatewayReadyFuture: CompletableFuture<Unit>? = null
 
-    @Volatile
-    private var activeStream: ActiveStream? = null
+    private val activeStreams = ConcurrentHashMap<String, ActiveStream>()
 
     @Volatile
     private var activeProfile: String = "default"
@@ -417,7 +416,21 @@ class HermesApiClient(
         return parseMessages(array)
     }
 
-    fun createSession(): HermesSession {
+    /** Source recovery is explicitly scoped, even if the active UI profile changes. */
+    fun loadArtifactSourceMessages(sessionId: String, profile: String, messageId: String): List<ChatMessage> {
+        val metadata = JSONObject(request("GET", appendProfileQuery("/api/sessions/${pathSegment(sessionId)}", profile)))
+        val count = (metadata.optJSONObject("session") ?: metadata).optInt("message_count", 0)
+        var offset = (count - 200).coerceAtLeast(0)
+        while (true) {
+            val raw = request("GET", appendProfileQuery("/api/sessions/${pathSegment(sessionId)}/messages?limit=200&offset=$offset", profile))
+            val array = findArray(JSONTokener(raw).nextValue(), "messages", "items", "data") ?: JSONArray()
+            val messages = parseMessages(array)
+            if (messageId.isBlank() || messages.any { it.id == messageId } || offset == 0) return messages
+            offset = (offset - 200).coerceAtLeast(0)
+        }
+    }
+
+    fun createSession(workspacePath: String? = null): HermesSession {
         val result = rpcObject(
             "session.create",
             JSONObject()
@@ -428,7 +441,7 @@ class HermesApiClient(
             ?: error("远程网关没有返回运行会话 ID")
         val storedId = result.optString("stored_session_id").takeIf { it.isNotBlank() } ?: runtimeId
         val info = result.optJSONObject("info") ?: JSONObject()
-        return HermesSession(
+        val created = HermesSession(
             id = storedId,
             title = "新会话",
             source = "android",
@@ -436,7 +449,9 @@ class HermesApiClient(
             provider = firstString(info, "provider").orEmpty(),
             runtimeId = runtimeId,
             profile = activeProfile,
+            workspacePath = firstString(info, "cwd", "git_repo_root").orEmpty(),
         )
+        return if (workspacePath.isNullOrBlank()) created else setSessionDirectory(created, workspacePath)
     }
 
     fun resumeSession(session: HermesSession): ResumedSession {
@@ -444,6 +459,7 @@ class HermesApiClient(
             "session.resume",
             JSONObject()
                 .put("session_id", session.id)
+                .put("profile", session.profile)
                 .put("cols", 72)
                 .put("source", "android"),
             timeoutSeconds = 120,
@@ -457,6 +473,7 @@ class HermesApiClient(
                 runtimeId = runtimeId,
                 model = firstString(info, "model") ?: session.model,
                 provider = firstString(info, "provider") ?: session.provider,
+                workspacePath = session.workspacePath.ifBlank { firstString(info, "cwd", "git_repo_root").orEmpty() },
             ),
             messages,
         )
@@ -855,7 +872,7 @@ class HermesApiClient(
     }
 
     fun createProject(name: String, primaryPath: String): HermesProject {
-        val normalizedPath = primaryPath.trim().trimEnd('/')
+        val normalizedPath = normalizeWorkspacePath(primaryPath)
         val result = rpcObject(
             "projects.create",
             JSONObject()
@@ -872,14 +889,21 @@ class HermesApiClient(
 
     fun moveSessionToProject(session: HermesSession, project: HermesProject): HermesSession {
         val active = if (session.runtimeId.isNullOrBlank()) resumeSession(session).session else session
-        rpcObject(
+        return setSessionDirectory(active, project.primaryPath)
+    }
+
+    private fun setSessionDirectory(session: HermesSession, path: String): HermesSession {
+        val cwd = normalizeWorkspacePath(path)
+        require(cwd.startsWith('/')) { "项目目录需要使用服务器绝对路径" }
+        val result = rpcObject(
             "session.cwd.set",
-            JSONObject()
-                .put("session_id", active.runtimeId)
-                .put("cwd", project.primaryPath),
+            JSONObject().put("session_id", session.runtimeId).put("cwd", cwd).put("profile", session.profile),
             timeoutSeconds = 120,
         )
-        return active.copy(workspacePath = project.primaryPath)
+        if ((result.has("ok") && !result.optBoolean("ok")) || (result.has("error") && !result.isNull("error"))) {
+            throw ApiException(400, firstString(result, "error", "message") ?: "无法切换项目目录")
+        }
+        return session.copy(workspacePath = cwd)
     }
 
     fun generateSessionTitles(sessions: List<HermesSession>): Map<String, String> {
@@ -928,21 +952,37 @@ class HermesApiClient(
         request("DELETE", "/api/sessions/${pathSegment(sessionId)}")
     }
 
-    fun initialWorkspace(): WorkspaceListing {
-        val project = runCatching { activeProjectRoot() }.getOrNull()
-        if (project != null) {
-            runCatching { listWorkspace(project.second) }
-                .getOrNull()
-                ?.let { return it.copy(projectName = project.first) }
+    fun initialWorkspace(): WorkspaceListing = initialWorkspaceForProfile(currentProfile())
+
+    fun initialWorkspaceForProfile(profile: String): WorkspaceListing {
+        val config = try {
+            val root = JSONObject(request("GET", appendProfileQuery("/api/config", profile)))
+            root.optJSONObject("config") ?: root
+        } catch (error: ApiException) {
+            if (error.statusCode != 404) throw error
+            JSONObject()
         }
-        return listWorkspace(null)
+        val cwd = config.optJSONObject("terminal")?.optString("cwd")?.trim().orEmpty()
+        if (cwd.isNotBlank() && cwd !in setOf(".", "auto", "cwd")) {
+            require(cwd.startsWith('/')) { "Profile 的工作目录需使用服务器绝对路径，请在项目中选择目录" }
+            // A configured but inaccessible directory must not silently fall back.
+            return listWorkspaceForProfile(cwd, profile)
+        }
+        val project = try { activeProjectRoot(profile) } catch (error: ApiException) {
+            if (error.statusCode !in setOf(404, 501)) throw error
+            null
+        }
+        if (project != null) return listWorkspaceForProfile(project.second, profile).copy(projectName=project.first)
+        throw ApiException(400, "当前 Profile 未设置明确的工作目录，请先选择项目，或配置 terminal.cwd 为服务器绝对路径")
     }
 
-    fun listWorkspace(path: String?): WorkspaceListing {
+    fun listWorkspace(path: String?): WorkspaceListing = listWorkspaceForProfile(path, currentProfile())
+
+    fun listWorkspaceForProfile(path: String?, profile: String): WorkspaceListing {
         val suffix = path?.takeIf { it.isNotBlank() }
             ?.let { "?path=${queryValue(it)}" }
             .orEmpty()
-        val root = JSONObject(request("GET", "/api/files$suffix"))
+        val root = JSONObject(request("GET", appendProfileQuery("/api/files$suffix", profile)))
         val entries = root.optJSONArray("entries") ?: JSONArray()
         return WorkspaceListing(
             path = root.optString("path"),
@@ -967,17 +1007,21 @@ class HermesApiClient(
         )
     }
 
-    fun readWorkspaceDocument(path: String): WorkspaceDocument {
-        val root = JSONObject(request("GET", "/api/files/read?path=${queryValue(path)}"))
+    fun readWorkspaceDocument(path: String): WorkspaceDocument = readWorkspaceDocumentForProfile(path, currentProfile())
+
+    fun readWorkspaceDocumentForProfile(path: String, profile: String): WorkspaceDocument {
+        val root = JSONObject(request("GET", appendProfileQuery("/api/files/read?path=${queryValue(path)}", profile)))
         val dataUrl = root.optString("data_url")
         val encoded = dataUrl.substringAfter(',', missingDelimiterValue = "")
-        if (encoded.isBlank()) throw ApiException(500, "Hermes 没有返回文件内容")
-        val bytes = runCatching { Base64.decode(encoded, Base64.DEFAULT) }
+        if (!dataUrl.startsWith("data:") || !dataUrl.substringBefore(',').endsWith(";base64") || ',' !in dataUrl) {
+            throw ApiException(500, "Hermes 没有返回文件内容")
+        }
+        val bytes = runCatching { java.util.Base64.getMimeDecoder().decode(encoded) }
             .getOrElse { throw ApiException(500, "无法解析远程文件内容") }
         return WorkspaceDocument(
             name = firstString(root, "name") ?: path.substringAfterLast('/'),
             path = firstString(root, "path") ?: path,
-            mimeType = firstString(root, "mime_type") ?: "text/markdown",
+            mimeType = firstString(root, "mime_type") ?: "application/octet-stream",
             content = if (isTextDocument(path, firstString(root, "mime_type").orEmpty())) {
                 bytes.toString(Charsets.UTF_8)
             } else {
@@ -1009,14 +1053,16 @@ class HermesApiClient(
         throw ApiException(status, "无法读取 ${file.fileName}。$hint")
     }
 
-    fun saveWorkspaceDocument(path: String, content: String): WorkspaceDocument {
+    fun saveWorkspaceDocument(path: String, content: String): WorkspaceDocument = saveWorkspaceDocumentForProfile(path,content,currentProfile())
+
+    fun saveWorkspaceDocumentForProfile(path: String, content: String, profile: String): WorkspaceDocument {
         val dataUrl = "data:text/markdown;charset=utf-8;base64," +
             Base64.encodeToString(content.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         val body = JSONObject()
             .put("path", path)
             .put("data_url", dataUrl)
             .put("overwrite", true)
-        request("POST", "/api/files/upload", body.toString())
+        request("POST", appendProfileQuery("/api/files/upload", profile), body.toString())
         return WorkspaceDocument(
             name = path.substringAfterLast('/'),
             path = path,
@@ -1120,40 +1166,48 @@ class HermesApiClient(
         attachments: List<PendingAttachment>,
         onEvent: (StreamEvent) -> Unit,
     ) {
-        val runtimeId = session.runtimeId ?: resumeSession(session).session.runtimeId
-            ?: error("无法恢复 Hermes 会话")
+        if (controller.isStopped()) return
+        val active = if (session.runtimeId.isNullOrBlank()) resumeSession(session).session else session
+        val runtimeId = active.runtimeId ?: error("无法恢复 Hermes 会话")
         controller.runtimeSessionId = runtimeId
+        if (controller.isStopped()) return
         val registration = ActiveStream(runtimeId, controller, onEvent)
-        activeStream = registration
-
+        if (activeStreams.putIfAbsent(runtimeId, registration) != null) {
+            throw ApiException(409, "这段对话已有任务正在运行")
+        }
         try {
+            // Bind only this runtime. Never change the gateway's global active project.
+            // A resumed conversation must use its own directory before any attachments or prompt.
+            if (active.workspacePath.isNotBlank()) setSessionDirectory(active, active.workspacePath)
+            if (controller.isStopped()) return
             attachments.filter { it.dataUrl != null }.forEach { attachment ->
+                if (controller.isStopped()) return
                 rpcObject(
                     "image.attach_bytes",
                     JSONObject()
                         .put("session_id", runtimeId)
+                        .put("profile", session.profile)
                         .put("content_base64", attachment.dataUrl)
                         .put("filename", attachment.name),
                 )
             }
-            val text = appendTextAttachments(prompt, attachments)
+            if (controller.isStopped()) return
             rpcObject(
                 "prompt.submit",
-                JSONObject()
-                    .put("session_id", runtimeId)
-                    .put("text", text),
+                JSONObject().put("session_id", runtimeId).put("profile", session.profile)
+                    .put("text", appendTextAttachments(prompt, attachments)),
             )
-            if (!controller.awaitCompletion()) {
-                throw ApiException(408, "等待 Hermes 回复超时")
-            }
+            // Stop can race the submit acknowledgement; interrupt again after submit returns.
+            if (controller.isStopped()) stopRun(runtimeId, session.profile)
+            if (!controller.awaitCompletion()) throw ApiException(408, "等待 Hermes 回复超时")
         } finally {
-            if (activeStream === registration) activeStream = null
+            activeStreams.remove(runtimeId, registration)
         }
     }
 
-    fun stopRun(runtimeSessionId: String) {
+    fun stopRun(runtimeSessionId: String, profile: String = activeProfile) {
         runCatching {
-            rpcObject("session.interrupt", JSONObject().put("session_id", runtimeSessionId))
+            rpcObject("session.interrupt", JSONObject().put("session_id", runtimeSessionId).put("profile", profile))
         }
     }
 
@@ -1184,7 +1238,13 @@ class HermesApiClient(
         )
     }
 
+    fun ensureConnected() { ensureGatewayConnected() }
+
     fun reconnectGateway() {
+        if (activeStreams.isNotEmpty()) {
+            ensureGatewayConnected()
+            return
+        }
         synchronized(socketLock) {
             closeSocketLocked()
         }
@@ -1315,8 +1375,8 @@ class HermesApiClient(
 
     private fun endpoint(path: String): String = config.baseUrl.trimEnd('/') + "/" + path.trimStart('/')
 
-    private fun activeProjectRoot(): Pair<String, String>? {
-        val result = rpcObject("projects.list")
+    private fun activeProjectRoot(profile: String): Pair<String, String>? {
+        val result = rpcObject("projects.list", JSONObject().put("profile", profile))
         val projects = result.optJSONArray("projects") ?: return null
         val activeId = result.optString("active_id")
         val candidates = buildList {
@@ -1325,19 +1385,9 @@ class HermesApiClient(
             }
         }
         val project = candidates.firstOrNull { it.optString("id") == activeId }
-            ?: candidates.firstOrNull()
             ?: return null
-        val folders = project.optJSONArray("folders") ?: JSONArray()
-        var firstFolder: String? = null
-        var primaryFolder: String? = null
-        for (index in 0 until folders.length()) {
-            val folder = folders.optJSONObject(index) ?: continue
-            val folderPath = firstString(folder, "path") ?: continue
-            if (firstFolder == null) firstFolder = folderPath
-            if (folder.optBoolean("is_primary")) primaryFolder = folderPath
-        }
-        val rootPath = firstString(project, "primary_path") ?: primaryFolder ?: firstFolder ?: return null
-        return (firstString(project, "name") ?: "Hermes 项目") to rootPath
+        val parsed = parseProject(project) ?: return null
+        return parsed.name to parsed.primaryPath
     }
 
     private fun parseSession(item: JSONObject): HermesSession? {
@@ -1484,7 +1534,7 @@ class HermesApiClient(
     }
 
     private fun appendTextAttachments(prompt: String, attachments: List<PendingAttachment>): String {
-        val documents = attachments.filter { it.textContent != null }
+        val documents = attachments.filter { it.textContent != null || (it.remotePath != null && it.dataUrl == null) }
         if (documents.isEmpty()) return prompt
         return buildString {
             append(prompt)
@@ -1492,7 +1542,13 @@ class HermesApiClient(
                 append("\n\n--- 附件：")
                 append(attachment.name)
                 append(" ---\n")
-                append(attachment.textContent)
+                if (attachment.textContent != null) {
+                    append(attachment.textContent)
+                } else {
+                    append("服务器文件路径：")
+                    append(JSONObject.quote(attachment.remotePath))
+                    append("\n该附件保存在当前档案的服务器上，请使用文件工具读取后处理。")
+                }
                 append("\n--- 附件结束 ---")
             }
         }
@@ -1504,10 +1560,11 @@ class HermesApiClient(
             gatewayReadyFuture?.complete(Unit)
             return
         }
-        val stream = activeStream ?: return
         val payload = params.optJSONObject("payload") ?: params
         val sessionId = firstString(params, "session_id") ?: firstString(payload, "session_id")
-        if (!sessionId.isNullOrBlank() && sessionId != stream.sessionId) return
+        // Unlabelled events are safe only when exactly one runtime is registered.
+        val stream = routeSessionEvent(activeStreams, sessionId) ?: return
+        if (stream.controller.isStopped() || stream.controller.wasDisconnected()) return
         if (type == "message.start") {
             if (stream.turn.markStarted()) stream.onEvent(StreamEvent.RunStarted(stream.sessionId))
             return
@@ -1535,6 +1592,7 @@ class HermesApiClient(
                 ?.let { stream.onEvent(StreamEvent.AssistantInterim(it)) }
 
             "message.complete" -> {
+                activeStreams.remove(stream.sessionId, stream)
                 val status = payload.optString("status")
                 if (status in setOf("error", "failed", "failure")) {
                     stream.onEvent(StreamEvent.Error(firstString(payload, "error", "text") ?: "Hermes 运行失败"))
@@ -1595,6 +1653,7 @@ class HermesApiClient(
             }
 
             "error" -> {
+                activeStreams.remove(stream.sessionId, stream)
                 stream.onEvent(StreamEvent.Error(firstString(payload, "message", "error") ?: "Hermes 运行失败"))
                 stream.controller.finish()
             }
@@ -1615,9 +1674,9 @@ class HermesApiClient(
         val error = ApiException(0, message)
         pendingCalls.values.forEach { it.completeExceptionally(error) }
         pendingCalls.clear()
-        val interruptedStream = activeStream
-        activeStream = null
-        interruptedStream?.let { stream ->
+        val interruptedStreams = activeStreams.values.toList()
+        interruptedStreams.forEach { stream ->
+            activeStreams.remove(stream.sessionId, stream)
             if (!stream.controller.isStopped() && stream.controller.markDisconnected()) {
                 stream.onEvent(StreamEvent.ConnectionInterrupted(message))
             }
@@ -1645,6 +1704,7 @@ class HermesApiClient(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (socket !== webSocket) return
             val frame = runCatching { JSONObject(text) }.getOrNull() ?: return
             if (frame.optString("method") == "event") {
                 frame.optJSONObject("params")?.let(::handleGatewayEvent)
@@ -1765,7 +1825,7 @@ class HermesApiClient(
         }
         val encoded = dataUrl.substringAfter(',', missingDelimiterValue = "")
         if (encoded.isBlank()) throw ApiException(500, "Hermes 没有返回图片内容")
-        val bytes = runCatching { Base64.decode(encoded, Base64.DEFAULT) }
+        val bytes = runCatching { java.util.Base64.getMimeDecoder().decode(encoded) }
             .getOrElse { throw ApiException(500, "无法解析图片内容") }
         return ImagePreview(
             name = name,
@@ -1966,7 +2026,7 @@ class HermesApiClient(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val USER_AGENT = "Hermes-Android/3.0.3a"
+        const val USER_AGENT = "Hermes-Android/3.0.4"
         val AUXILIARY_TASK_KEYS = listOf(
             "vision",
             "web_extract",

@@ -28,6 +28,14 @@ import org.json.JSONObject
 class SecureConfigStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
+    private fun projectSelectionKey(profile: String): String =
+        "selected_project::${preferences.getString(KEY_GATEWAY_URL, "")}::$profile"
+
+    fun readSelectedProject(profile: String): String? = preferences.getString(projectSelectionKey(profile), null)
+    fun saveSelectedProject(profile: String, projectId: String?) {
+        preferences.edit { if(projectId == null) remove(projectSelectionKey(profile)) else putString(projectSelectionKey(profile), projectId) }
+    }
+
     fun read(): ConnectionConfig? = runCatching {
         val baseUrl = preferences.getString(KEY_GATEWAY_URL, null)?.takeIf { it.isNotBlank() } ?: return null
         val username = preferences.getString(KEY_USERNAME, null)?.takeIf { it.isNotBlank() } ?: return null
@@ -217,7 +225,7 @@ class SecureConfigStore(context: Context) {
             .filter(String::isNotBlank)
             .mapNotNull { line ->
                 val parts = line.split('\t')
-                if (parts.size !in setOf(8, 9)) return@mapNotNull null
+                if (parts.size !in setOf(8, 9, 10)) return@mapNotNull null
                 runCatching {
                     RecentArtifact(
                         profile = decodeField(parts[0]),
@@ -227,7 +235,8 @@ class SecureConfigStore(context: Context) {
                         path = decodeField(parts[4]),
                         name = decodeField(parts[5]),
                         kind = decodeField(parts[6]),
-                        workspacePath = if (parts.size == 9) decodeField(parts[7]) else "",
+                        workspacePath = if (parts.size >= 9) decodeField(parts[7]) else "",
+                        sourcePath = if (parts.size == 10) decodeField(parts[8]) else "",
                         seenAtMillis = parts.last().toLong(),
                     )
                 }.getOrNull()
@@ -247,6 +256,7 @@ class SecureConfigStore(context: Context) {
                 item.name,
                 item.kind,
                 item.workspacePath,
+                item.sourcePath,
             ).joinToString("\t", postfix = "\t${item.seenAtMillis}") { encodeField(it) }
         }
         preferences.edit { putString(KEY_RECENT_ARTIFACTS, encoded) }
@@ -382,35 +392,47 @@ class SecureConfigStore(context: Context) {
         saveEncryptedJson(KEY_RECENT_COMPLETIONS, array.toString())
     }
 
-    fun readActiveRunSnapshot(): ActiveRunSnapshot? = runCatching {
-        val raw = readEncryptedJson(KEY_ACTIVE_RUN_SNAPSHOT) ?: return@runCatching null
-        val item = JSONObject(raw)
-        ActiveRunSnapshot(
-            profile = item.optString("profile"),
-            sessionId = item.optString("sessionId"),
-            title = item.optString("title"),
-            submittedPrompt = item.optString("submittedPrompt"),
-            baselineAssistantSignature = item.optString("baselineAssistantSignature"),
-            startedAtMillis = item.optLong("startedAtMillis"),
-        ).takeIf { it.sessionId.isNotBlank() && it.startedAtMillis > 0L }
-    }.getOrNull()
+    fun readActiveRunSnapshots(): List<ActiveRunSnapshot> = runCatching {
+        val raw = readEncryptedJson(KEY_ACTIVE_RUN_SNAPSHOT) ?: return@runCatching emptyList()
+        // Upgrade the previous single-run object without dropping an in-progress task.
+        val items = if (raw.trimStart().startsWith("[")) JSONArray(raw) else JSONArray().put(JSONObject(raw))
+        (0 until items.length()).mapNotNull { index ->
+            val item = items.optJSONObject(index) ?: return@mapNotNull null
+            ActiveRunSnapshot(
+                profile = item.optString("profile"),
+                sessionId = item.optString("sessionId"),
+                title = item.optString("title"),
+                submittedPrompt = item.optString("submittedPrompt"),
+                baselineAssistantSignature = item.optString("baselineAssistantSignature"),
+                startedAtMillis = item.optLong("startedAtMillis"),
+                workspacePath = item.optString("workspacePath"),
+            ).takeIf { it.sessionId.isNotBlank() && it.startedAtMillis > 0L }
+        }
+    }.getOrDefault(emptyList())
 
     fun saveActiveRunSnapshot(value: ActiveRunSnapshot) {
-        saveEncryptedJson(
-            KEY_ACTIVE_RUN_SNAPSHOT,
-            JSONObject()
-                .put("profile", value.profile)
-                .put("sessionId", value.sessionId)
-                .put("title", value.title)
-                .put("submittedPrompt", value.submittedPrompt)
-                .put("baselineAssistantSignature", value.baselineAssistantSignature)
-                .put("startedAtMillis", value.startedAtMillis)
-                .toString(),
-        )
+        writeActiveRunSnapshots(readActiveRunSnapshots().filterNot {
+            it.profile == value.profile && it.sessionId == value.sessionId
+        } + value)
     }
 
-    fun clearActiveRunSnapshot() {
-        preferences.edit { remove(KEY_ACTIVE_RUN_SNAPSHOT) }
+    fun clearActiveRunSnapshot(profile: String, sessionId: String) {
+        writeActiveRunSnapshots(readActiveRunSnapshots().filterNot { it.profile == profile && it.sessionId == sessionId })
+    }
+
+    private fun writeActiveRunSnapshots(values: List<ActiveRunSnapshot>) {
+        if (values.isEmpty()) {
+            preferences.edit { remove(KEY_ACTIVE_RUN_SNAPSHOT) }
+            return
+        }
+        saveEncryptedJson(KEY_ACTIVE_RUN_SNAPSHOT, JSONArray().apply {
+            values.forEach { value ->
+                put(JSONObject().put("profile", value.profile).put("sessionId", value.sessionId)
+                    .put("title", value.title).put("submittedPrompt", value.submittedPrompt)
+                    .put("baselineAssistantSignature", value.baselineAssistantSignature)
+                    .put("startedAtMillis", value.startedAtMillis).put("workspacePath", value.workspacePath))
+            }
+        }.toString())
     }
 
     private fun readEncryptedJson(key: String): String? {

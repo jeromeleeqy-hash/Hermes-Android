@@ -195,13 +195,13 @@ fun VoiceConversationScreen(
             )
 
             if (voice.phase == VoicePhase.LISTENING) {
-                TextButton(onClick = onCancelListening, modifier = Modifier.padding(top = 4.dp)) { Text("取消录音") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCancelListening, modifier = Modifier.padding(top = 4.dp)) { Text("取消录音") }
             }
             if (voice.agentSttAvailable == false && state.voicePreferences.engine != "system") {
-                TextButton(onClick = useSystemRecognition, modifier = Modifier.padding(top = 4.dp)) { Text("改用手机系统识别") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = useSystemRecognition, modifier = Modifier.padding(top = 4.dp)) { Text("改用手机系统识别") }
             }
             if (voice.requiresAgentUpdate) {
-                TextButton(onClick = onOpenGatewaySettings, modifier = Modifier.padding(top = 4.dp)) {
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpenGatewaySettings, modifier = Modifier.padding(top = 4.dp)) {
                     Text("检查并更新 Hermes Agent")
                 }
             }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -185,7 +186,7 @@ fun HermesSegmentedControl(
     val safeIndex = selectedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     val innerPadding = if (compact) 3.dp else 5.dp
     val itemSpacing = if (compact) 3.dp else 4.dp
-    val controlHeight = if (compact) 31.dp else 38.dp
+    val controlHeight = if (compact) 40.dp else 44.dp
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(if (compact) skin.controlRadius.dp else (skin.controlRadius + 2).dp),
@@ -222,7 +223,7 @@ fun HermesSegmentedControl(
                     items.forEachIndexed { index, label ->
                         val selected = safeIndex == index
                         val textColor by animateColorAsState(
-                            targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            targetValue = if (selected) AssistantBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                             label = "segmentTextColor",
                         )
@@ -251,19 +252,17 @@ fun HermesSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val animatedScale by animateFloatAsState(
-        targetValue = if (checked) 0.82f else 0.78f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = 0.72f),
-        label = "switchScale",
-    )
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
         enabled = enabled,
-        modifier = modifier.graphicsLayer { scaleX = animatedScale; scaleY = animatedScale },
+        modifier = modifier.graphicsLayer { scaleX = .84f; scaleY = .84f },
         colors = SwitchDefaults.colors(
-            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            checkedThumbColor = Color.White,
+            checkedTrackColor = AssistantAccent,
+            checkedBorderColor = Color.Transparent,
+            disabledCheckedThumbColor = MaterialTheme.colorScheme.surface,
+            disabledCheckedTrackColor = AssistantAccent.copy(alpha = .35f),
             uncheckedThumbColor = MaterialTheme.colorScheme.surface,
             uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             uncheckedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
@@ -299,29 +298,16 @@ fun HermesBottomDock(
     selected: AppRoute,
     hasUnreadConversations: Boolean,
     onSelect: (AppRoute) -> Unit,
+    showDivider: Boolean = selected != AppRoute.HOME,
 ) {
-    val skin = HermesSkin.current
-    GlassPanel(
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(22.dp),
-                ambientColor = Color.Black.copy(alpha = 0.06f),
-                spotColor = Color.Black.copy(alpha = 0.10f),
-            ),
-        shape = RoundedCornerShape(22.dp),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-    ) {
-        DockItems(selected, hasUnreadConversations, onSelect)
-    }
+    ReferenceBottomDock(selected, hasUnreadConversations, onSelect, showDivider)
 }
 
 @Composable
 private fun DockItems(selected: AppRoute, hasUnreadConversations: Boolean, onSelect: (AppRoute) -> Unit) {
-    val routes = listOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE)
+    val routes = listOf(AppRoute.HOME, AppRoute.SESSIONS, AppRoute.PROFILE)
     val selectedIndex = routes.indexOf(selected).coerceAtLeast(0)
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(50.dp)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(64.dp)) {
         val itemWidth = maxWidth / routes.size
         val indicatorOffset by animateDpAsState(
             targetValue = itemWidth * selectedIndex,
@@ -330,7 +316,7 @@ private fun DockItems(selected: AppRoute, hasUnreadConversations: Boolean, onSel
         )
         Box(
             modifier = Modifier.align(Alignment.CenterStart).offset(x = indicatorOffset)
-                .width(itemWidth).height(44.dp).padding(horizontal = 3.dp)
+                .width(itemWidth).heightIn(min = 48.dp).padding(horizontal = 3.dp)
                 .clip(RoundedCornerShape(15.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = HermesSkin.current.selectedFillAlpha)),
         )
@@ -339,9 +325,8 @@ private fun DockItems(selected: AppRoute, hasUnreadConversations: Boolean, onSel
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DockItem("对话", HermesIconKind.NAV_CHAT_OUTLINE, HermesIconKind.NAV_CHAT_FILLED, selected == AppRoute.SESSIONS, hasUnreadConversations, Modifier.weight(1f)) { onSelect(AppRoute.SESSIONS) }
-            DockItem("空间", HermesIconKind.NAV_SPACE_OUTLINE, HermesIconKind.NAV_SPACE_FILLED, selected == AppRoute.WORKSPACE, false, Modifier.weight(1f)) { onSelect(AppRoute.WORKSPACE) }
-            DockItem("任务", HermesIconKind.NAV_TASK_OUTLINE, HermesIconKind.NAV_TASK_FILLED, selected == AppRoute.TASKS, false, Modifier.weight(1f)) { onSelect(AppRoute.TASKS) }
+            DockItem("助理", HermesIconKind.NAV_SPACE_OUTLINE, HermesIconKind.NAV_SPACE_FILLED, selected == AppRoute.HOME, false, Modifier.weight(1f)) { onSelect(AppRoute.HOME) }
+            DockItem("回看", HermesIconKind.NAV_CHAT_OUTLINE, HermesIconKind.NAV_CHAT_FILLED, selected == AppRoute.SESSIONS, hasUnreadConversations, Modifier.weight(1f)) { onSelect(AppRoute.SESSIONS) }
             DockItem("我的", HermesIconKind.NAV_PROFILE_OUTLINE, HermesIconKind.NAV_PROFILE_FILLED, selected == AppRoute.PROFILE, false, Modifier.weight(1f)) { onSelect(AppRoute.PROFILE) }
         }
     }
@@ -363,7 +348,7 @@ private fun DockItem(
         label = "dockIconFill",
     )
     val tint by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (selected) AssistantBlue else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "dockTint",
     )
@@ -374,7 +359,7 @@ private fun DockItem(
     )
     Column(
         modifier = modifier
-            .height(44.dp)
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
