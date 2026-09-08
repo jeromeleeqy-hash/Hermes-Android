@@ -190,8 +190,7 @@ fun HermesSegmentedControl(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(if (compact) skin.controlRadius.dp else (skin.controlRadius + 2).dp),
-        color = if (skin.glass) MaterialTheme.colorScheme.surface.copy(alpha = skin.chromeAlpha)
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = Color.Transparent,
         tonalElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(
             0.7.dp,
@@ -214,7 +213,7 @@ fun HermesSegmentedControl(
                         .width(itemWidth)
                         .height(controlHeight)
                         .clip(RoundedCornerShape(if (compact) skin.controlRadius.dp else (skin.controlRadius + 1).dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = skin.selectedFillAlpha)),
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .55f)),
                 )
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -298,9 +297,8 @@ fun HermesBottomDock(
     selected: AppRoute,
     hasUnreadConversations: Boolean,
     onSelect: (AppRoute) -> Unit,
-    showDivider: Boolean = selected != AppRoute.HOME,
 ) {
-    ReferenceBottomDock(selected, hasUnreadConversations, onSelect, showDivider)
+    ReferenceBottomDock(selected, hasUnreadConversations, onSelect)
 }
 
 @Composable

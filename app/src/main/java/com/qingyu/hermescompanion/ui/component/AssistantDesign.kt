@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.*
@@ -44,12 +46,6 @@ val NavigationGradientStart: Color
 val NavigationGradientEnd: Color
     @Composable get() = if(MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFFC6ACFF) else Color(0xFF8860DA)
 
-@Composable
-fun FixedRegionDivider(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier.fillMaxWidth().testTag("fixed_region_divider"), thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFF344452) else Color(0xFFDCE6F0))
-}
-
 val AssistantAccent = Color(0xFF009BDE)
 val AssistantMint = Color(0xFF06B9A9)
 val AssistantPurple = Color(0xFF8260E7)
@@ -61,26 +57,44 @@ fun AssistantPanel(modifier: Modifier = Modifier, content: @Composable () -> Uni
         shadowElevation = 0.dp, content = content)
 }
 
-/** Draw the original artwork viewport: no re-generated face, pose or avatar substitution.
- * Coordinates are in the supplied 853 x 1844 design reference; source bytes are unchanged. */
+/** A native contour clip removes the rectangular backdrop without tinting the face.
+ * Coordinates follow the unmodified 1254px portrait; holes between curls stay transparent. */
+private val hermesPortraitContour = """
+    M 145 646 C 65 649 26 720 43 779 C 54 810 80 824 109 829
+    C 60 859 33 891 44 938 C 53 985 86 1010 123 1015
+    C 133 1050 163 1076 199 1072 C 191 1091 171 1100 151 1092
+    C 159 1107 174 1111 186 1113 L 183 1119
+    C 411 1253 815 1267 1093 1103 L 1077 1092
+    C 1118 1085 1136 1057 1131 1024 C 1101 1054 1074 1057 1049 1040
+    C 1063 1024 1078 1014 1080 990 C 1094 1005 1091 1008 1088 1008
+    C 1144 1007 1175 951 1180 901 C 1185 877 1179 852 1170 846
+    C 1154 890 1110 907 1051 878 C 1116 882 1152 837 1138 793
+    C 1126 753 1100 735 1077 735 C 1110 760 1101 807 1068 809
+    C 1005 811 969 689 959 545 C 999 531 1017 483 1007 424
+    C 1002 328 960 232 888 183 C 842 133 769 100 681 89
+    C 508 58 375 135 307 286 C 268 374 256 491 220 597
+    C 191 682 164 733 137 743 C 95 749 91 684 145 646 Z
+    M 124 913 C 103 943 99 973 114 998 C 104 994 95 966 103 943 Z
+    M 183 1007 C 178 1029 186 1049 198 1058 C 184 1052 176 1038 179 1020 Z
+    M 1070 965 C 1088 980 1092 995 1085 1005 C 1084 987 1076 978 1070 965 Z
+""".trimIndent()
+
 @Composable
 fun ReferenceHermesGirl(modifier: Modifier = Modifier) {
-    val artwork = ImageBitmap.imageResource(R.drawable.hermes_home_reference)
-    val backdrop = MaterialTheme.colorScheme.background
-    // Shift the reference backdrop to the theme without changing its source or pose.
-    val palette = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
-        1f,0f,0f,0f,backdrop.red * 255f - 245f,
-        0f,1f,0f,0f,backdrop.green * 255f - 246f,
-        0f,0f,1f,0f,backdrop.blue * 255f - 250f,
-        0f,0f,0f,1f,0f)))
-    Canvas(modifier) {
-        drawImage(artwork, srcOffset = IntOffset(493, 176), srcSize = IntSize(312, 267),
-            dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.High,
-            colorFilter = if (backdrop.luminance() > .5f) palette else null)
-        // The reference's search button overlaps the top-right six pixels of the
-        // viewport. Cover only that UI fragment; it does not intersect the artwork.
-        drawRect(if (backdrop.luminance() > .5f) backdrop else Color(0xFFF5F6FA), topLeft = Offset(size.width * 242f / 312f, 0f),
-            size = androidx.compose.ui.geometry.Size(size.width * 70f / 312f, size.height * 6f / 267f))
+    val artwork = ImageBitmap.imageResource(R.drawable.hermes_home_portrait)
+    val contour = remember {
+        androidx.compose.ui.graphics.vector.PathParser().parsePathString(hermesPortraitContour).toPath().apply {
+            fillType = PathFillType.EvenOdd
+        }
+    }
+    Canvas(modifier.testTag("home_hermes_portrait")) {
+        // The portrait has alpha outside its native clip on both themes, including the curls.
+        // End above the source artwork's curved lower edge; the canvas ends at this flat cut.
+        scale(size.width / 1254f, size.height / 1080f, pivot = Offset.Zero) {
+            clipRect(left = 0f, top = 0f, right = 1254f, bottom = 1080f) { clipPath(contour) {
+                drawImage(artwork, dstSize = IntSize(1254, 1254), filterQuality = FilterQuality.High)
+            } }
+        }
     }
 }
 
@@ -105,6 +119,18 @@ fun AssistantGlyph(kind: String, modifier: Modifier = Modifier.size(24.dp), tint
                 "check" -> {line(5f,12f,10f,17f);line(10f,17f,19f,7f)}
                 "stop" -> {drawRoundRect(tint,topLeft=Offset(6f,6f),size=androidx.compose.ui.geometry.Size(12f,12f),cornerRadius=androidx.compose.ui.geometry.CornerRadius(2f))}
                 "folder" -> { val p=Path().apply { moveTo(3f,6f); quadraticTo(3f,4f,5f,4f); lineTo(10f,4f); lineTo(12f,7f); lineTo(19f,7f); quadraticTo(21f,7f,21f,9f); lineTo(21f,19f); quadraticTo(21f,21f,19f,21f); lineTo(5f,21f); quadraticTo(3f,21f,3f,19f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
+                "tasks" -> {
+                    val body = Path().apply {
+                        moveTo(7f,3f); lineTo(17f,3f); quadraticTo(20f,3f,20f,6f)
+                        lineTo(20f,19f); quadraticTo(20f,22f,17f,22f); lineTo(7f,22f)
+                        quadraticTo(4f,22f,4f,19f); lineTo(4f,6f); quadraticTo(4f,3f,7f,3f); close()
+                    }
+                    drawPath(body,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke)
+                    val detail = if(filled) cutout else tint
+                    fun mark(x:Float,y:Float,x2:Float,y2:Float) = drawLine(detail,Offset(x,y),Offset(x2,y2),1.65f,StrokeCap.Round)
+                    mark(7f,9f,8.5f,10.5f); mark(8.5f,10.5f,11f,7.5f); mark(13.5f,9f,17f,9f)
+                    mark(7f,16f,8.5f,17.5f); mark(8.5f,17.5f,11f,14.5f); mark(13.5f,16f,17f,16f)
+                }
                 "compose" -> { val p=Path().apply { moveTo(14f,4f);lineTo(5f,4f);quadraticTo(3f,4f,3f,6f);lineTo(3f,19f);quadraticTo(3f,21f,5f,21f);lineTo(18f,21f);quadraticTo(20f,21f,20f,19f);lineTo(20f,12f) };drawPath(p,tint,style=stroke); val pen=Path().apply{moveTo(10f,14f);lineTo(11f,10f);lineTo(19f,2f);lineTo(22f,5f);lineTo(14f,13f);close()};drawPath(pen,tint,style=stroke) }
                 "file" -> {val p=Path().apply{moveTo(5f,2f);lineTo(15f,2f);lineTo(20f,7f);lineTo(20f,22f);lineTo(5f,22f);close()};drawPath(p,tint,style=stroke);line(8f,10f,16f,10f);line(8f,14f,16f,14f);line(8f,18f,13f,18f)}
                 "bulb" -> {drawCircle(tint,6f,Offset(12f,9f),style=stroke);line(9f,15f,9f,19f);line(15f,15f,15f,19f);line(9f,19f,15f,19f);line(10f,22f,14f,22f)}
@@ -132,14 +158,17 @@ private fun HermesNavigationPortrait(brush:Brush,modifier:Modifier=Modifier) {
         },colorFilter=ColorFilter.tint(Color.White))
 }
 
-/** Persistent four-tab navigation: no selected icon background. */
+/** Five tabs share one opaque lower backing, with no selected icon background. */
 @Composable
-fun ReferenceBottomDock(selected: AppRoute, hasUnread: Boolean, onSelect: (AppRoute) -> Unit, showDivider: Boolean = selected != AppRoute.HOME) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
-    if (showDivider) FixedRegionDivider()
-    AssistantPanel(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal=14.dp,vertical=8.dp)) {
+fun ReferenceBottomDock(selected: AppRoute, hasUnread: Boolean, onSelect: (AppRoute) -> Unit,
+    navigationInsets: WindowInsets = WindowInsets.navigationBars) {
+    Column(Modifier.fillMaxWidth().padding(top=8.dp).background(MaterialTheme.colorScheme.background)
+        .testTag("bottom_dock_occlusion").windowInsetsPadding(navigationInsets).padding(bottom=8.dp)) {
+    Surface(Modifier.fillMaxWidth().padding(horizontal=14.dp).testTag("floating_bottom_dock"),
+        shape=RoundedCornerShape(26.dp), color=MaterialTheme.colorScheme.surface,
+        shadowElevation=5.dp) {
         Row(Modifier.fillMaxWidth().heightIn(min=64.dp).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-            listOf(Triple(AppRoute.HOME,"助理","home"),Triple(AppRoute.SESSIONS,"回看","history"),Triple(AppRoute.WORKSPACE,"文件","folder"),Triple(AppRoute.PROFILE,"我的","user")).forEach { (route,label,icon) ->
+            listOf(Triple(AppRoute.HOME,"助理","home"),Triple(AppRoute.SESSIONS,"回看","history"),Triple(AppRoute.TASKS,"任务","tasks"),Triple(AppRoute.WORKSPACE,"文件","folder"),Triple(AppRoute.PROFILE,"我的","user")).forEach { (route,label,icon) ->
                 val active=selected==route
                 val progress by animateFloatAsState(if(active) 1f else 0f,spring(dampingRatio=.78f,stiffness=Spring.StiffnessLow),label="navSelection")
                 val brush = Brush.verticalGradient(listOf(lerp(NavigationIdle,NavigationGradientStart,progress.coerceIn(0f,1f)),

@@ -21,6 +21,7 @@ class ConcurrentGatewayTest {
     private val submitted = LinkedBlockingQueue<String>()
     private val workers = Executors.newCachedThreadPool()
     private var denyDirectory = false
+    private var reasoning: String? = null
 
     @Before fun setUp() {
         server = MockWebServer()
@@ -43,7 +44,7 @@ class ConcurrentGatewayTest {
                         val id = params.optString("session_id")
                         val result = when (method) {
                             "session.create" -> JSONObject().put("session_id", "runtime-created").put("stored_session_id", "created")
-                            "session.resume" -> JSONObject().put("session_id", "runtime-$id")
+                            "session.resume" -> JSONObject().put("session_id", "runtime-$id").put("info", JSONObject().apply { reasoning?.let { put("reasoning_effort", it) } })
                             "session.cwd.set" -> JSONObject().put("ok", !denyDirectory)
                             else -> JSONObject().put("ok", true)
                         }
@@ -162,6 +163,34 @@ class ConcurrentGatewayTest {
         assertTrue(calls.none { it.getString("method")=="image.attach_bytes" })
         event("runtime-a","message.complete","已处理")
         future.get(10,TimeUnit.SECONDS)
+    }
+
+    @Test fun voiceFastReplyIsSessionScopedAndRestoredBeforeCompletion() {
+        reasoning = "high"
+        val events = CopyOnWriteArrayList<StreamEvent>()
+        val task = workers.submit {
+            client.streamVoiceMessage(StreamController(), HermesSession("voice", "语音", profile="work"), "今天的安排", true, {}, events::add)
+        }
+        assertEquals("runtime-voice", submitted.poll(15, TimeUnit.SECONDS))
+        event("runtime-voice", "message.complete", "今天有三件事。")
+        task.get(15, TimeUnit.SECONDS)
+        val changes = calls.filter { it.optString("method") == "config.set" }.map { it.getJSONObject("params") }
+        assertEquals(listOf("none", "high"), changes.map { it.getString("value") })
+        assertTrue(changes.all { it.getString("scope") == "session" && it.getString("profile") == "work" && it.getString("session_id") == "runtime-voice" })
+        assertEquals(1, events.count { it == StreamEvent.Completed })
+    }
+
+    @Test fun unsupportedVoiceReasoningStillSendsWithoutChangingConfig() {
+        reasoning = null
+        val notices = CopyOnWriteArrayList<String>()
+        val task = workers.submit {
+            client.streamVoiceMessage(StreamController(), HermesSession("old", "旧网关"), "你好", true, notices::add, {})
+        }
+        assertEquals("runtime-old", submitted.poll(15, TimeUnit.SECONDS))
+        event("runtime-old", "message.complete", "你好。")
+        task.get(15, TimeUnit.SECONDS)
+        assertTrue(calls.none { it.optString("method") == "config.set" })
+        assertEquals(1, notices.size)
     }
 
 }

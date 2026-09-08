@@ -73,9 +73,9 @@ fun ComposerToolsSheet(
             }
             Text("提示词片段", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
             listOf(
-                "请先梳理目标，再给出可执行步骤",
-                "请总结重点，并列出需要我确认的事项",
-                "请检查现有内容，直接给出改进后的版本",
+                "先梳理目标，再给出可执行步骤",
+                "总结重点，并列出需要我确认的事项",
+                "检查现有内容，直接给出改进后的版本",
             ).forEachIndexed { index, prompt ->
                 val background = listOf(
                     MaterialTheme.colorScheme.primaryContainer,

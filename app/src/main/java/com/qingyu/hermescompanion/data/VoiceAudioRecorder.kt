@@ -14,7 +14,9 @@ class VoiceAudioRecorder(private val context: Context) {
         cancel()
         val file = File.createTempFile("hermes-voice-", ".m4a", context.cacheDir)
         val activeRecorder = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()
-        activeRecorder.apply {
+        outputFile = file
+        recorder = activeRecorder
+        try { activeRecorder.apply {
             setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -24,8 +26,7 @@ class VoiceAudioRecorder(private val context: Context) {
             prepare()
             start()
         }
-        outputFile = file
-        recorder = activeRecorder
+        } catch (error: Exception) { cancel(); throw error }
     }
 
     fun stop(): Pair<ByteArray, String> {
@@ -33,21 +34,20 @@ class VoiceAudioRecorder(private val context: Context) {
         val file = outputFile ?: error("没有找到录音文件")
         recorder = null
         outputFile = null
-        try {
+        val bytes = try {
             activeRecorder.stop()
+            file.readBytes()
         } finally {
             activeRecorder.release()
+            file.delete()
         }
-        val bytes = file.readBytes()
-        file.delete()
         require(bytes.isNotEmpty()) { "录音内容为空，请靠近麦克风后重试" }
         return bytes to "audio/mp4"
     }
 
-    fun inputLevel(): Float {
+    fun inputSample(): VoiceInputSample {
         val amplitude = runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
-        if (amplitude <= 0) return 0f
-        return kotlin.math.sqrt((amplitude / 32767f).coerceIn(0f, 1f))
+        return voiceInputSample(amplitude)
     }
 
     fun cancel() {

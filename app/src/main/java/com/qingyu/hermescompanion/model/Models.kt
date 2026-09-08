@@ -61,6 +61,7 @@ data class HermesSession(
     val isPinned: Boolean = false,
     val workspacePath: String = "",
     val runtimeId: String? = null,
+    val reasoningEffort: String? = null,
     val profile: String = "default",
 )
 
@@ -431,7 +432,9 @@ data class VoicePreferences(
     val autoSend: Boolean = false,
     val engine: String = "automatic",
     val autoRead: Boolean = true,
-    val continuous: Boolean = false,
+    val continuous: Boolean = true,
+    val fastReply: Boolean = true,
+    val noiseSensitivity: String = "balanced",
     val speechRate: Float = 1.0f,
 )
 
@@ -445,6 +448,7 @@ enum class VoicePhase {
 }
 
 data class VoiceConversationState(
+    val listenRequest: Long = 0,
     val active: Boolean = false,
     val phase: VoicePhase = VoicePhase.IDLE,
     val transcript: String = "",

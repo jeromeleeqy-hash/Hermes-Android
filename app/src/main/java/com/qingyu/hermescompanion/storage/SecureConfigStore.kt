@@ -125,6 +125,17 @@ class SecureConfigStore(context: Context) {
         }
     }
 
+    fun pendingVoiceReasoning(server: String, profile: String, session: String): String? =
+        preferences.getString("voice_restore::$server::$profile::$session", null)
+
+    fun savePendingVoiceReasoning(server: String, profile: String, session: String, effort: String?) {
+        // Commit before the remote mutation so an interrupted app can restore on the next send.
+        val key = "voice_restore::$server::$profile::$session"
+        val edit = preferences.edit()
+        if (effort == null) edit.remove(key) else edit.putString(key, effort)
+        check(edit.commit()) { "无法保存语音模式恢复信息" }
+    }
+
     fun readVoicePreferences(): VoicePreferences = runCatching {
         VoicePreferences(
             enabled = preferences.getBoolean(KEY_VOICE_ENABLED, true),
@@ -133,7 +144,9 @@ class SecureConfigStore(context: Context) {
             autoSend = preferences.getBoolean(KEY_VOICE_AUTO_SEND, false),
             engine = preferences.getString(KEY_VOICE_ENGINE, "automatic").orEmpty().ifBlank { "automatic" },
             autoRead = preferences.getBoolean(KEY_VOICE_AUTO_READ, true),
-            continuous = preferences.getBoolean(KEY_VOICE_CONTINUOUS, false),
+            continuous = preferences.getBoolean(KEY_VOICE_CONTINUOUS, true),
+            fastReply = preferences.getBoolean("voice_fast_reply", true),
+            noiseSensitivity = preferences.getString("voice_noise_sensitivity", "balanced").orEmpty().ifBlank { "balanced" },
             speechRate = preferences.getFloat(KEY_VOICE_SPEECH_RATE, 1.0f),
         )
     }.getOrDefault(VoicePreferences())
@@ -147,6 +160,8 @@ class SecureConfigStore(context: Context) {
             putString(KEY_VOICE_ENGINE, value.engine)
             putBoolean(KEY_VOICE_AUTO_READ, value.autoRead)
             putBoolean(KEY_VOICE_CONTINUOUS, value.continuous)
+            putBoolean("voice_fast_reply", value.fastReply)
+            putString("voice_noise_sensitivity", value.noiseSensitivity)
             putFloat(KEY_VOICE_SPEECH_RATE, value.speechRate)
         }
     }

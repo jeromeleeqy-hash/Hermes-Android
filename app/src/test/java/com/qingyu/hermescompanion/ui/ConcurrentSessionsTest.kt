@@ -393,4 +393,27 @@ class ConcurrentSessionsTest {
         } finally { release.countDown() }
     }
 
+    @Test fun continuousVoicePreservesUnsentTextAndAttachments() {
+        val attachment = PendingAttachment(name = "待发送资料.txt", mimeType = "text/plain", textContent = "原附件")
+        vm.updateDraft("今天的安排")
+        setState(vm.uiState.copy(attachments = listOf(attachment)))
+        vm.openVoiceConversation()
+        vm.submitVoiceConversationText("今天的安排")
+        assertEquals("今天的安排", vm.uiState.draft)
+        assertEquals(listOf(attachment), vm.uiState.attachments)
+        assertTrue(runs().getValue(a.scopedId).submittedAttachments.isEmpty())
+        assertEquals("今天的安排", drafts["default::a"])
+    }
+
+    @Test fun lateVoiceResultCannotSendAfterClosingOrSwitchingConversation() {
+        vm.openVoiceConversation()
+        vm.closeVoiceConversation()
+        vm.submitVoiceConversationText("迟到的识别结果")
+        assertTrue(runs().isEmpty())
+        vm.openVoiceConversation()
+        setState(vm.uiState.copy(selectedSession = b))
+        vm.submitVoiceConversationText("不能发到 B")
+        assertTrue(runs().isEmpty())
+    }
+
 }

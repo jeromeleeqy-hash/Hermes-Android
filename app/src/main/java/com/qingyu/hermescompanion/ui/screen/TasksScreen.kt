@@ -119,9 +119,9 @@ fun TasksScreen(
         if (state.pendingAgentRequests.isNotEmpty()) selectedTab = TaskTab.PENDING
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState())
+            modifier = Modifier.weight(1f).fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = contentPadding.calculateBottomPadding())
                 .padding(horizontal = HermesSpacing.page, vertical = 8.dp),
         ) {
             TaskPageHeader(

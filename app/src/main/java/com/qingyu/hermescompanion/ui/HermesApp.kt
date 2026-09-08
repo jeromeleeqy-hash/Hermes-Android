@@ -70,7 +70,6 @@ import com.qingyu.hermescompanion.ui.component.ImagePreviewDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
-    val homeKeyboardVisible = state.route == AppRoute.HOME && WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val snackbarHostState = remember { SnackbarHostState() }
     val message = state.errorMessage ?: state.noticeMessage
 
@@ -89,7 +88,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         }
     }
 
-    CompositionLocalProvider(LocalRippleConfiguration provides androidx.compose.material3.RippleConfiguration()) {
+    CompositionLocalProvider(LocalRippleConfiguration provides null) {
         AmbientBackground {
             Scaffold(
         containerColor = Color.Transparent,
@@ -98,10 +97,6 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             // Reserve layout space for running tasks; a snackbar overlay obscures
             // the sessions screen's new-chat button on compact phones.
             Column {
-                if (state.workspaceAttachmentTarget == null && !homeKeyboardVisible && state.route in
-                    setOf(AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
-                    com.qingyu.hermescompanion.ui.component.FixedRegionDivider()
-                }
                 if (state.workspaceAttachmentTarget == null && state.isStreaming && state.route !in setOf(AppRoute.SETUP, AppRoute.HOME, AppRoute.CHAT, AppRoute.VOICE_CHAT)) {
                     GlobalRunStatusPill(
                         state = state,
@@ -109,10 +104,9 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                         onStop = viewModel::stopActiveRun,
                     )
                 }
-            if (state.workspaceAttachmentTarget == null && !homeKeyboardVisible && state.route in setOf(AppRoute.HOME, AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
+            if (state.workspaceAttachmentTarget == null && state.route in setOf(AppRoute.HOME, AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
                 HermesBottomDock(
-                    showDivider = false,
-                    selected = when (state.route) { AppRoute.SETTINGS -> AppRoute.PROFILE; AppRoute.TASKS -> AppRoute.HOME; else -> state.route },
+                    selected = when (state.route) { AppRoute.SETTINGS -> AppRoute.PROFILE; else -> state.route },
                     hasUnreadConversations = state.unreadSessionIds.isNotEmpty(),
                     onSelect = { route ->
                         when (route) {
@@ -157,8 +151,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             AppRoute.HOME -> AssistantHomeScreen(
                 state, padding, viewModel::startFromHome, viewModel::openSession,
                 viewModel::showSessions, viewModel::showTasks, viewModel::showWorkspace,
-                viewModel::refreshSessions, viewModel::respondToAgentRequest,
-                viewModel::showSessionSearch, viewModel::startWithAttachmentsFromHome, viewModel::startWithVoiceFromHome,
+                viewModel::respondToAgentRequest, viewModel::showSessionSearch,
             )
             AppRoute.SETUP -> ConnectionScreen(
                 state = state,
@@ -437,6 +430,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onSystemResult = viewModel::submitVoiceConversationText,
                 onUnavailable = viewModel::showVoiceRecognitionUnavailable,
                 onOpenGatewaySettings = viewModel::openConnectionSettings,
+                onFastReplyChange = { viewModel.updateVoicePreferences(state.voicePreferences.copy(fastReply = it)) },
+                onNoiseSensitivityChange = { viewModel.updateVoicePreferences(state.voicePreferences.copy(noiseSensitivity = it)) },
             )
 
             AppRoute.ABOUT -> AboutScreen(

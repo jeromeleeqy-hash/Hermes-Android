@@ -119,7 +119,7 @@ fun WorkspaceScreen(
             listing?.parent?.let(onOpenDirectory)
         } else if (picking) onCancelAttachmentPicker()
     }
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding).then(if (picking) Modifier.navigationBarsPadding() else Modifier)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding()).then(if (picking) Modifier.navigationBarsPadding() else Modifier)) {
         Column(modifier = Modifier.statusBarsPadding().padding(start = HermesSpacing.page, end = HermesSpacing.page, top = 12.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Text(if (picking) "选择附件" else "文件与成果",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
@@ -177,6 +177,7 @@ fun WorkspaceScreen(
             ) {
                 RecentArtifactsList(
                     items = recentArtifacts,
+                    bottomInset = contentPadding.calculateBottomPadding(),
                     isLoading = state.isRecentArtifactsLoading,
                     onOpen = if (picking) onSelectRecentAttachment else onOpenRecentArtifact,
                     onOpenSource = onOpenArtifactSource,
@@ -198,7 +199,7 @@ fun WorkspaceScreen(
                 listing.entries.isEmpty() -> WorkspaceEmpty("这个文件夹是空的")
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 2.dp, bottom = 12.dp),
+                    contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 2.dp, bottom = contentPadding.calculateBottomPadding() + 12.dp),
                 ) {
                     items(listing.entries, key = { it.path }) { entry ->
                         WorkspaceEntryRow(entry, picking = picking, enabled = !state.isWorkspaceAttaching) {
@@ -276,6 +277,7 @@ private fun RecentArtifactsList(
     isLoading: Boolean,
     onOpen: (RecentArtifact) -> Unit,
     onOpenSource: (RecentArtifact) -> Unit,
+    bottomInset: androidx.compose.ui.unit.Dp = 0.dp,
     picking: Boolean = false,
     enabled: Boolean = true,
 ) {
@@ -285,7 +287,7 @@ private fun RecentArtifactsList(
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 4.dp, bottom = 14.dp),
+        contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 4.dp, bottom = bottomInset + 14.dp),
     ) {
         items(items, key = { "${it.profile}:${it.path}" }) { item ->
             Column(Modifier.fillMaxWidth()) {

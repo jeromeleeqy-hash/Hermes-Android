@@ -5,21 +5,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -34,11 +28,9 @@ fun AssistantHomeScreen(
     state: AppUiState, contentPadding: PaddingValues,
     onStart: (String) -> Unit, onOpen: (HermesSession) -> Unit,
     onHistory: () -> Unit, onTasks: () -> Unit, onFiles: () -> Unit,
-    onRefresh: () -> Unit, onRespond: (AgentRequest, String) -> Unit,
-    onSearch: () -> Unit, onAdd: (String) -> Unit, onVoice: (String) -> Unit,
-    keyboardInsets: WindowInsets = WindowInsets.ime,
+    onRespond: (AgentRequest, String) -> Unit,
+    onSearch: () -> Unit,
 ) {
-    var draft by rememberSaveable(state.activeProfile, state.selectedProjectId) { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     val name = state.userProfile.hermesDisplayName.ifBlank { "Hermes" }
     val user = state.userProfile.displayName.ifBlank { state.username }.takeIf { it.isNotBlank() }
@@ -47,12 +39,8 @@ fun AssistantHomeScreen(
     val featured = sessions.firstOrNull { session -> runs.none { it.session.scopedId == session.scopedId } }
     val recent = (runs.map { it.session } + sessions.filterNot { state.pendingAgentRequests.isEmpty() && it.scopedId == featured?.scopedId }).distinctBy { it.scopedId }.take(2)
     val greeting = when (LocalTime.now().hour) { in 5..10 -> "早上好"; in 11..13 -> "中午好"; in 14..18 -> "下午好"; else -> "晚上好" }
-    val enabled = !state.isBusy && !state.isProfileSwitching
-    // Scaffold padding must be consumed before IME padding; otherwise the dock's
-    // reserved height is counted again above the keyboard.
-    Column(Modifier.fillMaxSize().testTag("home_root").padding(contentPadding)
-        .consumeWindowInsets(contentPadding).windowInsetsPadding(keyboardInsets)) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().statusBarsPadding(), contentPadding=PaddingValues(start=14.dp,end=14.dp,top=8.dp,bottom=8.dp)) {
+    Column(Modifier.fillMaxSize().testTag("home_root").padding(top = contentPadding.calculateTopPadding())) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().statusBarsPadding(), contentPadding=PaddingValues(start=14.dp,end=14.dp,top=8.dp,bottom=contentPadding.calculateBottomPadding()+16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth().heightIn(min=48.dp).padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     Box {
@@ -75,7 +63,8 @@ fun AssistantHomeScreen(
             item {
                 BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min=110.dp)) {
                     val girlWidth = maxWidth * .39f
-                    ReferenceHermesGirl(Modifier.align(Alignment.BottomEnd).width(girlWidth).height(girlWidth * (267f/312f)))
+                    ReferenceHermesGirl(Modifier.align(Alignment.BottomEnd).padding(end=8.dp)
+                        .width(girlWidth).height(girlWidth * (1080f / 1254f)))
                     Column(Modifier.fillMaxWidth(.62f).padding(start=8.dp,top=25.dp,bottom=22.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
                         Text(if(user==null) "$greeting。" else "$greeting，$user",fontSize=23.sp,lineHeight=30.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
                         Text(when { state.pendingAgentRequests.isNotEmpty() -> "今天，有 ${state.pendingAgentRequests.size} 件事需要你决定。"; runs.isNotEmpty() -> "有 ${runs.size} 件事正在进行，我在这里。"; else -> "今天，有什么事想交给我？" },fontSize=14.sp,lineHeight=21.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -84,19 +73,16 @@ fun AssistantHomeScreen(
             }
             item {
                 if (state.pendingAgentRequests.isNotEmpty()) DecisionCard(state.pendingAgentRequests.first(),onRespond)
-                else AssistantPanel(Modifier.fillMaxWidth()) {
+                else AssistantPanel(Modifier.fillMaxWidth().testTag("home_featured_card")) {
                     Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         HomeCardLabel("最近在聊","bulb",Color(0xFFC88E14))
                         Text(featured?.title?.ifBlank{"继续上次的想法"} ?: "从一件小事开始",fontSize=17.sp,lineHeight=24.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(featured?.preview?.takeIf{it.isNotBlank()} ?: "整理资料、记下想法，或聊聊今天的事。",fontSize=14.sp,lineHeight=21.sp,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                            HomeChoice(if(featured!=null) "继续这件事" else "聊聊新想法","history",AssistantMint,Modifier.weight(1f)) { if(featured!=null) onOpen(featured) else onStart(draft) }
-                            HomeChoice("开个新话题","plus",AssistantPurple,Modifier.weight(1f)) { onStart(draft) }
+                            HomeChoice(if(featured!=null) "继续这件事" else "聊聊新想法","history",AssistantMint,Modifier.weight(1f)) { if(featured!=null) onOpen(featured) else onStart("") }
+                            HomeChoice("开个新话题","plus",AssistantPurple,Modifier.weight(1f)) { onStart("") }
                         }
-                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick={if(featured!=null) onOpen(featured) else onStart(draft)},contentPadding=PaddingValues(0.dp)) {
-                            Text(if(featured!=null) "接着聊聊" else "开始对话",fontSize=15.sp,fontWeight=FontWeight.SemiBold,color=AssistantBlue)
-                            Spacer(Modifier.width(8.dp));AssistantGlyph("arrow",Modifier.size(21.dp),AssistantBlue)
-                        }
+
                     }
                 }
             }
@@ -122,26 +108,8 @@ fun AssistantHomeScreen(
                     }
                 }
             }
-            item {
-                Row(Modifier.fillMaxWidth().clickable(onClick=onTasks).padding(horizontal=8.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                    AssistantIconWell("check",AssistantMint,Modifier.size(30.dp))
-                    Text(when {state.pendingAgentRequests.isNotEmpty()->"${state.pendingAgentRequests.size} 项等待确认";runs.isNotEmpty()->"${runs.size} 件事正在处理";else->"暂时没有待确认事项"},Modifier.weight(1f).padding(start=10.dp),fontSize=13.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    IconButton(onClick=onFiles,modifier=Modifier.size(36.dp)) {AssistantGlyph("file",Modifier.size(18.dp))}
-                }
-            }
         }
-        FixedRegionDivider()
-        AssistantPanel(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=4.dp).testTag("home_composer")) {
-            Row(Modifier.fillMaxWidth().heightIn(min=54.dp).padding(horizontal=6.dp,vertical=3.dp),verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onClick={onAdd(draft)},enabled=enabled,modifier=Modifier.testTag("home_add").semantics { contentDescription="添加内容" }) {AssistantIconWell("plus",MaterialTheme.colorScheme.onSurfaceVariant,Modifier.size(30.dp))}
-                BasicTextField(value=draft,onValueChange={draft=it},enabled=enabled,maxLines=4,
-                    textStyle=MaterialTheme.typography.bodyLarge.copy(color=MaterialTheme.colorScheme.onSurface),cursorBrush=SolidColor(AssistantBlue),
-                    keyboardOptions=KeyboardOptions(imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={if(enabled) onStart(draft)}),
-                    modifier=Modifier.weight(1f).padding(horizontal=3.dp,vertical=8.dp).testTag("home_input"),
-                    decorationBox={inner->Box {if(draft.isEmpty()) Text("有什么事，交给我…",fontSize=16.sp,color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.75f));inner()}})
-                IconButton(onClick={if(draft.isBlank()) onVoice(draft) else onStart(draft)},enabled=enabled,modifier=Modifier.testTag("home_voice_send").semantics { contentDescription=if(draft.isBlank()) "语音输入" else "进入对话" }) {AssistantGlyph(if(draft.isBlank())"wave" else "arrow",Modifier.size(24.dp),AssistantBlue)}
-            }
-        }
+
     }
 }
 

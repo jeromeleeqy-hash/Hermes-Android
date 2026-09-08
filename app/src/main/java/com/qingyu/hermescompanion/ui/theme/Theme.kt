@@ -202,6 +202,7 @@ private val OfficeShapes = Shapes(
     extraLarge = RoundedCornerShape(24.dp),
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun HermesCompanionTheme(
     themeMode: ThemeMode,
@@ -215,6 +216,8 @@ fun HermesCompanionTheme(
         ThemeMode.DARK -> true
     }
     androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides HermesPressIndication,
+        androidx.compose.material3.LocalRippleConfiguration provides null,
         LocalHermesSkin provides OfficeSkin,
         LocalHermesExtendedColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors,
     ) {

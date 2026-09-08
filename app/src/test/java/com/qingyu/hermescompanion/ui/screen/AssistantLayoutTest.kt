@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -36,52 +37,71 @@ class AssistantLayoutTest {
     private val running = HermesSession("running", "内容转化分析")
     private val request = AgentRequest("request","runtime","running",AgentRequestType.CLARIFICATION,"这周的内容，先优化哪个方向？","互动不错，但咨询偏少。我整理了两个方向。",listOf(AgentRequestChoice("增加咨询量"),AgentRequestChoice("提高咨询质量")))
     private val state = AppUiState(route=AppRoute.HOME,username="Jerome",sessions=listOf(session,running),pendingAgentRequests=listOf(request),runningRuns=listOf(RunUiState(running,"已看完 12 篇内容，正在整理建议",0,false)))
-    private fun render(ime:Int=0,fontScale:Float=1f,onStart:(String)->Unit={},onAdd:(String)->Unit={},onVoice:(String)->Unit={}) {
+    private fun render(fontScale:Float=1f,dark:Boolean=false,preview:AppUiState=state,onStart:(String)->Unit={}) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f,fontScale)) {
-                HermesCompanionTheme(themeMode=ThemeMode.LIGHT,skinMode=SkinMode.CLEAN) {
+                HermesCompanionTheme(if(dark) ThemeMode.DARK else ThemeMode.LIGHT,SkinMode.CLEAN) {
                     Scaffold(modifier=Modifier.fillMaxSize().testTag("test_viewport"),contentWindowInsets=WindowInsets(0,0,0,0),
-                        bottomBar={if(ime==0) ReferenceBottomDock(AppRoute.HOME,false,{})}) { padding ->
-                        AssistantHomeScreen(state,padding,onStart,{},{},{},{},{},{_,_->},{},onAdd,onVoice,WindowInsets(bottom=ime))
+                        bottomBar={ReferenceBottomDock(AppRoute.HOME,false,{})}) { padding ->
+                        AssistantHomeScreen(preview,padding,onStart,{},{},{},{},{_,_->},{})
                     }
                 }
             }
         }
         compose.waitForIdle()
     }
-    private fun capture(name:String, selector:SemanticsNodeInteraction=compose.onRoot()) {
+    private fun capture(name:String, selector:SemanticsNodeInteraction=compose.onRoot()): Bitmap {
         val file=File("build/ui-validation/$name.png");file.parentFile.mkdirs()
         val view=(selector.fetchSemanticsNode().root as ViewRootForTest).view
-        compose.runOnIdle {
+        return compose.runOnIdle {
             val bitmap=Bitmap.createBitmap(view.width,view.height,Bitmap.Config.ARGB_8888)
             val canvas=android.graphics.Canvas(bitmap)
             canvas.drawColor(android.graphics.Color.rgb(245,246,250))
             view.draw(canvas)
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+            bitmap
         }
     }
-    @Test fun homeUsesRealContentAndInputActionsKeepDraft() {
-        var sent="";var added="";var voiced=false
-        render(onStart={sent=it},onAdd={added=it},onVoice={voiced=true})
+    @Test fun homeKeepsRealContentWithoutComposer() {
+        render()
         compose.onNodeWithText("这周的内容，先优化哪个方向？").assertIsDisplayed()
         compose.onNodeWithText("本周运营复盘").assertExists()
-        capture("home-reference")
-        compose.onNodeWithTag("home_voice_send").performClick();assertTrue(voiced)
-        compose.onNodeWithTag("home_input").performTextInput("帮我整理客户反馈")
-        compose.onNodeWithTag("home_add").performClick();assertEquals("帮我整理客户反馈",added)
-        compose.onNodeWithTag("home_voice_send").performClick();assertEquals("帮我整理客户反馈",sent)
+        compose.onNodeWithTag("home_input").assertDoesNotExist()
+        compose.onNodeWithTag("home_composer").assertDoesNotExist()
+        compose.onNodeWithTag("fixed_region_divider").assertDoesNotExist()
+        val root=compose.onNodeWithTag("home_root").fetchSemanticsNode().boundsInRoot
+        val dock=compose.onNodeWithTag("floating_bottom_dock").fetchSemanticsNode().boundsInRoot
+        assertTrue("Scrollable home extends behind the floating dock",root.bottom >= dock.bottom)
+        capture("home-light-320")
     }
-    private fun checkKeyboard(fontScale:Float,name:String) {
-        render(280,fontScale)
-        compose.onNodeWithTag("home_input").performTextInput("记录今天的进展")
-        val root=compose.onNodeWithTag("test_viewport").fetchSemanticsNode().boundsInRoot
-        val composer=compose.onNodeWithTag("home_composer").fetchSemanticsNode().boundsInRoot
-        assertEquals("Only the 280 px keyboard inset and 4 px margin should remain",284f,root.bottom-composer.bottom,1.1f)
-        assertTrue(composer.left>=root.left && composer.right<=root.right)
-        capture(name)
+    @Test @Config(qualifiers="w360dp-h800dp-mdpi") fun homeLargeTextStillReachesItsLastRow() {
+        render(fontScale=1.3f)
+        compose.onNodeWithText("本周运营复盘").performScrollTo().assertIsDisplayed()
+        capture("home-large-320")
     }
-    @Test @Config(qualifiers="w360dp-h800dp-mdpi") fun keyboardAt360HasNoDockSizedGap()=checkKeyboard(1f,"home-keyboard-360")
-    @Test @Config(qualifiers="w360dp-h800dp-mdpi") fun keyboardWithLargeFontHasNoDockSizedGap()=checkKeyboard(1.3f,"home-keyboard-360-large")
+    @Test fun homeNewTopicOpensChatWithoutRedundantLink() {
+        var started=false
+        render(preview=state.copy(pendingAgentRequests=emptyList()),onStart={started=true})
+        compose.onNodeWithText("接着聊聊").assertDoesNotExist()
+        compose.onNodeWithText("开个新话题").performClick()
+        assertTrue(started)
+        compose.onNodeWithText("1 件事正在处理").assertDoesNotExist()
+        compose.onNodeWithText("暂时没有待确认事项").assertDoesNotExist()
+        val portrait = compose.onNodeWithTag("home_hermes_portrait").fetchSemanticsNode().boundsInRoot
+        val card = compose.onNodeWithTag("home_featured_card").fetchSemanticsNode().boundsInRoot
+        assertEquals("Portrait flat base touches the card", card.top, portrait.bottom, .1f)
+        val bitmap = capture("home-simplified-320")
+        val backdrop = bitmap.getPixel(0, portrait.center.y.toInt())
+        for (fraction in listOf(.35f, .5f, .65f)) {
+            assertNotEquals("The flat portrait base must contain artwork", backdrop,
+                bitmap.getPixel((portrait.left + portrait.width * fraction).toInt(), portrait.bottom.toInt() - 2))
+        }
+    }
+    @Test fun darkHomeUsesTheSamePortraitWithoutWhiteRectangle() {
+        render(dark=true)
+        compose.onNodeWithTag("home_hermes_portrait").assertIsDisplayed()
+        capture("home-dark-320")
+    }
     @Test fun twelveChoicesKeepConfirmationAccessible() {
         var reply=""
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT, SkinMode.CLEAN) {
@@ -117,6 +137,24 @@ class AssistantLayoutTest {
         compose.onNodeWithText("调整要求").assertIsDisplayed()
         compose.onNodeWithText("停止这项工作").assertIsDisplayed()
         capture("work-detail")
+    }
+
+    @Test fun thinkingHasOneIndicator() {
+        val work = state.copy(route=AppRoute.CHAT,selectedSession=running,isStreaming=true,streamingSessionId=running.id,
+            pendingAgentRequests=emptyList(),runStage="准备回答",
+            messages=listOf(ChatMessage(role=MessageRole.USER,content="分析一下本周内容的咨询转化"),ChatMessage(role=MessageRole.ASSISTANT,content="",reasoning="正在核对上下文。",isStreaming=true)),
+            chatTodos=listOf(ChatTodo("1","已读完 12 篇内容",TodoStatus.COMPLETED),ChatTodo("2","已完成内容对比",TodoStatus.COMPLETED),ChatTodo("3","正在核对咨询入口",TodoStatus.IN_PROGRESS),ChatTodo("4","整理改进建议",TodoStatus.PENDING)),
+            chatArtifacts=listOf(ChatArtifact("/workspace/内容数据.xlsx","内容数据.xlsx","xlsx")))
+        compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
+            ChatScreen(state=work,onEntryHandled={},contentPadding=PaddingValues(),onBack={},onDraftChange={},onAddAttachments={},onRemoveAttachment={},
+                onSend={},onRetryFailed={},onStop={},onSteer={},onQueue={},onCancelQueued={},onRespondRequest={_,_->},onVoiceConversation={},
+                onStartVoiceInput={},onStopVoiceInput={},onCancelVoiceInput={},onVoiceSystemResult={},onVoiceUnavailable={},onLoadModels={},onSwitchModel={_,_->},
+                onLoadCommandCatalog={},onSetCouncilMode={},onOpenArtifact={},onOpenWorkspace={},onOpenImage={_,_->},onOpenLink={},onLoadInlineImages={},onLoadOlderMessages={},onScrollPositionChange={_,_,_->})
+        } }
+        compose.onNodeWithText("调整要求").assertIsDisplayed()
+        compose.onNodeWithText("停止这项工作").assertIsDisplayed()
+        compose.onAllNodesWithText("正在思考", substring=true).assertCountEquals(1)
+        capture("thinking-single-320")
     }
 
     @Test fun modernPaletteAndLauncherPreview() {
@@ -193,7 +231,7 @@ class AssistantLayoutTest {
     @Test fun tasks_unified() {
         val preview=state.copy(route=AppRoute.TASKS,sessions=emptyList(),pendingAgentRequests=emptyList(),runningRuns=emptyList(),cronJobs=listOf(CronJob("daily","每日运营简报","汇总昨天的数据和待办",CronSchedule(expression="0 9 * * *",display="每天 09:00")),CronJob("weekly","每周复盘","整理本周进展",CronSchedule(expression="0 18 * * 5",display="每周五 18:00"),enabled=false)))
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
-            Scaffold(bottomBar={ReferenceBottomDock(AppRoute.HOME,false,{})},contentWindowInsets=WindowInsets(0,0,0,0)) { padding ->
+            Scaffold(bottomBar={ReferenceBottomDock(AppRoute.TASKS,false,{})},contentWindowInsets=WindowInsets(0,0,0,0)) { padding ->
                 TasksScreen(state=preview,contentPadding=padding,onStartConversation={},onOpenActiveRun={_ -> },onStopActiveRun={_ -> },onRespondRequest={_,_ -> },onOpenCompletion={_ -> },onOpenCronSession={_ -> },onOpenArtifact={_ -> },onRefreshCron={},onCreateCron={_,_,_ -> },onOpenCron={_ -> },onUpdateCron={_,_,_,_ -> },onToggleCron={_ -> },onTriggerCron={_ -> },onDeleteCron={_ -> })
             }
         } }
@@ -221,6 +259,42 @@ class AssistantLayoutTest {
         compose.onNodeWithTag("nav_WORKSPACE").performClick()
         compose.onNodeWithTag("nav_WORKSPACE").assertIsSelected()
         compose.onNodeWithTag("nav_HOME").assertIsNotSelected()
+        compose.onNodeWithTag("nav_TASKS").performClick()
+        compose.onNodeWithTag("nav_TASKS").assertIsSelected()
+        compose.onNodeWithTag("nav_WORKSPACE").assertIsNotSelected()
+        compose.onNodeWithText("任务").assertIsDisplayed()
+    }
+
+    @Test fun navigationBlocksAllContentBelowItsTopIncludingSystemGestureInset() {
+        compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
+            Scaffold(modifier=Modifier.fillMaxSize().testTag("occlusion_root"),
+                bottomBar={ReferenceBottomDock(AppRoute.TASKS,false,{},WindowInsets(0,0,0,24))},
+                contentWindowInsets=WindowInsets(0,0,0,0)) { _ ->
+                Box(Modifier.fillMaxSize().background(Color.Magenta))
+            }
+        } }
+        val dock = compose.onNodeWithTag("floating_bottom_dock").fetchSemanticsNode().boundsInRoot
+        val image = capture("dock-occlusion-320", compose.onNodeWithTag("occlusion_root"))
+        assertEquals(android.graphics.Color.MAGENTA, image.getPixel(0, dock.top.toInt() - 20))
+        for (y in dock.top.toInt() + 1 until image.height step 3) {
+            for (x in 0 until image.width step 3) assertNotEquals("Content leaked at $x,$y", android.graphics.Color.MAGENTA, image.getPixel(x,y))
+        }
+    }
+
+    @Test fun voiceNoiseModeCanChangeWhileListening() {
+        var chosen = ""
+        compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
+            var preview by remember { mutableStateOf(state.copy(route=AppRoute.VOICE_CHAT,
+                voiceConversation=VoiceConversationState(active=true,phase=VoicePhase.LISTENING,message="停顿中，即将自动发送…"))) }
+            VoiceConversationScreen(preview,PaddingValues(),{},{},{},{},{},{},{},{},
+                onNoiseSensitivityChange={ value -> chosen=value; preview=preview.copy(voicePreferences=preview.voicePreferences.copy(noiseSensitivity=value)) })
+        } }
+        compose.onNodeWithText("收音：日常").performClick()
+        compose.onNodeWithText("嘈杂 · 减少背景声误触发，靠近手机说话").performClick()
+        assertEquals("noisy",chosen)
+        compose.onNodeWithText("收音：嘈杂").assertIsDisplayed()
+        compose.onNodeWithText("停顿中，即将自动发送…").assertIsDisplayed()
+        capture("voice-listening-320")
     }
 
     @Test fun homeMenuKeepsOnlyUsefulDestinations() {

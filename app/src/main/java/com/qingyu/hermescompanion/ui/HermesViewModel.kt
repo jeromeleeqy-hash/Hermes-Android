@@ -273,6 +273,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private var voicePlaybackJob: Job? = null
     private var voiceCaptureJob: Job? = null
     private var voiceLevelJob: Job? = null
+    private var voiceEpoch = 0L
+    private var voiceSessionKey: String? = null
     private var slashCommandQuery: String = ""
     private val commandCatalogCache = mutableMapOf<String, List<SlashCommand>>()
     private val messageCache = LinkedHashMap<String, List<ChatMessage>>()
@@ -325,7 +327,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         )
         val saved = configStore.read()
         if (saved != null) {
-            val client = HermesApiClient(saved, cookieJar)
+            val client = HermesApiClient(saved, cookieJar, configStore)
             apiClient = client
             uiState = uiState.copy(
                 route = AppRoute.SETUP,
@@ -364,7 +366,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             runCatching {
                 val config = ConnectionConfig(normalizedUrl, username.trim())
-                val client = HermesApiClient(config, cookieJar)
+                val client = HermesApiClient(config, cookieJar, configStore)
                 val signedInAs = withContext(Dispatchers.IO) { client.login(config.username, password) }
                 configStore.save(config)
                 apiClient?.takeIf { it !== client }?.close()
@@ -1316,6 +1318,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         attachments: List<PendingAttachment>,
         submittedPromptOverride: String? = null,
         councilMode: CouncilMode = CouncilMode.OFF,
+        voiceTurn: Boolean = false,
     ) {
         val client = apiClient ?: return
         if (activeRuns.containsKey(session.scopedId)) return
@@ -1353,18 +1356,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         activeRuns[session.scopedId] = run
         if (session.messageCount == 0 || session.title == "新会话") pendingTitleSessionIds += session.id
         configStore.saveActiveRunSnapshot(run.snapshot())
-        val consumeDraft = configStore.readDraft(session.profile, session.id).trim() == prompt.trim()
+        val consumeDraft = !voiceTurn && configStore.readDraft(session.profile, session.id).trim() == prompt.trim()
         if (consumeDraft) configStore.clearDraft(session.profile, session.id)
-        if (attachmentDrafts[session.scopedId] == attachments) attachmentDrafts.remove(session.scopedId)
+        if (!voiceTurn && attachmentDrafts[session.scopedId] == attachments) attachmentDrafts.remove(session.scopedId)
         failedSends.remove(session.scopedId)
         val unread = uiState.unreadSessionIds - session.scopedId
         configStore.saveUnreadSessionIds(unread)
         val isVisible = isVisible(run)
         uiState = uiState.copy(
-            draft = if (isVisible && uiState.draft.trim() == prompt.trim()) "" else uiState.draft,
-            attachments = if (isVisible && uiState.attachments == attachments) emptyList() else uiState.attachments,
+            draft = if (!voiceTurn && isVisible && uiState.draft.trim() == prompt.trim()) "" else uiState.draft,
+            attachments = if (!voiceTurn && isVisible && uiState.attachments == attachments) emptyList() else uiState.attachments,
             failedSend = if (isVisible) null else uiState.failedSend,
-            councilMode = if (isVisible) CouncilMode.OFF else uiState.councilMode,
+            councilMode = if (!voiceTurn && isVisible) CouncilMode.OFF else uiState.councilMode,
             unreadSessionIds = unread,
             errorMessage = null,
             noticeMessage = null,
@@ -1375,9 +1378,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         run.controller = controller
         run.streamJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                client.streamMessage(controller, session, submittedPrompt, attachments) { event ->
-                    viewModelScope.launch { handleStreamEvent(run, event) }
-                }
+                val receive: (StreamEvent) -> Unit = { event -> viewModelScope.launch { handleStreamEvent(run, event) } }
+                if (voiceTurn) client.streamVoiceMessage(controller, session, submittedPrompt, uiState.voicePreferences.fastReply,
+                    onNotice = { message -> viewModelScope.launch { if (isVisible(run)) showNotice(message) } }, onEvent = receive)
+                else client.streamMessage(controller, session, submittedPrompt, attachments, receive)
             }.onFailure { throwable ->
                 if (!controller.isStopped() && !controller.wasDisconnected()) {
                     withContext(Dispatchers.Main) {
@@ -1501,6 +1505,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(stoppingSessionKeys = uiState.stoppingSessionKeys + run.session.scopedId)
         removeRun(run)
         uiState = uiState.copy(noticeMessage = "已请求停止这段对话")
+        if (voiceIsCurrent() && isVisible(run)) interruptVoicePlayback()
         val client = apiClient
         viewModelScope.launch {
             try {
@@ -2740,200 +2745,195 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun voiceIsCurrent(epoch: Long = voiceEpoch): Boolean = epoch == voiceEpoch &&
+        uiState.route == AppRoute.VOICE_CHAT && uiState.voiceConversation.active &&
+        uiState.selectedSession?.scopedId == voiceSessionKey
+
     fun openVoiceConversation() {
-        if (!uiState.voicePreferences.enabled) return showNotice("请先在‘我的 → 语音’中启用语音功能")
-        if (uiState.selectedSession == null) return showNotice("请先打开一个对话")
+        if (!uiState.voicePreferences.enabled) return showNotice("先在‘我的 → 语音’中启用语音功能")
+        val session = uiState.selectedSession ?: return showNotice("先打开一个对话")
+        voiceEpoch++
+        voiceSessionKey = session.scopedId
         voiceRecorder.cancel()
+        voiceLevelJob?.cancel()
         voiceCaptureJob?.cancel()
-        voiceCaptureJob = null
+        voicePlaybackJob?.cancel()
+        voicePlayback.stop()
         voiceReturnRoute = uiState.route
-        uiState = uiState.copy(
-            route = AppRoute.VOICE_CHAT,
-            voiceCapture = VoiceCaptureState(),
-            voiceConversation = uiState.voiceConversation.copy(
-                active = true,
+        uiState = uiState.copy(route = AppRoute.VOICE_CHAT, voiceCapture = VoiceCaptureState(),
+            voiceConversation = VoiceConversationState(active = true,
                 phase = if (currentRun() != null) VoicePhase.THINKING else VoicePhase.IDLE,
-                message = if (currentRun() != null) "Hermes 正在处理当前问题" else "点按按钮开始说话",
-            ),
-            errorMessage = null,
-        )
+                message = if (currentRun() != null) "Hermes 正在处理当前问题" else "点按开始，说完停顿后自动发送"), errorMessage = null)
     }
 
     fun closeVoiceConversation() {
+        voiceEpoch++
+        voiceSessionKey = null
+        voiceCaptureJob?.cancel(); voiceCaptureJob = null
         voiceRecorder.cancel()
-        voiceLevelJob?.cancel()
-        voiceLevelJob = null
-        voicePlaybackJob?.cancel()
+        voiceLevelJob?.cancel(); voiceLevelJob = null
+        voicePlaybackJob?.cancel(); voicePlaybackJob = null
         voicePlayback.stop()
-        uiState = uiState.copy(
-            route = voiceReturnRoute.takeIf { it == AppRoute.CHAT } ?: AppRoute.CHAT,
-            voiceConversation = VoiceConversationState(),
-        )
+        uiState = uiState.copy(route = voiceReturnRoute.takeIf { it == AppRoute.CHAT } ?: AppRoute.CHAT,
+            voiceConversation = VoiceConversationState())
     }
 
     fun startVoiceListening() {
-        if (currentRun() != null) return showNotice("请等待 Hermes 完成当前回复")
-        voicePlaybackJob?.cancel()
+        if (!voiceIsCurrent() || currentRun() != null || uiState.voiceConversation.phase == VoicePhase.LISTENING) return
+        voicePlaybackJob?.cancel(); voicePlaybackJob = null
         voicePlayback.stop()
-        runCatching { voiceRecorder.start() }
-            .onSuccess {
-                uiState = uiState.copy(
-                    voiceConversation = uiState.voiceConversation.copy(
-                        active = true,
-                        phase = VoicePhase.LISTENING,
-                        transcript = "",
-                        provider = "",
-                        message = "正在聆听，再点一次即可发送",
-                        requiresAgentUpdate = false,
-                        inputLevel = 0f,
-                    ),
-                )
-                voiceLevelJob?.cancel()
-                voiceLevelJob = viewModelScope.launch {
-                    while (uiState.voiceConversation.phase == VoicePhase.LISTENING) {
-                        val level = voiceRecorder.inputLevel()
-                        uiState = uiState.copy(
-                            voiceConversation = uiState.voiceConversation.copy(inputLevel = level),
-                        )
-                        delay(72)
+        runCatching { voiceRecorder.start() }.onSuccess {
+            uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.LISTENING,
+                transcript = "", provider = "", message = "正在适应环境声音，可以直接说话", requiresAgentUpdate = false, inputLevel = 0f))
+            voiceLevelJob?.cancel()
+            val epoch = voiceEpoch
+            val endpoint = com.qingyu.hermescompanion.data.VoiceSilenceDetector(sensitivity = uiState.voicePreferences.noiseSensitivity)
+            val started = android.os.SystemClock.elapsedRealtime()
+            voiceLevelJob = viewModelScope.launch {
+                while (voiceIsCurrent(epoch) && uiState.voiceConversation.phase == VoicePhase.LISTENING) {
+                    val sample = voiceRecorder.inputSample()
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    endpoint.sensitivity = uiState.voicePreferences.noiseSensitivity
+                    val shouldSend = endpoint.sampleDb(sample.dbFs, now)
+                    uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(inputLevel = sample.displayLevel,
+                        message = when {
+                            endpoint.isCalibrating -> "正在适应环境声音，可以直接说话"
+                            endpoint.isSpeaking -> "正在听你说，说完停顿后自动发送"
+                            endpoint.hasSpeech -> "停顿中，即将自动发送…"
+                            else -> "正在听，靠近手机自然说话即可"
+                        }))
+                    if (shouldSend) {
+                        voiceLevelJob = null // stopVoiceListening must not cancel its own caller.
+                        stopVoiceListening()
+                        break
                     }
+                    if (now - started > 90_000) { voiceLevelJob = null; cancelVoiceListening(); break }
+                    delay(72)
                 }
             }
-            .onFailure { throwable ->
-                uiState = uiState.copy(
-                    voiceConversation = uiState.voiceConversation.copy(
-                        phase = VoicePhase.ERROR,
-                        message = throwable.message ?: "无法启动麦克风",
-                    ),
-                )
-            }
+        }.onFailure { error ->
+            uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.ERROR,
+                message = error.message ?: "无法启动麦克风"))
+        }
     }
 
     fun cancelVoiceListening() {
         voiceRecorder.cancel()
-        voiceLevelJob?.cancel()
-        voiceLevelJob = null
-        uiState = uiState.copy(
-            voiceConversation = uiState.voiceConversation.copy(
-                phase = VoicePhase.IDLE,
-                message = "已取消，点按重新说话",
-                inputLevel = 0f,
-            ),
-        )
+        voiceLevelJob?.cancel(); voiceLevelJob = null
+        voiceCaptureJob?.cancel(); voiceCaptureJob = null
+        if (!voiceIsCurrent()) return
+        uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE,
+            message = "已暂停，点按重新说话", inputLevel = 0f))
     }
 
     fun stopVoiceListening() {
         val client = apiClient ?: return
-        if (uiState.voiceConversation.phase != VoicePhase.LISTENING) return
-        voiceLevelJob?.cancel()
-        voiceLevelJob = null
-        uiState = uiState.copy(
-            voiceConversation = uiState.voiceConversation.copy(
-                phase = VoicePhase.TRANSCRIBING,
-                message = "正在识别语音",
-                inputLevel = 0f,
-            ),
-        )
-        viewModelScope.launch {
-            runCatching {
-                val (bytes, mimeType) = withContext(Dispatchers.IO) { voiceRecorder.stop() }
-                if (uiState.voicePreferences.engine == "system") {
-                    throw IllegalStateException("请使用手机系统语音识别")
-                }
-                withContext(Dispatchers.IO) { client.transcribeAudio(bytes, mimeType) }
-            }.onSuccess { result ->
-                val transcript = normalizeVoiceTranscript(result.transcript, uiState.voicePreferences.transcriptScript).trim()
-                uiState = uiState.copy(
-                    voiceConversation = uiState.voiceConversation.copy(
-                        phase = VoicePhase.THINKING,
-                        transcript = transcript,
-                        provider = result.provider,
-                        message = "已发送，Hermes 正在思考",
-                        agentSttAvailable = true,
-                        requiresAgentUpdate = false,
-                    ),
-                )
-                submitVoiceConversationText(transcript)
-            }.onFailure { throwable ->
-                val root = unwrapFailure(throwable)
+        if (!voiceIsCurrent() || uiState.voiceConversation.phase != VoicePhase.LISTENING) return
+        voiceLevelJob?.cancel(); voiceLevelJob = null
+        val epoch = voiceEpoch
+        val profile = uiState.activeProfile
+        uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.TRANSCRIBING,
+            message = "正在识别语音", inputLevel = 0f))
+        voiceCaptureJob = viewModelScope.launch {
+            try {
+                // Release the recorder before suspension so close/reopen cannot stop a newer capture.
+                val (bytes, mime) = voiceRecorder.stop()
+                val result = withContext(Dispatchers.IO) { client.transcribeAudio(bytes, mime, profile) }
+                if (!voiceIsCurrent(epoch)) return@launch
+                uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(provider = result.provider,
+                    agentSttAvailable = true, requiresAgentUpdate = false))
+                submitVoiceConversationText(result.transcript)
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+            catch (error: Exception) {
+                if (!voiceIsCurrent(epoch)) return@launch
+                val root = unwrapFailure(error)
                 val unavailable = root is ApiException && root.statusCode in setOf(404, 405, 501)
                 val incompatible = isAgentSttCompatibilityFailure(root)
-                uiState = uiState.copy(
-                    voiceConversation = uiState.voiceConversation.copy(
-                        phase = VoicePhase.ERROR,
-                        message = when {
-                            incompatible -> agentSttCompatibilityMessage()
-                            unavailable -> "当前 Agent 未启用语音识别，可切换为手机系统识别"
-                            else -> diagnosticFailure(root)
-                        },
-                        agentSttAvailable = if (unavailable) false else uiState.voiceConversation.agentSttAvailable,
-                        requiresAgentUpdate = incompatible,
-                    ),
-                )
+                uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.ERROR,
+                    message = if (incompatible) agentSttCompatibilityMessage() else if (unavailable) "当前 Agent 未启用语音识别，可改用手机系统识别" else diagnosticFailure(root),
+                    agentSttAvailable = if (unavailable) false else uiState.voiceConversation.agentSttAvailable,
+                    requiresAgentUpdate = incompatible))
             }
         }
     }
 
     fun submitVoiceConversationText(text: String) {
+        if (!voiceIsCurrent()) return
+        val session = uiState.selectedSession ?: return
         val transcript = normalizeVoiceTranscript(text, uiState.voicePreferences.transcriptScript).trim()
         if (transcript.isBlank() || currentRun() != null) return
-        uiState = uiState.copy(
-            draft = transcript,
-            voiceConversation = uiState.voiceConversation.copy(
-                phase = VoicePhase.THINKING,
-                transcript = transcript,
-                message = "Hermes 正在思考",
-            ),
-        )
-        sendMessage()
+        if (uiState.isModelSwitching) return showNotice("模型正在切换，稍后再说")
+        uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.THINKING,
+            transcript = transcript, message = "正在生成回答"))
+        startMessage(session, transcript, emptyList(), voiceTurn = true)
     }
 
     fun interruptVoicePlayback() {
-        voicePlaybackJob?.cancel()
+        voicePlaybackJob?.cancel(); voicePlaybackJob = null
         voicePlayback.stop()
-        uiState = uiState.copy(
-            voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE, message = "已停止播放"),
-        )
+        if (voiceIsCurrent()) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
+            phase = VoicePhase.IDLE, message = "已停止播放，点按继续说话"))
+    }
+
+    private fun requestNextVoiceTurn() {
+        if (!voiceIsCurrent()) return
+        val continuous = uiState.voicePreferences.continuous
+        uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE,
+            message = if (continuous) "准备聆听" else "回答完毕，点按继续",
+            listenRequest = uiState.voiceConversation.listenRequest + if (continuous) 1 else 0))
     }
 
     private fun speakVoiceReply(text: String) {
-        if (!uiState.voiceConversation.active || text.isBlank()) return
-        if (!uiState.voicePreferences.autoRead) {
-            uiState = uiState.copy(
-                voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE, message = "Hermes 已回复"),
-            )
-            return
-        }
+        if (!voiceIsCurrent()) return
+        val spoken = com.qingyu.hermescompanion.data.spokenReply(text)
+        if (spoken.isBlank() || !uiState.voicePreferences.autoRead) { requestNextVoiceTurn(); return }
         val client = apiClient ?: return
+        val epoch = voiceEpoch
+        val profile = uiState.activeProfile
+        val preferences = uiState.voicePreferences
         voicePlaybackJob?.cancel()
         voicePlaybackJob = viewModelScope.launch {
-            uiState = uiState.copy(
-                voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.SPEAKING, message = "Hermes 正在回答"),
-            )
-            val preferences = uiState.voicePreferences
-            val agentResult = if (preferences.engine != "system" && uiState.voiceConversation.agentTtsAvailable != false) {
-                runCatching { withContext(Dispatchers.IO) { client.synthesizeSpeech(text) } }
-            } else null
-            if (agentResult?.isSuccess == true) {
-                val audio = agentResult.getOrThrow()
-                uiState = uiState.copy(
-                    voiceConversation = uiState.voiceConversation.copy(provider = audio.provider, agentTtsAvailable = true),
-                )
-                voicePlayback.play(audio)
-            } else {
-                if (agentResult?.exceptionOrNull() is ApiException) {
-                    uiState = uiState.copy(
-                        voiceConversation = uiState.voiceConversation.copy(agentTtsAvailable = false, provider = "Android TTS"),
-                    )
+            try {
+                uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.SPEAKING,
+                    message = "Hermes 正在回答"))
+                val chinese = com.qingyu.hermescompanion.data.containsChinese(spoken)
+                suspend fun phone() {
+                    if (!voiceIsCurrent(epoch)) throw kotlinx.coroutines.CancellationException()
+                    uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(provider = "手机中文语音".takeIf { chinese } ?: "Android TTS"))
+                    voicePlayback.speakSystem(spoken, preferences.language, preferences.speechRate)
                 }
-                voicePlayback.speakSystem(text, preferences.language, preferences.speechRate)
-            }
-            uiState = uiState.copy(
-                voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE, message = "回答完毕，点按继续"),
-            )
-            if (preferences.continuous && uiState.route == AppRoute.VOICE_CHAT) {
-                delay(450)
-                startVoiceListening()
+                suspend fun agent() {
+                    if (chinese) {
+                        val config = withContext(Dispatchers.IO) { client.voiceSettings(profile).tts }
+                        if (!com.qingyu.hermescompanion.data.agentVoiceSupportsChinese(config)) {
+                            throw IllegalStateException("Agent 当前发音人不支持中文，在语音设置中选择中文发音人后重试")
+                        }
+                    }
+                    for (chunk in com.qingyu.hermescompanion.data.speechChunks(spoken)) {
+                        val audio = withContext(Dispatchers.IO) { client.synthesizeSpeech(chunk, profile) }
+                        if (!voiceIsCurrent(epoch)) throw kotlinx.coroutines.CancellationException()
+                        uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(provider = audio.provider, agentTtsAvailable = true))
+                        voicePlayback.play(audio)
+                    }
+                }
+                // An English-only engine may return valid audio containing only digits/English.
+                // For Chinese in automatic mode, first use a verified Chinese phone voice.
+                if (preferences.engine == "system") phone()
+                else if (chinese && preferences.engine == "automatic") {
+                    try { phone() } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) { agent() }
+                } else {
+                    try { agent() } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) { phone() }
+                }
+                if (!voiceIsCurrent(epoch)) return@launch
+                delay(350)
+                voicePlaybackJob = null
+                requestNextVoiceTurn()
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+            catch (error: Exception) {
+                if (voiceIsCurrent(epoch)) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
+                    phase = VoicePhase.ERROR, message = error.message ?: "朗读失败，回答已保留在对话中"))
             }
         }
     }
@@ -3341,7 +3341,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         updateSession(session.id) { it.copy(messageCount = maxOf(it.messageCount, completed.size), runtimeId = session.runtimeId) }
         removeRunRequests(run)
         // Voice playback belongs to the conversation being viewed, never a background completion.
-        if (hasReply && isVisible(run)) speakVoiceReply(text)
+        if (hasReply && isVisible(run)) speakVoiceReply(reply?.content.orEmpty())
         if (needsAttention) {
             val name = uiState.userProfile.hermesDisplayName.ifBlank { "Hermes" }
             HermesNotifications.showMessage(getApplication(), "$name 已回复",
@@ -3741,6 +3741,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         restoreQueuedDraft(run)
         removeRunRequests(run)
         removeRun(run)
+        if (voiceIsCurrent() && isVisible(run)) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
+            phase = VoicePhase.ERROR, message = "回复暂时失败，内容已保留，可回到对话重试"))
         handleFailure(throwable)
     }
 

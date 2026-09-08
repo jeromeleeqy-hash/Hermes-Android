@@ -28,6 +28,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -76,9 +83,14 @@ fun VoiceConversationScreen(
     onSystemResult: (String) -> Unit,
     onUnavailable: () -> Unit,
     onOpenGatewaySettings: () -> Unit,
+    onFastReplyChange: (Boolean) -> Unit = {},
+    onNoiseSensitivityChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val voice = state.voiceConversation
+    var showNoiseOptions by remember { mutableStateOf(false) }
+    val usesSystemRecognition = state.voicePreferences.engine == "system" ||
+        (state.voicePreferences.engine == "automatic" && voice.agentSttAvailable == false)
     val animatedLevel by animateFloatAsState(
         targetValue = if (voice.phase == VoicePhase.LISTENING) voice.inputLevel else 0f,
         label = "voice-input-level",
@@ -91,7 +103,7 @@ fun VoiceConversationScreen(
             result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
                 ?.takeIf(String::isNotBlank)
                 ?.let(onSystemResult)
-        }
+        } else onCancelListening()
     }
     val useSystemRecognition = {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -100,7 +112,9 @@ fun VoiceConversationScreen(
                 RecognizerIntent.EXTRA_LANGUAGE,
                 voiceRecognitionLanguage(state.voicePreferences.language, state.voicePreferences.transcriptScript),
             )
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "请对 Hermes 说话")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "对 Hermes 说话，说完自动发送")
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_250L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_250L)
         }
         try {
             systemLauncher.launch(intent)
@@ -115,6 +129,15 @@ fun VoiceConversationScreen(
             onStartListening()
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    val latestCancel by rememberUpdatedState(onCancelListening)
+    DisposableEffect(Unit) { onDispose { latestCancel() } }
+    LaunchedEffect(voice.listenRequest) {
+        if (voice.listenRequest > 0 && voice.active && voice.phase == VoicePhase.IDLE) {
+            if (state.voicePreferences.engine == "system" ||
+                (state.voicePreferences.engine == "automatic" && voice.agentSttAvailable == false)) useSystemRecognition()
+            else startAgentRecognition()
         }
     }
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
@@ -158,7 +181,7 @@ fun VoiceConversationScreen(
             )
             Text(
                 when (voice.phase) {
-                    VoicePhase.LISTENING -> "自然说话即可，声音会实时响应"
+                    VoicePhase.LISTENING -> voice.message.ifBlank { "说完停顿后自动发送" }
                     VoicePhase.TRANSCRIBING -> "正在把语音转换为文字"
                     VoicePhase.THINKING -> "已发送，正在生成回答"
                     VoicePhase.SPEAKING -> "回答正在播放，可随时打断"
@@ -171,6 +194,16 @@ fun VoiceConversationScreen(
                 modifier = Modifier.padding(top = 8.dp),
             )
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onFastReplyChange(!state.voicePreferences.fastReply) },
+                    enabled = voice.phase in setOf(VoicePhase.IDLE, VoicePhase.ERROR)) {
+                    Text(if (state.voicePreferences.fastReply) "快速回答 ✓" else "深入思考")
+                }
+                if (!usesSystemRecognition) TextButton(onClick = { showNoiseOptions = true },
+                    enabled = voice.phase in setOf(VoicePhase.IDLE, VoicePhase.ERROR, VoicePhase.LISTENING)) {
+                    Text("收音：${voiceSensitivityLabel(state.voicePreferences.noiseSensitivity)}")
+                }
+            }
             VoiceControlOrb(
                 phase = voice.phase,
                 inputLevel = animatedLevel,
@@ -208,6 +241,18 @@ fun VoiceConversationScreen(
         }
 
     }
+    if (showNoiseOptions) AlertDialog(
+        onDismissRequest = { showNoiseOptions = false },
+        title = { Text("收音环境") },
+        text = { Column {
+            voiceSensitivityOptions.forEach { (value, label) ->
+                TextButton(onClick = { onNoiseSensitivityChange(value); showNoiseOptions = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text(label + if (state.voicePreferences.noiseSensitivity == value) " ✓" else "")
+                }
+            }
+        } },
+        confirmButton = { TextButton(onClick = { showNoiseOptions = false }) { Text("关闭") } },
+    )
 }
 
 @Composable
@@ -412,7 +457,7 @@ private fun VoiceCoreStatus(
         VoicePhase.IDLE -> if (continuous) "连续对话已开启" else "准备就绪"
     }
     val action = when (phase) {
-        VoicePhase.LISTENING -> "点按结束并发送"
+        VoicePhase.LISTENING -> "停顿自动发送 · 也可点按提前结束"
         VoicePhase.SPEAKING -> "点按语音核心可打断"
         VoicePhase.TRANSCRIBING, VoicePhase.THINKING -> "请稍候"
         VoicePhase.ERROR -> "根据上方提示处理后重试"

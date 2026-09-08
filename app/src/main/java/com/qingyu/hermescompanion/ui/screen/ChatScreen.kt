@@ -517,7 +517,6 @@ fun ChatScreen(
                 HomeChoice("停止这项工作", "stop", HermesColors.extended.warning, Modifier.weight(1f), onStop)
             }
         }
-        com.qingyu.hermescompanion.ui.component.FixedRegionDivider()
         Composer(
             inputFocusRequester = composerFocusRequester,
             inlineStop = showHistory,
@@ -683,6 +682,7 @@ private fun MessageItem(
     val syntheticProcessing = message.role == MessageRole.ASSISTANT && message.isStreaming &&
         isSyntheticProcessingStatus(message.content)
     val visibleContent = if (syntheticProcessing) "" else message.content
+    val visibleReasoning = message.reasoning.takeUnless { it.trim().trimEnd('.', '…') == "正在思考" }.orEmpty()
     BoxWithConstraints(
         modifier = Modifier.fillMaxWidth().then(
             if (highlighted) {
@@ -795,10 +795,10 @@ private fun MessageItem(
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                 }
-                if (message.reasoning.isNotBlank()) {
+                if (visibleReasoning.isNotBlank()) {
                     ReasoningDisclosure(
-                        reasoning = message.reasoning,
-                        streaming = message.isStreaming,
+                        reasoning = visibleReasoning,
+                        streaming = message.isStreaming && visibleContent.isBlank() && runningToolCount == 0 && !syntheticProcessing,
                     )
                 }
                 if (visibleContent.isNotBlank()) {
@@ -835,7 +835,7 @@ private fun MessageItem(
                         }
                     }
                 }
-                if (message.isStreaming) {
+                if (message.isStreaming && !(visibleReasoning.isNotBlank() && visibleContent.isBlank() && runningToolCount == 0 && !syntheticProcessing)) {
                     Row(
                         modifier = Modifier.padding(top = if (visibleContent.isBlank()) 2.dp else 8.dp),
                         verticalAlignment = Alignment.CenterVertically,

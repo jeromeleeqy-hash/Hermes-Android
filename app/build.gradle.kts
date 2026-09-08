@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-val stableDebugKeystore = rootProject.file("signing/hermes-debug.keystore")
+val stableDebugKeystore = file(providers.gradleProperty("hermesSigningFile").orNull ?: rootProject.file("signing/hermes-debug.keystore"))
+val hermesPreview = providers.gradleProperty("hermesPreview").map(String::toBoolean).getOrElse(false)
 
 plugins {
     id("com.android.application")
@@ -17,11 +18,12 @@ android {
         applicationId = "com.qingyu.hermescompanion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 315
-        versionName = "3.1.5-release"
+        versionCode = 320
+        versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        manifestPlaceholders["hermesAppLabel"] = if (hermesPreview) "Hermes 预览" else "Hermes"
     }
 
     signingConfigs {
@@ -37,8 +39,8 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            applicationIdSuffix = if (hermesPreview) ".preview" else ".debug"
+            versionNameSuffix = if (hermesPreview) "-preview" else "-debug"
             signingConfigs.findByName("stableDebug")?.let { signingConfig = it }
             // Keep the installable build in one DEX for compatibility with OEM runtimes.
             // Resource shrinking stays disabled while the new icon system is being verified.

@@ -111,6 +111,7 @@ private fun defaultServerSttModel(provider: String): String = when (provider) {
 class HermesApiClient(
     private val config: ConnectionConfig,
     private val cookieJar: SecureCookieJar,
+    private val voiceRestoreStore: com.qingyu.hermescompanion.storage.SecureConfigStore? = null,
 ) {
     private val http = OkHttpClient.Builder()
         .cookieJar(cookieJar)
@@ -138,6 +139,8 @@ class HermesApiClient(
     private var gatewayReadyFuture: CompletableFuture<Unit>? = null
 
     private val activeStreams = ConcurrentHashMap<String, ActiveStream>()
+    private val voiceRestores = ConcurrentHashMap<String, String>()
+    private val turnLeases = ConcurrentHashMap<String, Any>()
 
     @Volatile
     private var activeProfile: String = "default"
@@ -270,12 +273,12 @@ class HermesApiClient(
         )
     }
 
-    fun transcribeAudio(bytes: ByteArray, mimeType: String): SpeechTranscription {
+    fun transcribeAudio(bytes: ByteArray, mimeType: String, profile: String = activeProfile): SpeechTranscription {
         val encoded = Base64.encodeToString(bytes, Base64.NO_WRAP)
         val body = JSONObject()
             .put("data_url", "data:$mimeType;base64,$encoded")
             .put("mime_type", mimeType)
-        val root = JSONObject(request("POST", "/api/audio/transcribe", body.toString()))
+        val root = JSONObject(request("POST", appendProfileQuery("/api/audio/transcribe", profile), body.toString()))
         if (!root.optBoolean("ok", true)) {
             throw ApiException(400, firstString(root, "message", "error") ?: "Hermes 语音识别失败")
         }
@@ -284,9 +287,15 @@ class HermesApiClient(
         return SpeechTranscription(transcript, firstString(root, "provider").orEmpty())
     }
 
-    fun synthesizeSpeech(text: String): SpeechAudio {
+    fun voiceSettings(profile: String = activeProfile): ServerVoiceSettings {
+        val root = JSONObject(request("GET", appendProfileQuery("/api/config", profile)))
+        return parseServerVoiceSettings(root.optJSONObject("config") ?: root)
+    }
+
+    fun synthesizeSpeech(text: String, profile: String = activeProfile): SpeechAudio {
+        require(text.length <= 8_000) { "朗读文本需要分段处理" }
         val root = JSONObject(
-            request("POST", "/api/audio/speak", JSONObject().put("text", text.take(8_000)).toString()),
+            request("POST", appendProfileQuery("/api/audio/speak", profile), JSONObject().put("text", text).toString()),
         )
         if (!root.optBoolean("ok", true)) {
             throw ApiException(400, firstString(root, "message", "error") ?: "Hermes 语音合成失败")
@@ -448,6 +457,7 @@ class HermesApiClient(
             model = firstString(info, "model").orEmpty(),
             provider = firstString(info, "provider").orEmpty(),
             runtimeId = runtimeId,
+            reasoningEffort = firstString(info, "reasoning_effort"),
             profile = activeProfile,
             workspacePath = firstString(info, "cwd", "git_repo_root").orEmpty(),
         )
@@ -471,6 +481,7 @@ class HermesApiClient(
         return ResumedSession(
             session.copy(
                 runtimeId = runtimeId,
+                reasoningEffort = firstString(info, "reasoning_effort"),
                 model = firstString(info, "model") ?: session.model,
                 provider = firstString(info, "provider") ?: session.provider,
                 workspacePath = session.workspacePath.ifBlank { firstString(info, "cwd", "git_repo_root").orEmpty() },
@@ -1159,15 +1170,98 @@ class HermesApiClient(
         request("DELETE", "/api/cron/jobs/${pathSegment(jobId)}")
     }
 
+    private inline fun <T> withTurnLease(session: HermesSession, block: () -> T): T {
+        val key = "${session.profile}::${session.id}"
+        val lease = Any()
+        if (turnLeases.putIfAbsent(key, lease) != null) throw ApiException(409, "这段对话已有任务正在运行")
+        try { return block() } finally { turnLeases.remove(key, lease) }
+    }
+
+    private fun voiceRestoreKey(session: HermesSession) = "${session.profile}::${session.id}"
+
+    private fun rememberVoiceReasoning(session: HermesSession, effort: String) {
+        voiceRestoreStore?.savePendingVoiceReasoning(config.baseUrl, session.profile, session.id, effort)
+        voiceRestores[voiceRestoreKey(session)] = effort
+    }
+
+    private fun setSessionReasoning(session: HermesSession, effort: String) {
+        require(!session.runtimeId.isNullOrBlank())
+        // Validate the runtime: old gateways must never interpret a missing session as a global edit.
+        val status = rpcObject("session.status", JSONObject().put("session_id", session.runtimeId).put("profile", session.profile))
+        if (status.optBoolean("running") || status.optString("output").contains("Agent Running: Yes", ignoreCase = true)) {
+            throw ApiException(409, "这段对话正在执行，完成后再切换语音思考模式")
+        }
+        rpcObject("config.set", JSONObject().put("session_id", session.runtimeId).put("profile", session.profile)
+            .put("scope", "session").put("key", "reasoning").put("value", effort))
+    }
+
+    private fun restoreVoiceReasoning(session: HermesSession): String? {
+        val effort = voiceRestores[voiceRestoreKey(session)]
+            ?: voiceRestoreStore?.pendingVoiceReasoning(config.baseUrl, session.profile, session.id) ?: return null
+        setSessionReasoning(session, effort)
+        voiceRestoreStore?.savePendingVoiceReasoning(config.baseUrl, session.profile, session.id, null)
+        voiceRestores.remove(voiceRestoreKey(session))
+        return effort
+    }
+
+    fun streamVoiceMessage(controller: StreamController, session: HermesSession, prompt: String, fastReply: Boolean,
+        onNotice: (String) -> Unit, onEvent: (StreamEvent) -> Unit) {
+        withTurnLease(session) {
+        if (controller.isStopped()) return
+        var active = resumeSession(session).session
+        restoreVoiceReasoning(active)?.let { active = active.copy(reasoningEffort = it) }
+        if (controller.isStopped()) return
+        var changed = false
+        if (fastReply) {
+            val original = active.reasoningEffort
+            if (original in setOf("minimal", "low", "medium", "high", "xhigh", "max", "ultra")) {
+                try {
+                    rememberVoiceReasoning(active, original!!)
+                    setSessionReasoning(active, "none")
+                    changed = true
+                } catch (error: Exception) {
+                    val rejection = generateSequence<Throwable>(error) { it.cause }.filterIsInstance<RpcException>().firstOrNull()
+                    if (rejection?.rpcCode in setOf(-32601, -32602, 4002)) {
+                        // Explicit rejection means no setting changed; old gateways can still answer.
+                        voiceRestoreStore?.savePendingVoiceReasoning(config.baseUrl, active.profile, active.id, null)
+                        voiceRestores.remove(voiceRestoreKey(active))
+                    } else {
+                        // A lost acknowledgement may have changed the runtime; restore before sending.
+                        restoreVoiceReasoning(active)
+                    }
+                    onNotice("当前 Agent 暂不支持语音快速回答，本次沿用原模型设置")
+                }
+            } else if (original != "none") onNotice("当前 Agent 未提供可恢复的思考设置，本次沿用原模型设置")
+        }
+        var completed = false
+        try {
+            streamMessageInternal(controller, active, prompt, emptyList(), restoreBeforeSend = false) { event ->
+                if (event == StreamEvent.Completed) completed = true else onEvent(event)
+            }
+        } finally {
+            if (changed && !controller.wasDisconnected()) {
+                // Stops restore on the next send, after the interrupt has reached the server.
+                if (!controller.isStopped()) runCatching { restoreVoiceReasoning(active) }
+                    .onFailure { onNotice("回答已完成；原思考设置将在下次发送前恢复") }
+            }
+            if (completed) onEvent(StreamEvent.Completed)
+        }
+        }
+    }
+
     fun streamMessage(
         controller: StreamController,
         session: HermesSession,
         prompt: String,
         attachments: List<PendingAttachment>,
         onEvent: (StreamEvent) -> Unit,
-    ) {
+    ) = withTurnLease(session) { streamMessageInternal(controller, session, prompt, attachments, true, onEvent) }
+
+    private fun streamMessageInternal(controller: StreamController, session: HermesSession, prompt: String,
+        attachments: List<PendingAttachment>, restoreBeforeSend: Boolean, onEvent: (StreamEvent) -> Unit) {
         if (controller.isStopped()) return
         val active = if (session.runtimeId.isNullOrBlank()) resumeSession(session).session else session
+        if (restoreBeforeSend) restoreVoiceReasoning(active)
         val runtimeId = active.runtimeId ?: error("无法恢复 Hermes 会话")
         controller.runtimeSessionId = runtimeId
         if (controller.isStopped()) return
@@ -2026,7 +2120,7 @@ class HermesApiClient(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val USER_AGENT = "Hermes-Android/3.0.4"
+        val USER_AGENT = "Hermes-Android/${com.qingyu.hermescompanion.BuildConfig.VERSION_NAME}"
         val AUXILIARY_TASK_KEYS = listOf(
             "vision",
             "web_extract",

@@ -95,6 +95,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val LocalProfileDockInset = androidx.compose.runtime.staticCompositionLocalOf { 0.dp }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -147,7 +149,8 @@ fun ProfileScreen(
         else onBackToProfile()
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalProfileDockInset provides contentPadding.calculateBottomPadding()) {
+    Box(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         AnimatedContent(
             targetState = pane,
             modifier = Modifier.fillMaxSize(),
@@ -271,6 +274,8 @@ fun ProfileScreen(
 
 }
 
+}
+
 private enum class ProfilePane { HOME, SETTINGS, GUIDE }
 
 @Composable
@@ -288,7 +293,7 @@ private fun ProfileHomeContent(
     val displayName = state.userProfile.displayName.ifBlank { state.username.ifBlank { "Hermes 用户" } }
     val bio = state.userProfile.bio.ifBlank { "个人工作助理" }
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding()
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current).statusBarsPadding()
             .padding(horizontal = HermesSpacing.page),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -385,7 +390,7 @@ private fun ProfileSettingsListContent(
     Column(Modifier.fillMaxSize()) {
         ProfilePageHeader("设置", onBack)
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
                 .padding(horizontal = HermesSpacing.page),
         ) {
             GlassPanel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
@@ -422,7 +427,7 @@ private fun ProfileGuideContent(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         ProfilePageHeader("使用说明", onBack)
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
                 .padding(horizontal = HermesSpacing.page),
         ) {
             HermesWelcomeAnimation(
@@ -735,7 +740,7 @@ fun ProfileSettingsScreen(
         }
 
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
                 .padding(horizontal = HermesSpacing.page),
         ) {
         GlassPanel(Modifier.fillMaxWidth()) {

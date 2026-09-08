@@ -155,7 +155,7 @@ fun SessionsScreen(
     }
 
     val skin = HermesSkin.current
-    Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+    Box(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Column(modifier = Modifier.fillMaxSize()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -198,7 +198,7 @@ fun SessionsScreen(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = HermesSpacing.page, top = 4.dp, end = HermesSpacing.page, bottom = 86.dp),
+                    contentPadding = PaddingValues(start = HermesSpacing.page, top = 4.dp, end = HermesSpacing.page, bottom = contentPadding.calculateBottomPadding() + 86.dp),
                 ) {
                 when {
                     state.isBusy && regularSessions.isEmpty() -> item("loading") {
@@ -282,7 +282,7 @@ fun SessionsScreen(
         }
         com.qingyu.hermescompanion.ui.component.AssistantCreateButton(
             label="新建对话",onClick=onNewSession,large=true,
-            modifier=Modifier.align(Alignment.BottomEnd).padding(end=18.dp,bottom=18.dp).testTag("new_conversation"),
+            modifier=Modifier.align(Alignment.BottomEnd).padding(end=18.dp,bottom=contentPadding.calculateBottomPadding()+18.dp).testTag("new_conversation"),
         )
     }
 

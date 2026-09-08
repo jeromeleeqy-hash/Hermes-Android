@@ -201,17 +201,26 @@ fun VoiceSettingsScreen(
                     preferences.enabled,
                 ) { onChange(preferences.copy(enabled = it)) }
                 SettingsChoiceRow("语音引擎", voiceEngineLabel(preferences.engine), preferences.enabled) { picker = "engine" }
-                SwitchSettingRow("自动朗读回复", "优先使用 Agent TTS，失败时回退到 Android TTS", preferences.autoRead, preferences.enabled) {
+                SettingsChoiceRow("收音环境", voiceSensitivityLabel(preferences.noiseSensitivity), preferences.enabled && preferences.engine != "system") { picker = "noiseSensitivity" }
+                SwitchSettingRow("自动朗读回复", "中文优先使用匹配的中文发音人，完整朗读回答", preferences.autoRead, preferences.enabled) {
                     onChange(preferences.copy(autoRead = it))
                 }
                 SwitchSettingRow("连续对话", "朗读结束后自动重新聆听；可随时点按打断", preferences.continuous, preferences.enabled && preferences.autoRead) {
                     onChange(preferences.copy(continuous = it))
                 }
-                SwitchSettingRow("识别后自动发送", "关闭时先把识别文字放入输入框", preferences.autoSend, preferences.enabled) {
+                SwitchSettingRow("语音快速回答", "连续语音临时减少思考等待，不改变文字对话设置", preferences.fastReply, preferences.enabled) {
+                    onChange(preferences.copy(fastReply = it))
+                }
+                SwitchSettingRow("单次语音自动发送", "仅用于聊天输入框；连续语音停顿后始终自动发送", preferences.autoSend, preferences.enabled) {
                     onChange(preferences.copy(autoSend = it))
                 }
                 SettingsChoiceRow("中文转写文字", transcriptScriptLabel(preferences.transcriptScript), preferences.enabled) { picker = "transcriptScript" }
                 SettingsChoiceRow("手机兜底语言", voiceLanguageLabel(preferences.language), preferences.enabled) { picker = "phoneLanguage" }
+                SettingsActionRow("手机朗读设置", "安装中文语音包或选择手机发音引擎", preferences.enabled) {
+                    try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    catch (_: ActivityNotFoundException) { testResult = "在手机系统设置中搜索“文字转语音”安装中文语音包" }
+                    catch (_: SecurityException) { testResult = "在手机系统设置中打开“文字转语音”" }
+                }
                 SettingsActionRow("测试手机语音识别", if (testResult.isBlank()) "仅测试 Android 系统服务" else testResult, preferences.enabled, launchTest)
             }
         }
@@ -302,6 +311,7 @@ fun VoiceSettingsScreen(
                 } else {
                     when (target) {
                         "engine" -> onChange(preferences.copy(engine = value))
+                        "noiseSensitivity" -> onChange(preferences.copy(noiseSensitivity = value))
                         "transcriptScript" -> onChange(preferences.copy(transcriptScript = value))
                         "phoneLanguage" -> onChange(preferences.copy(language = value))
                         "sttProvider" -> serverDraft = serverDraft.copy(stt = serverDraft.stt.copy(provider = value, model = defaultSttModel(value)))
@@ -418,8 +428,21 @@ private fun defaultTtsVoice(provider: String): String = when (provider) {
     else -> ""
 }
 
+internal fun voiceSensitivityLabel(value: String): String = when (value) {
+    "quiet" -> "轻声"
+    "noisy" -> "嘈杂"
+    else -> "日常"
+}
+
+internal val voiceSensitivityOptions = listOf(
+    "balanced" to "日常 · 自动适应环境声音",
+    "noisy" to "嘈杂 · 减少背景声误触发，靠近手机说话",
+    "quiet" to "轻声 · 提高收音灵敏度，适合安静环境",
+)
+
 private fun voicePickerTitle(target: String): String = when (target) {
     "engine" -> "语音引擎"
+    "noiseSensitivity" -> "收音环境"
     "transcriptScript" -> "中文转写文字"
     "phoneLanguage" -> "手机兜底语言"
     "sttProvider" -> "STT 服务商"
@@ -433,6 +456,7 @@ private fun voicePickerTitle(target: String): String = when (target) {
 
 private fun voicePickerSelected(target: String, preferences: VoicePreferences, voice: ServerVoiceSettings): String = when (target) {
     "engine" -> preferences.engine
+    "noiseSensitivity" -> preferences.noiseSensitivity
     "transcriptScript" -> preferences.transcriptScript
     "phoneLanguage" -> preferences.language
     "sttProvider" -> voice.stt.provider
@@ -446,6 +470,7 @@ private fun voicePickerSelected(target: String, preferences: VoicePreferences, v
 
 private fun voicePickerOptions(target: String, voice: ServerVoiceSettings): List<Pair<String, String>> {
     val base = when (target) {
+        "noiseSensitivity" -> voiceSensitivityOptions
         "engine" -> listOf(
             "automatic" to "自动（推荐）",
             "agent" to "Hermes Agent",
@@ -560,9 +585,14 @@ fun ChangeLogScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
     SettingsPage("更新日志", "Hermes 移动端版本记录", contentPadding, onBack) {
         if (BuildConfig.VERSION_CODE >= 300) {
             ChangeLogEntry(
+                version = BuildConfig.VERSION_NAME,
+                date = "2026-09-08",
+                current = true,
+                items = listOf("首页女孩恢复平底，与卡片直接衔接", "导航栏下方完整遮挡滚动内容，底部增加任务入口", "移除首页底部重复的任务和文件按钮", "连续语音按环境底噪判断停顿，支持日常、嘈杂、轻声收音", "沿用预览版签名，可覆盖升级 3.1.6 预览版"),
+            )
+            ChangeLogEntry(
                 version = "3.1.1-release",
                 date = "2026-09-07",
-                current = true,
                 items = listOf("首页按参考图重新排版，使用原画中的托腮女孩", "近期事项合并为一张卡片，输入条和导航恢复紧凑样式", "修复键盘弹出时导航占位导致的大块空白", "工作详情使用进度时间线、资料分组和调整/停止操作", "首页附件和语音按钮接入实际会话功能"),
             )
             ChangeLogEntry(
