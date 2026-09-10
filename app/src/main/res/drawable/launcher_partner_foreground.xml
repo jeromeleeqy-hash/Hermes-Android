@@ -1,0 +1,3 @@
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:insetLeft="13%" android:insetTop="13%" android:insetRight="13%" android:insetBottom="13%">
+    <bitmap android:src="@drawable/launcher_partner_art" android:antialias="true" android:filter="true" android:gravity="fill" />
+</inset>

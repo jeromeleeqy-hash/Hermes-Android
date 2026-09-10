@@ -1,5 +1,8 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
@@ -153,14 +156,10 @@ fun HermesMulticolorIcon(
     iconSize: Dp = 24.dp,
     tint: Color? = null,
 ) {
+    val inherited = androidx.compose.material3.LocalContentColor.current
     val effectiveTint = tint ?: when (kind.tone) {
-        HermesIconTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-        HermesIconTone.PRIMARY -> AssistantBlue
-        HermesIconTone.CYAN -> HermesColors.extended.cyan
-        HermesIconTone.VIOLET -> HermesColors.extended.purple
-        HermesIconTone.SUCCESS -> HermesColors.extended.success
-        HermesIconTone.WARNING -> HermesColors.extended.warning
-        HermesIconTone.ERROR -> MaterialTheme.colorScheme.error
+        HermesIconTone.ERROR -> MaterialTheme.colorScheme.error.copy(alpha = inherited.alpha)
+        else -> if (inherited == MaterialTheme.colorScheme.onSurface) MaterialTheme.colorScheme.onSurfaceVariant else inherited
     }
     Image(
         painter = painterResource(kind.drawableRes),
@@ -173,7 +172,7 @@ fun HermesMulticolorIcon(
 @Composable
 fun HermesPinnedMarker(
     modifier: Modifier = Modifier,
-    contentDescription: String? = "已置顶",
+    contentDescription: String? = uiText(R.string.ui_0446, "已置顶"),
     iconSize: Dp = 16.dp,
 ) {
     HermesMulticolorIcon(

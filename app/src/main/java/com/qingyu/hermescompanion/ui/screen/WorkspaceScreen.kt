@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.screen
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,7 +24,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.qingyu.hermescompanion.ui.component.HermesAlertDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -62,8 +66,8 @@ import com.qingyu.hermescompanion.ui.theme.HermesSpacing
 import java.util.Locale
 
 private enum class WorkspaceTab(val label: String) {
-    RECENT("最近产物"),
-    FILES("项目文件"),
+    RECENT(uiText(R.string.ui_1351, "最近产物")),
+    FILES(uiText(R.string.ui_1352, "项目文件")),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,13 +126,13 @@ fun WorkspaceScreen(
     Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding()).then(if (picking) Modifier.navigationBarsPadding() else Modifier)) {
         Column(modifier = Modifier.statusBarsPadding().padding(start = HermesSpacing.page, end = HermesSpacing.page, top = 12.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(if (picking) "选择附件" else "文件与成果",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
-                if (picking) TextButton(onClick=onCancelAttachmentPicker) { Text("取消") }
-                else TextButton(onClick=onChooseProject) { Text("切换项目") }
+                Text(if (picking) uiText(R.string.ui_1353, "选择附件") else uiText(R.string.ui_0618, "文件与成果"),Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
+                if (picking) TextButton(onClick=onCancelAttachmentPicker) { Text(uiText(R.string.ui_0553, "取消")) }
+                else TextButton(onClick=onChooseProject) { Text(uiText(R.string.ui_1354, "切换项目")) }
             }
             Text(state.activeProfile + (listing?.projectName?.let { " · $it" } ?: ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=4.dp,bottom=16.dp))
             if (picking) Text(
-                "点击文件，添加到「${state.workspaceAttachmentTarget?.title?.ifBlank { "当前对话" }}」",
+                uiText(R.string.ui_1355, "点击文件，添加到「%1\$s」", state.workspaceAttachmentTarget?.title?.ifBlank { uiText(R.string.ui_1356, "当前对话") }),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
@@ -150,10 +154,10 @@ fun WorkspaceScreen(
                         enabled = canGoUp && !state.isWorkspaceAttaching,
                         modifier = Modifier.size(40.dp),
                     ) {
-                        HermesMulticolorIcon(HermesIconKind.FOLDER_UP, contentDescription = "返回上级", iconSize = 18.dp)
+                        HermesMulticolorIcon(HermesIconKind.FOLDER_UP, contentDescription = uiText(R.string.ui_1357, "返回上级"), iconSize = 18.dp)
                     }
                     Text(
-                        listing?.path ?: "正在读取工作区…",
+                        listing?.path ?: uiText(R.string.ui_0975, "正在读取工作区…"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -166,7 +170,7 @@ fun WorkspaceScreen(
 
         if (state.isWorkspaceAttaching) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text("正在添加附件…", Modifier.padding(horizontal = HermesSpacing.page, vertical = 8.dp),
+            Text(uiText(R.string.ui_1358, "正在添加附件…"), Modifier.padding(horizontal = HermesSpacing.page, vertical = 8.dp),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
         if (selectedTab == WorkspaceTab.RECENT) {
@@ -195,8 +199,8 @@ fun WorkspaceScreen(
                     CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.2.dp)
                 }
 
-                listing == null -> WorkspaceEmpty(if (picking) "未能打开对话目录，请下拉重试，或从最近产物选择文件" else "未能打开项目目录，请点击上方“切换项目”重新选择")
-                listing.entries.isEmpty() -> WorkspaceEmpty("这个文件夹是空的")
+                listing == null -> WorkspaceEmpty(if (picking) uiText(R.string.ui_1359, "未能打开对话目录，请下拉重试，或从最近产物选择文件") else uiText(R.string.ui_1360, "未能打开项目目录，请点击上方“切换项目”重新选择"))
+                listing.entries.isEmpty() -> WorkspaceEmpty(uiText(R.string.ui_1361, "这个文件夹是空的"))
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 2.dp, bottom = contentPadding.calculateBottomPadding() + 12.dp),
@@ -236,12 +240,12 @@ fun ProfileFileScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onClose) {
-                    HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回")
+                    HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回"))
                 }
                 Column(Modifier.padding(horizontal = 6.dp)) {
-                    Text("Hermes 文件", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(uiText(R.string.ui_1362, "Hermes 文件"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "正在读取 ${state.activeProfile} Profile",
+                        uiText(R.string.ui_1363, "正在读取 %1\$s Profile", state.activeProfile),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -267,7 +271,7 @@ fun ProfileFileScreen(
         sourceArtifact = null,
         onOpenSource = {},
         allowEditing = false,
-        subtitle = "${state.activeProfile} Profile · Hermes 原始文件",
+        subtitle = uiText(R.string.ui_1364, "%1\$s Profile · Hermes 原始文件", state.activeProfile),
     )
 }
 
@@ -282,7 +286,7 @@ private fun RecentArtifactsList(
     enabled: Boolean = true,
 ) {
     if (items.isEmpty()) {
-        WorkspaceEmpty(if (isLoading) "正在整理最近对话产物…" else "对话中生成的文件会出现在这里")
+        WorkspaceEmpty(if (isLoading) uiText(R.string.ui_1365, "正在整理最近对话产物…") else uiText(R.string.ui_1366, "对话中生成的文件会出现在这里"))
         return
     }
     LazyColumn(
@@ -313,7 +317,7 @@ private fun RecentArtifactsList(
                     Column(Modifier.weight(1f).padding(start = 10.dp)) {
                         Text(item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            "${item.kind} · 来自 ${item.sessionTitle}",
+                            uiText(R.string.ui_1367, "%1\$s · 来自 %2\$s", localizedArtifactKind(item.kind), item.sessionTitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -324,7 +328,7 @@ private fun RecentArtifactsList(
                         modifier = Modifier.padding(start = 2.dp).size(48.dp)) {
                         HermesMulticolorIcon(
                             if (picking) HermesIconKind.ADD_OUTLINE else HermesIconKind.SOURCE_CHAT,
-                            contentDescription = if (picking) "添加 ${item.name}" else "返回来源对话",
+                            contentDescription = if (picking) uiText(R.string.ui_1368, "添加 %1\$s", item.name) else uiText(R.string.ui_1369, "返回来源对话"),
                             iconSize = 17.dp,
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -370,13 +374,13 @@ private fun WorkspaceEntryRow(entry: WorkspaceEntry, picking: Boolean = false, e
             Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(entry.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    if (entry.isDirectory) "文件夹" else formatFileSize(entry.size),
+                    if (entry.isDirectory) uiText(R.string.ui_1370, "文件夹") else formatFileSize(entry.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (picking && !entry.isDirectory) HermesMulticolorIcon(HermesIconKind.ADD_OUTLINE,
-                contentDescription = "添加 ${entry.name}", iconSize = 18.dp, tint = MaterialTheme.colorScheme.primary)
+                contentDescription = uiText(R.string.ui_1368, "添加 %1\$s", entry.name), iconSize = 18.dp, tint = MaterialTheme.colorScheme.primary)
 
         }
         HorizontalDivider(
@@ -424,38 +428,38 @@ private fun WorkspaceDocumentScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = closeSafely) {
-                HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回")
+                HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回"))
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 6.dp)) {
                 Text(document.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    if (state.isWorkspaceEditing) "可视化编辑" else subtitle ?: documentPreviewLabel(document),
+                    if (state.isWorkspaceEditing) uiText(R.string.ui_1371, "可视化编辑") else subtitle ?: documentPreviewLabel(document),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (state.isWorkspaceEditing) {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onEditingChange(false) }, enabled = !state.isWorkspaceSaving) { Text("取消") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onEditingChange(false) }, enabled = !state.isWorkspaceSaving) { Text(uiText(R.string.ui_0553, "取消")) }
                 TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onSave, enabled = !state.isWorkspaceSaving) {
                     if (state.isWorkspaceSaving) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
                         HermesMulticolorIcon(HermesIconKind.SAVE, contentDescription = null, iconSize = 17.dp)
-                        Text("保存", modifier = Modifier.padding(start = 3.dp))
+                        Text(uiText(R.string.ui_0936, "保存"), modifier = Modifier.padding(start = 3.dp))
                     }
                 }
             } else {
                 IconButton(onClick = { clipboard.setText(AnnotatedString(document.path)) }, modifier = Modifier.size(38.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.COPY, contentDescription = "复制路径", iconSize = 17.dp)
+                    HermesMulticolorIcon(HermesIconKind.COPY, contentDescription = uiText(R.string.ui_1372, "复制路径"), iconSize = 17.dp)
                 }
                 IconButton(onClick = onShare, modifier = Modifier.size(38.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.SHARE, contentDescription = "系统分享", iconSize = 17.dp)
+                    HermesMulticolorIcon(HermesIconKind.SHARE, contentDescription = uiText(R.string.ui_1373, "系统分享"), iconSize = 17.dp)
                 }
                 IconButton(onClick = { exportLauncher.launch(document.name) }, modifier = Modifier.size(38.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.DOWNLOAD, contentDescription = "保存到手机", iconSize = 17.dp)
+                    HermesMulticolorIcon(HermesIconKind.DOWNLOAD, contentDescription = uiText(R.string.ui_1374, "保存到手机"), iconSize = 17.dp)
                 }
                 if (isMarkdown && allowEditing) IconButton(onClick = { onEditingChange(true) }, modifier = Modifier.size(38.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.DOCUMENT_EDIT, contentDescription = "编辑", iconSize = 17.dp)
+                    HermesMulticolorIcon(HermesIconKind.DOCUMENT_EDIT, contentDescription = uiText(R.string.ui_1314, "编辑"), iconSize = 17.dp)
                 }
             }
         }
@@ -470,10 +474,10 @@ private fun WorkspaceDocumentScreen(
                 Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     HermesMulticolorIcon(HermesIconKind.SOURCE_CHAT, contentDescription = null, iconSize = 17.dp)
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("来自 ${sourceArtifact.sessionTitle}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("点击返回生成这份文件的消息", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(uiText(R.string.ui_1375, "来自 %1\$s", sourceArtifact.sessionTitle), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(uiText(R.string.ui_1376, "点击返回生成这份文件的消息"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    HermesMulticolorIcon(HermesIconKind.CHEVRON_RIGHT, contentDescription = "查看来源会话", iconSize = 17.dp)
+                    HermesMulticolorIcon(HermesIconKind.CHEVRON_RIGHT, contentDescription = uiText(R.string.ui_1377, "查看来源会话"), iconSize = 17.dp)
                 }
             }
         }
@@ -522,10 +526,10 @@ private fun WorkspaceDocumentScreen(
     if (showDiscard) {
         AlertDialog(
             onDismissRequest = { showDiscard = false },
-            title = { Text("放弃未保存的修改？") },
-            text = { Text("返回后，本次对文档的修改不会保存。") },
-            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false; onClose() }) { Text("放弃") } },
-            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false }) { Text("继续编辑") } },
+            title = { Text(uiText(R.string.ui_0754, "放弃未保存的修改？")) },
+            text = { Text(uiText(R.string.ui_1378, "返回后，本次对文档的修改不会保存。")) },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false; onClose() }) { Text(uiText(R.string.ui_1379, "放弃")) } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showDiscard = false }) { Text(uiText(R.string.ui_0756, "继续编辑")) } },
         )
     }
 }
@@ -575,25 +579,31 @@ private val WorkspaceDocument.isPdf: Boolean
         path.endsWith(".pdf", true)
 
 private fun documentPreviewLabel(document: WorkspaceDocument): String = when {
-    document.isMarkdown -> "Markdown 预览"
-    document.isHtml -> "安全 HTML 预览"
-    document.isPdf -> "PDF 预览"
-    else -> "文本预览"
+    document.isMarkdown -> uiText(R.string.ui_1380, "Markdown 预览")
+    document.isHtml -> uiText(R.string.ui_1381, "安全 HTML 预览")
+    document.isPdf -> uiText(R.string.ui_1382, "PDF 预览")
+    else -> uiText(R.string.ui_1383, "文本预览")
 }
 
 private fun resolveMarkdownImageSource(documentPath: String, source: String): String {
     val clean = source.trim()
-    if (clean.startsWith("data:", true) || clean.startsWith("http://", true) || clean.startsWith("https://", true) || clean.startsWith('/')) {
+    if (clean.startsWith("data:", true) || clean.startsWith("http://", true) || clean.startsWith("https://", true) || com.qingyu.hermescompanion.data.isAbsoluteRemotePath(clean)) {
         return clean
     }
-    val parent = documentPath.substringBeforeLast('/', "")
-    return if (parent.isBlank()) clean.removePrefix("./") else "$parent/${clean.removePrefix("./")}" 
+    val parent = com.qingyu.hermescompanion.data.remoteParentPath(documentPath)
+    return if (parent.isBlank()) clean.removePrefix("./") else com.qingyu.hermescompanion.data.joinServerPath(parent, clean.removePrefix("./")) 
 }
 
 private fun formatFileSize(bytes: Long?): String {
-    if (bytes == null) return "文件"
+    if (bytes == null) return uiText(R.string.ui_0064, "文件")
     if (bytes < 1024) return "$bytes B"
     val kib = bytes / 1024.0
     if (kib < 1024) return String.format(Locale.getDefault(), "%.1f KB", kib)
     return String.format(Locale.getDefault(), "%.1f MB", kib / 1024.0)
+}
+
+private fun localizedArtifactKind(kind: String): String = when (kind) {
+    "图片", "Image" -> uiText(R.string.ui_0057, "图片")
+    "文件", "File" -> uiText(R.string.ui_0064, "文件")
+    else -> kind
 }

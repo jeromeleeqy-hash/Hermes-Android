@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.screen
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -32,7 +36,7 @@ internal fun WorkProgress(todos:List<ChatTodo>, tools:List<ToolActivity>) {
                     Column(Modifier.weight(1f).padding(start=16.dp,bottom=if(i==steps.lastIndex)0.dp else 22.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(title,fontSize=16.sp,lineHeight=23.sp,fontWeight=FontWeight.Medium)
                         if(detail.isNotBlank()) Text(detail,fontSize=13.sp,lineHeight=20.sp,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        if(status==-1) Text("本步未完成",fontSize=12.sp,color=MaterialTheme.colorScheme.error)
+                        if(status==-1) Text(uiText(R.string.ui_1350, "本步未完成"),fontSize=12.sp,color=MaterialTheme.colorScheme.error)
                     }
                 }
             }

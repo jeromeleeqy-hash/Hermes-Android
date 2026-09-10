@@ -15,15 +15,16 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.qingyu.hermescompanion"
+        // Retain the installed preview identity when producing its stable upgrade.
+        applicationId = if (hermesPreview) "com.qingyu.hermescompanion.preview" else "com.qingyu.hermescompanion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 320
-        versionName = "3.2.0"
+        versionCode = 365
+        versionName = "3.6.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        manifestPlaceholders["hermesAppLabel"] = if (hermesPreview) "Hermes 预览" else "Hermes"
+        manifestPlaceholders["hermesAppLabel"] = "Hermes"
     }
 
     signingConfigs {
@@ -39,8 +40,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = if (hermesPreview) ".preview" else ".debug"
+            applicationIdSuffix = if (hermesPreview) "" else ".debug"
             versionNameSuffix = if (hermesPreview) "-preview" else "-debug"
+            manifestPlaceholders["hermesAppLabel"] = if (hermesPreview) "Hermes Preview" else "Hermes Debug"
             signingConfigs.findByName("stableDebug")?.let { signingConfig = it }
             // Keep the installable build in one DEX for compatibility with OEM runtimes.
             // Resource shrinking stays disabled while the new icon system is being verified.
@@ -52,7 +54,9 @@ android {
             )
         }
         release {
-            isMinifyEnabled = false
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = false
             signingConfigs.findByName("stableDebug")?.let { signingConfig = it }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -73,6 +77,8 @@ android {
         buildConfig = true
     }
 
+    androidResources { noCompress += "mp4" }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -91,6 +97,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
 
     implementation(platform("androidx.compose:compose-bom:2026.06.00"))
+    implementation("io.github.kyant0:backdrop:1.0.6")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")

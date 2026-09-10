@@ -1,0 +1,5 @@
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/launcher_sprite_background" />
+    <foreground android:drawable="@drawable/launcher_sprite_foreground" />
+    <monochrome android:drawable="@drawable/launcher_headphones_mono" />
+</adaptive-icon>

@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.data
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -21,7 +25,7 @@ object AttachmentReader {
 
     fun read(resolver: ContentResolver, uri: Uri): PendingAttachment {
         val mimeType = resolver.getType(uri) ?: "application/octet-stream"
-        val name = queryName(resolver, uri) ?: "附件"
+        val name = queryName(resolver, uri) ?: uiText(R.string.ui_0051, "附件")
 
         return when {
             mimeType.startsWith("image/") -> {
@@ -42,7 +46,7 @@ object AttachmentReader {
                 )
             }
 
-            else -> error("首版暂不支持 $name；目前支持图片和常见文本文件")
+            else -> error(uiText(R.string.ui_0052, "首版暂不支持 %1\$s；目前支持图片和常见文本文件", name))
         }
     }
 
@@ -62,7 +66,7 @@ object AttachmentReader {
 
     private fun readLimited(resolver: ContentResolver, uri: Uri, limit: Int): ByteArray {
         resolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "无法读取所选文件" }
+            requireNotNull(input) { uiText(R.string.ui_0053, "无法读取所选文件") }
             val output = ByteArrayOutputStream()
             val buffer = ByteArray(16 * 1024)
             var total = 0
@@ -70,7 +74,7 @@ object AttachmentReader {
                 val count = input.read(buffer)
                 if (count < 0) break
                 total += count
-                require(total <= limit) { "文件过大，请选择更小的文件" }
+                require(total <= limit) { uiText(R.string.ui_0054, "文件过大，请选择更小的文件") }
                 output.write(buffer, 0, count)
             }
             return output.toByteArray()

@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.screen
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -65,7 +69,7 @@ fun SessionSearchScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回")
+                HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回"))
             }
             GlassPanel(
                 modifier = Modifier.weight(1f).padding(start = 4.dp),
@@ -86,14 +90,14 @@ fun SessionSearchScreen(
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp).focusRequester(focusRequester),
                         decorationBox = { inner ->
                             if (query.isBlank()) {
-                                Text("搜索对话", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(uiText(R.string.ui_0613, "搜索对话"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             inner()
                         },
                     )
                     if (query.isNotBlank()) {
                         IconButton(onClick = { query = "" }, modifier = Modifier.size(32.dp)) {
-                            HermesMulticolorIcon(HermesIconKind.CLOSE, contentDescription = "清空", iconSize = 15.dp)
+                            HermesMulticolorIcon(HermesIconKind.CLOSE, contentDescription = uiText(R.string.ui_0949, "清空"), iconSize = 15.dp)
                         }
                     }
                 }
@@ -101,9 +105,9 @@ fun SessionSearchScreen(
         }
 
         when {
-            query.trim().length < 2 -> SearchHint("输入至少两个字符，可搜索最近 100 个对话的消息内容")
-            state.searchResults.isEmpty() && state.isSearchLoading -> SearchHint("正在搜索消息内容…")
-            state.searchResults.isEmpty() -> SearchHint("没有匹配的对话或消息")
+            query.trim().length < 2 -> SearchHint(uiText(R.string.ui_0950, "输入至少两个字符，可搜索最近 100 个对话的消息内容"))
+            state.searchResults.isEmpty() && state.isSearchLoading -> SearchHint(uiText(R.string.ui_0951, "正在搜索消息内容…"))
+            state.searchResults.isEmpty() -> SearchHint(uiText(R.string.ui_0952, "没有匹配的对话或消息"))
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(top = 5.dp),
                 contentPadding = PaddingValues(bottom = 20.dp),
@@ -111,7 +115,7 @@ fun SessionSearchScreen(
                 if (state.isSearchLoading) {
                     item(key = "searching") {
                         Text(
-                            "正在继续搜索完整消息…",
+                            uiText(R.string.ui_0953, "正在继续搜索完整消息…"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 8.dp),
@@ -149,14 +153,14 @@ private fun SearchResultRow(result: SessionSearchResult, onClick: (SessionSearch
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (result.matchedMessage) {
                     Text(
-                        "消息",
+                        uiText(R.string.ui_0954, "消息"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 6.dp),
                     )
                 }
                 Text(
-                    result.snippet.ifBlank { session.preview.ifBlank { "暂无内容摘要" } },
+                    com.qingyu.hermescompanion.ui.format.conversationPreview(result.snippet.ifBlank { session.preview }).ifBlank { uiText(R.string.ui_0955, "暂无内容摘要") },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

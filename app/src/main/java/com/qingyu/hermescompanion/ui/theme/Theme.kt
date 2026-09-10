@@ -28,29 +28,36 @@ data class HermesSkinTokens(
     val menuRadius: Int,
     val selectedFillAlpha: Float,
     val iconWellAlpha: Float,
+    val sheetRadius: Int = 24,
+    val dockRadius: Int = 28,
 )
 
-/**
- * Hermes now ships one focused interface language.  The token name is kept
- * compatible with the old preference model, but every screen receives these
- * assistant workspace tokens regardless of the legacy skin value.
- */
-private val OfficeSkin = HermesSkinTokens(
-    mode = SkinMode.CLEAN,
-    glass = false,
-    panelAlpha = 1f,
-    chromeAlpha = 1f,
-    shadowElevation = 0,
-    borderAlpha = .45f,
-    ambientStrength = 0f,
-    panelRadius = 20,
-    controlRadius = 16,
-    menuRadius = 16,
-    selectedFillAlpha = 1f,
-    iconWellAlpha = 1f,
+private val WarmSkin = HermesSkinTokens(
+    mode = SkinMode.CLEAN, glass = false, panelAlpha = 1f, chromeAlpha = 1f,
+    shadowElevation = 0, borderAlpha = 0f, ambientStrength = 0f,
+    panelRadius = 22, controlRadius = 16, menuRadius = 20,
+    selectedFillAlpha = 1f, iconWellAlpha = 1f,
+)
+private val LiquidGlassSkin = HermesSkinTokens(
+    mode = SkinMode.GLASS, glass = true, panelAlpha = 1f, chromeAlpha = .72f,
+    shadowElevation = 0, borderAlpha = .32f, ambientStrength = 0f,
+    panelRadius = 20, controlRadius = 12, menuRadius = 16,
+    selectedFillAlpha = .64f, iconWellAlpha = .72f,
+)
+private val PaperSkin = HermesSkinTokens(
+    mode = SkinMode.PAPER, glass = false, panelAlpha = 1f, chromeAlpha = 1f,
+    shadowElevation = 0, borderAlpha = .20f, ambientStrength = 0f,
+    panelRadius = 2, controlRadius = 8, menuRadius = 14,
+    selectedFillAlpha = .86f, iconWellAlpha = .72f,
 )
 
-val LocalHermesSkin = staticCompositionLocalOf { OfficeSkin }
+private fun skinTokens(mode: SkinMode) = when (mode) {
+    SkinMode.CLEAN -> WarmSkin
+    SkinMode.GLASS -> LiquidGlassSkin
+    SkinMode.PAPER -> PaperSkin
+}
+
+val LocalHermesSkin = staticCompositionLocalOf { WarmSkin }
 
 object HermesSkin {
     val current: HermesSkinTokens
@@ -128,79 +135,54 @@ object HermesSpacing {
     val minTouchTarget = 48.dp
 }
 
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF007AC5),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFE4F3FF),
-    onPrimaryContainer = Color(0xFF0078AD),
-    secondary = Color(0xFF7567E8),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF0ECFF),
-    onSecondaryContainer = Color(0xFF47359A),
-    tertiary = Color(0xFF16A7A0),
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFE4F6F5),
-    onTertiaryContainer = Color(0xFF08645F),
-    background = Color(0xFFF7FBFF),
-    onBackground = Color(0xFF161C2C),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF161C2C),
-    surfaceDim = Color(0xFFEAF2F8),
-    surfaceBright = Color(0xFFFFFFFF),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF8FCFF),
-    surfaceContainer = Color(0xFFF1F8FD),
-    surfaceContainerHigh = Color(0xFFEAF4FB),
-    surfaceContainerHighest = Color(0xFFE0EEF7),
-    surfaceVariant = Color(0xFFEFF7FC),
-    onSurfaceVariant = Color(0xFF606D7F),
-    outline = Color(0xFF9AA1AC),
-    outlineVariant = Color(0xFFDDEBF4),
-    error = Color(0xFFE25464),
-    errorContainer = Color(0xFFFFE8EB),
-    onErrorContainer = Color(0xFF6D2630),
-)
-
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF5AB3EE),
-    onPrimary = Color(0xFF07324C),
-    primaryContainer = Color(0xFF234B67),
-    onPrimaryContainer = Color(0xFFD8F0FF),
-    secondary = Color(0xFFA995FF),
-    onSecondary = Color(0xFF2E1D69),
-    secondaryContainer = Color(0xFF342D5A),
-    onSecondaryContainer = Color(0xFFEAE4FF),
-    tertiary = Color(0xFF39C6BC),
-    onTertiary = Color(0xFF003735),
-    tertiaryContainer = Color(0xFF173D3D),
-    onTertiaryContainer = Color(0xFFB5F0EB),
-    background = Color(0xFF0E1621),
-    onBackground = Color(0xFFF3F5F9),
-    surface = Color(0xFF17212B),
-    onSurface = Color(0xFFF3F5F9),
-    surfaceDim = Color(0xFF101923),
-    surfaceBright = Color(0xFF2B3946),
-    surfaceContainerLowest = Color(0xFF0E1621),
-    surfaceContainerLow = Color(0xFF111B25),
-    surfaceContainer = Color(0xFF17212B),
-    surfaceContainerHigh = Color(0xFF1E2A35),
-    surfaceContainerHighest = Color(0xFF273440),
-    surfaceVariant = Color(0xFF1E2A35),
-    onSurfaceVariant = Color(0xFFB7C0CF),
-    outline = Color(0xFF7E899A),
-    outlineVariant = Color(0xFF343C4A),
-    error = Color(0xFFFFB2B8),
-    errorContainer = Color(0xFF68282E),
-    onErrorContainer = Color(0xFFFFDADC),
-)
-
-private val OfficeShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(24.dp),
-)
+/** Every role is paired with its foreground; no palette inherits blue/purple controls. */
+internal fun hermesColorScheme(mode: SkinMode, dark: Boolean): androidx.compose.material3.ColorScheme {
+    val paper = mode == SkinMode.PAPER
+    val warm = mode == SkinMode.CLEAN
+    val accent = when {
+        paper && dark -> Color(0xFFE2E0DA)
+        paper -> Color(0xFF30332F)
+        warm && dark -> Color(0xFFA7CDB7)
+        warm -> Color(0xFF3F6B57)
+        dark -> Color(0xFFA3C7FF)
+        else -> Color(0xFF275FA8)
+    }
+    val bg = when {
+        paper && dark -> Color(0xFF171817)
+        paper -> Color(0xFFFAF9F5)
+        warm && dark -> Color(0xFF161C19)
+        warm -> Color(0xFFF4F6F2)
+        dark -> Color(0xFF141820)
+        else -> Color(0xFFF4F6FA)
+    }
+    val surface = when { paper -> bg; dark && warm -> Color(0xFF212B25); dark -> Color(0xFF222933); else -> Color.White }
+    val ink = if (dark) Color(0xFFF1F2F0) else Color(0xFF202725)
+    val secondaryInk = if (dark) Color(0xFFB8C1BD) else Color(0xFF626E69)
+    val line = if (dark) Color(0xFF3C4641) else Color(0xFFDDE3DE)
+    val well = when { dark && !paper && !warm -> Color(0xFF2C3949); dark -> Color(0xFF303A35); paper -> Color(0xFFF0F0E9); warm -> Color(0xFFEBF0EA); else -> Color(0xFFECF0F6) }
+    val active = when { dark && paper -> Color(0xFF3C403A); dark && warm -> Color(0xFF304C3D); dark -> Color(0xFF284262); paper -> Color(0xFFE9ECE5); warm -> Color(0xFFE1EDE2); else -> Color(0xFFE1ECFB) }
+    val scheme = if (dark) darkColorScheme() else lightColorScheme()
+    return scheme.copy(
+        primary = accent, onPrimary = if (dark) Color(0xFF17261C) else Color.White,
+        primaryContainer = active, onPrimaryContainer = accent,
+        secondary = accent, onSecondary = if (dark) Color(0xFF17261C) else Color.White,
+        secondaryContainer = well, onSecondaryContainer = accent,
+        tertiary = accent, onTertiary = if (dark) Color(0xFF17261C) else Color.White,
+        tertiaryContainer = active, onTertiaryContainer = accent,
+        background = bg, onBackground = ink, surface = surface, onSurface = ink,
+        surfaceDim = bg, surfaceBright = surface, surfaceTint = Color.Transparent,
+        surfaceContainerLowest = surface, surfaceContainerLow = bg,
+        surfaceContainer = well, surfaceContainerHigh = well, surfaceContainerHighest = active,
+        surfaceVariant = well, onSurfaceVariant = secondaryInk,
+        outline = secondaryInk, outlineVariant = line,
+        inverseSurface = ink, inverseOnSurface = bg, inversePrimary = if (dark) accent else active,
+        error = if (dark) Color(0xFFFFB4AB) else Color(0xFFAE3F42),
+        onError = if (dark) Color(0xFF601410) else Color.White,
+        errorContainer = if (dark) Color(0xFF542B2D) else Color(0xFFFBEAEC),
+        onErrorContainer = if (dark) Color(0xFFFFDAD6) else Color(0xFF772A2D),
+        scrim = Color(0xFF101923),
+    )
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -215,17 +197,32 @@ fun HermesCompanionTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
+    val colors = hermesColorScheme(skinMode, darkTheme)
+    val skin = skinTokens(skinMode)
+    val extended = (if (darkTheme) DarkExtendedColors else LightExtendedColors).copy(
+        infoContainer = colors.primaryContainer, onInfoContainer = colors.primary,
+        cyan = colors.primary, cyanContainer = colors.primaryContainer,
+        purple = colors.primary, purpleContainer = colors.secondaryContainer,
+    )
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.foundation.LocalIndication provides HermesPressIndication,
         androidx.compose.material3.LocalRippleConfiguration provides null,
-        LocalHermesSkin provides OfficeSkin,
-        LocalHermesExtendedColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors,
+        LocalHermesSkin provides skin,
+        LocalHermesExtendedColors provides extended,
     ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = colors,
             typography = HermesTypography,
-            shapes = OfficeShapes,
-            content = content,
+            shapes = Shapes(
+                extraSmall = RoundedCornerShape(skin.controlRadius.dp),
+                small = RoundedCornerShape(skin.controlRadius.dp),
+                medium = RoundedCornerShape(skin.panelRadius.dp),
+                large = RoundedCornerShape(skin.panelRadius.dp),
+                extraLarge = RoundedCornerShape(skin.menuRadius.dp),
+            ),
+            content = { androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides colors.onSurface,
+            ) { content() } },
         )
     }
 }

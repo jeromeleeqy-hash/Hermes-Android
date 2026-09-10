@@ -1,0 +1,444 @@
+{
+  "version": "3.6.3",
+  "version_code": 363,
+  "build_type": "release",
+  "debuggable": false,
+  "application_label": "Hermes",
+  "application_id": "com.qingyu.hermescompanion.preview",
+  "same_identity_as_3_6_2": true,
+  "signer_sha256": "741c1844bb9267547e06af30d56c0da5bfcbf01491d3670496d88837a2860ad6",
+  "apk_sha256": "76a9e92feae7f4dd479216ce46890a09b6259320178296beb22c1c91c6743db1",
+  "apk_bytes": 55359496,
+  "signature_v2": "passed",
+  "zip_crc": "passed",
+  "zipalign_16k": "passed",
+  "dex_entries": [
+    "classes.dex"
+  ],
+  "dex_headers": "passed",
+  "string_pairs": 1428,
+  "bilingual_history_entries": 64,
+  "guide_categories": 6,
+  "guide_articles": 19,
+  "intro_bytes": 2020726,
+  "intro_packaged_without_zip_compression": true,
+  "tests": {
+    "tests": 295,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "suite": "com.qingyu.hermescompanion.assistant.AssistantRecordsTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.assistant.AssistantRepositoryTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.assistant.AssistantUiTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.assistant.DailyConversationTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.ArtifactFilesTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.AudioFileRequestBodyTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.ChatInsightsTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.ConcurrentGatewayTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.DailyConversationApiTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.HermesApiClientTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.ProfileWorkspaceTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.ReleaseHistory362Test",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.RemotePaths361Test",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.SessionRoutingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.VoiceDraftStoreTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.data.VoiceTurnPolicyTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.i18n.Language361Test",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.ArtifactIndexStoreTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.AvatarCropTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.AvatarStorageTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.DailyConversationBindingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.SkinPreferencesTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.UiPreferences360Test",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.storage.VoiceTranscriptCommitTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.AvatarProfileTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.ChatCitationsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.ChatLinksTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.ChineseScriptNormalizerTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.ConcurrentSessionsTest",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.CouncilModeTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.CouncilTranscriptTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.SessionSearchTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.StreamRecoveryTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.VoiceCompatibilityTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.VoiceInputRoutingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.format.ConversationPreviewTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.format.ProjectSelectionTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.format.SessionFilteringTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.format.TimeFormattingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.format.TitleFormattingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.AgentRequestUiTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.AssistantLayoutTest",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.ChatScrollingTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.Onboarding363Test",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.ProfileAvatarCropTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.ProfileDisplayTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.SkinRedesignTest",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.UiRefinement362Test",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.UiRefinement363Test",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.UiUpgrade360Test",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.screen.UiUpgrade361Test",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.qingyu.hermescompanion.ui.theme.SkinColorTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "ui_captures": [
+    "363-chat-menu-glass.png",
+    "363-edit-identity-CLEAN.png",
+    "363-edit-identity-GLASS.png",
+    "363-edit-identity-PAPER.png",
+    "363-gateway-CLEAN.png",
+    "363-gateway-GLASS.png",
+    "363-gateway-PAPER.png",
+    "363-gateway-settings-en.png",
+    "363-gateway-settings-glass-dark-en.png",
+    "363-guide-article.png",
+    "363-guide-category.png",
+    "363-guide-index.png",
+    "363-guide-voice-en.png",
+    "363-home-CLEAN-en-780.png",
+    "363-home-CLEAN-en-844.png",
+    "363-home-CLEAN-zh-780.png",
+    "363-home-CLEAN-zh-844.png",
+    "363-home-GLASS-en-780.png",
+    "363-home-GLASS-en-844.png",
+    "363-home-GLASS-zh-780.png",
+    "363-home-GLASS-zh-844.png",
+    "363-home-PAPER-en-780.png",
+    "363-home-PAPER-en-844.png",
+    "363-home-PAPER-zh-780.png",
+    "363-home-PAPER-zh-844.png",
+    "363-identity-CLEAN.png",
+    "363-identity-GLASS.png",
+    "363-identity-PAPER.png",
+    "363-intro-poster.png",
+    "363-sessions-glass-padding.png",
+    "361-footer-HOME-background.png",
+    "361-footer-HOME.png",
+    "361-footer-SESSIONS-background.png",
+    "361-footer-SESSIONS.png",
+    "361-footer-SETTINGS-background.png",
+    "361-footer-SETTINGS.png",
+    "361-footer-TASKS-background.png",
+    "361-footer-TASKS.png",
+    "361-footer-WORKSPACE-background.png",
+    "361-footer-WORKSPACE.png"
+  ],
+  "limits": [
+    "No physical Android phone was attached. Continuous voice foreground lifecycle and flag restoration were tested with Robolectric, not with an OEM screen timeout.",
+    "The welcome clip was inspected and its packaged format verified; physical-device MediaPlayer decoding and live glass optics were not exercised.",
+    "Existing Windows-path parsing and networking regression tests passed; no live Windows Hermes server was connected."
+  ]
+}

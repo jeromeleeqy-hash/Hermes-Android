@@ -1,0 +1,42 @@
+{
+  "baseline": "Hermes-3.4.0-source.zip",
+  "modified": [
+    "README.md",
+    "app/build.gradle.kts",
+    "app/src/main/java/com/qingyu/hermescompanion/assistant/ReminderAlarms.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/data/HermesApiClient.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/storage/SecureConfigStore.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/HermesApp.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/HermesViewModel.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/screen/AssistantHomeScreen.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/screen/ChatScreen.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/screen/SettingsScreens.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/screen/ShareToHermesDialog.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/assistant/AssistantUiTest.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/ui/ConcurrentSessionsTest.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/ui/screen/AssistantLayoutTest.kt",
+    "docs/ASSISTANT-PROTOCOL.md",
+    "docs/DESKTOP-WORKSPACE.md",
+    "docs/USE-AND-DEPLOY-3.4.md",
+    "docs/VALIDATION-3.4.md"
+  ],
+  "added": [
+    "app/src/main/java/com/qingyu/hermescompanion/assistant/DailyConversation.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/ui/component/VoiceRecoveryBar.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/assistant/DailyConversationTest.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/data/DailyConversationApiTest.kt",
+    "app/src/test/java/com/qingyu/hermescompanion/storage/DailyConversationBindingTest.kt",
+    "docs/USE-AND-DEPLOY-3.4.1.md",
+    "docs/VALIDATION-3.4.1.md",
+    "docs/validation-3.4.1/apk-metadata.txt",
+    "docs/validation-3.4.1/apk-signature.txt",
+    "docs/validation-3.4.1/daily-home-320.png",
+    "docs/validation-3.4.1/daily-home-dark-large-320.png",
+    "docs/validation-3.4.1/daily-share-320.png",
+    "docs/validation-3.4.1/test-summary.json"
+  ],
+  "removed": [
+    "app/src/main/java/com/qingyu/hermescompanion/assistant/AssistantController.kt",
+    "app/src/main/java/com/qingyu/hermescompanion/assistant/AssistantUi.kt"
+  ]
+}

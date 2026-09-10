@@ -1,16 +1,21 @@
 package com.qingyu.hermescompanion.ui.format
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-enum class SessionTimeFilter(val label: String, val maxAgeSeconds: Long?) {
-    ALL("全部时间", null),
-    TODAY("今天", 0),
-    SEVEN_DAYS("近 7 天", 7 * 24 * 60 * 60),
-    THIRTY_DAYS("近 30 天", 30 * 24 * 60 * 60),
+enum class SessionTimeFilter(private val labelProvider: () -> String, val maxAgeSeconds: Long?) {
+    ALL({ uiText(R.string.ui_0480, "全部时间") }, null),
+    TODAY({ uiText(R.string.ui_0477, "今天") }, 0),
+    SEVEN_DAYS({ uiText(R.string.ui_0481, "近 7 天") }, 7 * 24 * 60 * 60),
+    THIRTY_DAYS({ uiText(R.string.ui_0482, "近 30 天") }, 30 * 24 * 60 * 60);
+    val label: String get() = labelProvider()
 }
 
 fun sessionMatchesTime(

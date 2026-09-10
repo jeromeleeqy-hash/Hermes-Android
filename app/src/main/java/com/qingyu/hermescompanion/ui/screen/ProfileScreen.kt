@@ -1,4 +1,15 @@
 package com.qingyu.hermescompanion.ui.screen
+import com.qingyu.hermescompanion.ui.component.HermesRadioButton as RadioButton
+
+
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
+import com.qingyu.hermescompanion.ui.component.hermesWell
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,6 +19,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
@@ -44,11 +56,11 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Button
+import com.qingyu.hermescompanion.ui.component.HermesButton as Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import com.qingyu.hermescompanion.ui.component.HermesModalBottomSheet as ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
@@ -79,6 +91,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.ui.AppUiState
 import com.qingyu.hermescompanion.ui.ThemeMode
+import com.qingyu.hermescompanion.ui.SkinMode
 import com.qingyu.hermescompanion.model.UserProfilePreferences
 import com.qingyu.hermescompanion.storage.AvatarCropSpec
 import com.qingyu.hermescompanion.storage.AvatarTarget
@@ -106,6 +119,7 @@ fun ProfileScreen(
     onOpenSettings: () -> Unit,
     onBackToProfile: () -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
+    onSkinChange: (SkinMode) -> Unit,
     onConnectionSettings: () -> Unit,
     onNotificationSettings: () -> Unit,
     onVoiceSettings: () -> Unit,
@@ -121,7 +135,12 @@ fun ProfileScreen(
     onUpdateUserAvatar: (Uri, AvatarCropSpec) -> Unit,
     onAbout: () -> Unit,
     onChangeLog: () -> Unit,
+    onReduceMotionChange: (Boolean) -> Unit = {},
+    onLanguageChange: (com.qingyu.hermescompanion.i18n.AppLanguageMode) -> Unit = {},
+    onReplayIntro: () -> Unit = {},
+    onLauncherIconChange: (com.qingyu.hermescompanion.appearance.LauncherIcon) -> Unit = {},
 ) {
+    var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var pane by remember(showSettings) {
         mutableStateOf(if (showSettings) ProfilePane.SETTINGS else ProfilePane.HOME)
@@ -186,6 +205,7 @@ fun ProfileScreen(
                 ProfilePane.SETTINGS -> ProfileSettingsListContent(
                     onBack = onBackToProfile,
                     onTheme = { showThemePicker = true },
+                    onLanguage = { showLanguagePicker = true },
                     onConnectionSettings = onConnectionSettings,
                     onNotificationSettings = onNotificationSettings,
                     onVoiceSettings = onVoiceSettings,
@@ -198,7 +218,9 @@ fun ProfileScreen(
                     onChangeLog = onChangeLog,
                     onAbout = onAbout,
                 )
-                ProfilePane.GUIDE -> ProfileGuideContent(
+                ProfilePane.GUIDE -> OperationGuideScreen(
+                    contentPadding = PaddingValues(bottom = LocalProfileDockInset.current),
+                    onReplayIntro = onReplayIntro,
                     onBack = { pane = if (showSettings) ProfilePane.SETTINGS else ProfilePane.HOME },
                 )
             }
@@ -239,6 +261,9 @@ fun ProfileScreen(
         )
     }
 
+    if (showLanguagePicker) {
+        com.qingyu.hermescompanion.ui.component.LanguagePicker(state.languageMode, onLanguageChange) { showLanguagePicker = false }
+    }
     if (showThemePicker) {
         ModalBottomSheet(
             onDismissRequest = { showThemePicker = false },
@@ -246,19 +271,44 @@ fun ProfileScreen(
                 topStart = 20.dp,
                 topEnd = 20.dp,
             ),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (state.skinMode == SkinMode.GLASS) .92f else 1f),
             tonalElevation = 0.dp,
         ) {
-            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 28.dp)) {
-                Text("外观", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+                Text(uiText(R.string.ui_0843, "外观"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "选择浅色、深色或跟随系统",
+                    uiText(R.string.ui_0844, "选择界面材质与颜色模式"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp, bottom = 12.dp),
                 )
-                Text("颜色模式", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 7.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(uiText(R.string.ui_0845, "界面皮肤"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 7.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    SkinMode.entries.forEach { skin ->
+                        val (name, description) = when (skin) {
+                            SkinMode.GLASS -> uiText(R.string.ui_0846, "液态玻璃") to uiText(R.string.ui_0847, "清晰内容 · 透光导航与弹层")
+                            SkinMode.CLEAN -> uiText(R.string.ui_0848, "温暖灵动") to uiText(R.string.ui_0849, "柔和卡片 · 鼠尾草绿")
+                            SkinMode.PAPER -> uiText(R.string.ui_0850, "安静耐看") to uiText(R.string.ui_0851, "留白与细线 · 专注阅读")
+                        }
+                        Surface(
+                            onClick = { onSkinChange(skin) },
+                            shape = MaterialTheme.shapes.large,
+                            color = if (state.skinMode == skin) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.dp, if (state.skinMode == skin) MaterialTheme.colorScheme.primary.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f)),
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                com.qingyu.hermescompanion.ui.component.SkinPreview(skin)
+                                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                                    Text(name, fontWeight = FontWeight.SemiBold)
+                                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (state.skinMode == skin) HermesMulticolorIcon(HermesIconKind.CHECK, uiText(R.string.ui_0852, "已选择"), iconSize = 20.dp)
+                            }
+                        }
+                    }
+                }
+                Text(uiText(R.string.ui_0853, "颜色模式"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 18.dp, bottom = 7.dp))
+                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     ThemeMode.entries.forEach { mode ->
                         ThemeChoice(
                             mode = mode,
@@ -268,6 +318,12 @@ fun ProfileScreen(
                         )
                     }
                 }
+                com.qingyu.hermescompanion.ui.component.LauncherIconChoices(state.launcherIcon, state.isIconChanging, onLauncherIconChange)
+                Spacer(Modifier.height(20.dp))
+                com.qingyu.hermescompanion.ui.component.SettingsToggle(
+                    uiText(R.string.ui_0854, "减少动态效果"), uiText(R.string.ui_0855, "使用静态人物，减少页面过渡"), state.reduceMotion,
+                    onCheckedChange = onReduceMotionChange, horizontalPadding = 0,
+                )
             }
         }
     }
@@ -290,8 +346,8 @@ private fun ProfileHomeContent(
     onSoul: () -> Unit,
     onGuide: () -> Unit,
 ) {
-    val displayName = state.userProfile.displayName.ifBlank { state.username.ifBlank { "Hermes 用户" } }
-    val bio = state.userProfile.bio.ifBlank { "个人工作助理" }
+    val displayName = state.userProfile.displayName.ifBlank { state.username.ifBlank { uiText(R.string.ui_0856, "Hermes 用户") } }
+    val bio = state.userProfile.bio.ifBlank { uiText(R.string.ui_0150, "个人工作助理") }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current).statusBarsPadding()
             .padding(horizontal = HermesSpacing.page),
@@ -315,9 +371,9 @@ private fun ProfileHomeContent(
             modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ProfileActionButton("设置照片", HermesIconKind.CAMERA_ADD, onSetPhoto, Modifier.weight(1f))
-            ProfileActionButton("编辑信息", HermesIconKind.EDIT, onEdit, Modifier.weight(1f))
-            ProfileActionButton("设置", HermesIconKind.SETTINGS, onSettings, Modifier.weight(1f))
+            ProfileActionButton(uiText(R.string.ui_0857, "设置照片"), HermesIconKind.CAMERA_ADD, onSetPhoto, Modifier.weight(1f))
+            ProfileActionButton(uiText(R.string.ui_0858, "编辑信息"), HermesIconKind.EDIT, onEdit, Modifier.weight(1f))
+            ProfileActionButton(uiText(R.string.ui_0859, "设置"), HermesIconKind.SETTINGS, onSettings, Modifier.weight(1f))
         }
 
         GlassPanel(
@@ -326,8 +382,8 @@ private fun ProfileHomeContent(
         ) {
             ProfileInfoRow(
                 icon = HermesIconKind.CONNECTION,
-                title = "远程网关",
-                value = "连接正常 · ${maskAddress(state.baseUrl)}",
+                title = uiText(R.string.ui_0761, "远程网关"),
+                value = uiText(R.string.ui_0860, "连接正常 · %1\$s", maskAddress(state.baseUrl)),
                 showChevron = true,
             )
         }
@@ -336,8 +392,8 @@ private fun ProfileHomeContent(
                 Row(Modifier.fillMaxWidth().clickable(onClick = onMemory)) {
                     ProfileInfoRow(
                         HermesIconKind.MEMORY,
-                        "我的记忆",
-                        "长期事实、偏好与经验 · ${state.activeProfile}/MEMORY.md",
+                        uiText(R.string.ui_0861, "我的记忆"),
+                        uiText(R.string.ui_0862, "长期事实、偏好与经验 · %1\$s/MEMORY.md", state.activeProfile),
                         showChevron = true,
                     )
                 }
@@ -349,8 +405,8 @@ private fun ProfileHomeContent(
                 Row(Modifier.fillMaxWidth().clickable(onClick = onSoul)) {
                     ProfileInfoRow(
                         HermesIconKind.SOUL,
-                        "我的心智",
-                        "人格、原则与行为边界 · ${state.activeProfile}/SOUL.md",
+                        uiText(R.string.ui_0863, "我的心智"),
+                        uiText(R.string.ui_0864, "人格、原则与行为边界 · %1\$s/SOUL.md", state.activeProfile),
                         showChevron = true,
                     )
                 }
@@ -362,8 +418,8 @@ private fun ProfileHomeContent(
         ) {
             ProfileInfoRow(
                 HermesIconKind.GUIDE,
-                "使用说明",
-                "连接、对话、专家会审、任务、语音与故障排查",
+                uiText(R.string.ui_0865, "使用说明"),
+                uiText(R.string.ui_0866, "连接、对话、专家会审、任务、语音与故障排查"),
                 showChevron = true,
             )
         }
@@ -375,6 +431,7 @@ private fun ProfileHomeContent(
 private fun ProfileSettingsListContent(
     onBack: () -> Unit,
     onTheme: () -> Unit,
+    onLanguage: () -> Unit,
     onConnectionSettings: () -> Unit,
     onNotificationSettings: () -> Unit,
     onVoiceSettings: () -> Unit,
@@ -388,115 +445,36 @@ private fun ProfileSettingsListContent(
     onAbout: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        ProfilePageHeader("设置", onBack)
+        ProfilePageHeader(uiText(R.string.ui_0859, "设置"), onBack)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
                 .padding(horizontal = HermesSpacing.page),
         ) {
-            GlassPanel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            com.qingyu.hermescompanion.ui.component.SettingsBlock(uiText(R.string.ui_0867, "应用偏好")) {
                 Column(Modifier.fillMaxWidth()) {
-                    SettingRow(HermesIconKind.CONNECTION, "远程网关", onConnectionSettings)
-                    SettingRow(HermesIconKind.APPEARANCE, "外观", onTheme)
-                    SettingRow(HermesIconKind.NOTIFICATION, "通知设置", onNotificationSettings)
-                    SettingRow(HermesIconKind.MICROPHONE, "语音设置", onVoiceSettings)
+                    SettingRow(HermesIconKind.CONNECTION, uiText(R.string.ui_0761, "远程网关"), onConnectionSettings)
+                    SettingRow(HermesIconKind.APPEARANCE, uiText(R.string.ui_0843, "外观"), onTheme)
+                    SettingRow(HermesIconKind.CONVERSATION_STYLE, uiText(R.string.language_title, "语言"), onLanguage)
+                    SettingRow(HermesIconKind.NOTIFICATION, uiText(R.string.ui_0868, "通知设置"), onNotificationSettings)
+                    SettingRow(HermesIconKind.MICROPHONE, uiText(R.string.ui_0869, "语音设置"), onVoiceSettings)
                 }
             }
-            GlassPanel(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(20.dp)) {
+            com.qingyu.hermescompanion.ui.component.SettingsBlock(uiText(R.string.ui_0870, "Hermes 助理")) {
                 Column(Modifier.fillMaxWidth()) {
-                    SettingRow(HermesIconKind.SKILLS, "技能与工具", onSkillsTools)
-                    SettingRow(HermesIconKind.MODEL, "模型设置", onModelSettings)
-                    SettingRow(HermesIconKind.CONVERSATION_STYLE, "对话风格", onConversationStyle)
-                    SettingRow(HermesIconKind.VERIFIED, "审批模式", onApprovalSettings)
-                    SettingRow(HermesIconKind.MEMORY, "记忆与上下文", onMemoryContext)
-                    SettingRow(HermesIconKind.ARCHIVE, "已归档对话", onArchivedSessions)
+                    SettingRow(HermesIconKind.SKILLS, uiText(R.string.ui_0493, "技能与工具"), onSkillsTools)
+                    SettingRow(HermesIconKind.MODEL, uiText(R.string.ui_0498, "模型设置"), onModelSettings)
+                    SettingRow(HermesIconKind.CONVERSATION_STYLE, uiText(R.string.ui_0518, "对话风格"), onConversationStyle)
+                    SettingRow(HermesIconKind.VERIFIED, uiText(R.string.ui_0527, "审批模式"), onApprovalSettings)
+                    SettingRow(HermesIconKind.MEMORY, uiText(R.string.ui_0533, "记忆与上下文"), onMemoryContext)
+                    SettingRow(HermesIconKind.ARCHIVE, uiText(R.string.ui_0547, "已归档对话"), onArchivedSessions)
                 }
             }
-            GlassPanel(Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(20.dp)) {
+            com.qingyu.hermescompanion.ui.component.SettingsBlock(uiText(R.string.ui_0871, "关于")) {
                 Column(Modifier.fillMaxWidth()) {
-                    SettingRow(HermesIconKind.CHANGELOG, "更新日志", onChangeLog)
-                    SettingRow(HermesIconKind.INFORMATION, "关于 Hermes", onAbout)
+                    SettingRow(HermesIconKind.CHANGELOG, uiText(R.string.ui_0872, "更新日志"), onChangeLog)
+                    SettingRow(HermesIconKind.INFORMATION, uiText(R.string.ui_0873, "关于 Hermes"), onAbout)
                 }
             }
-            Spacer(Modifier.height(26.dp))
-        }
-    }
-}
-
-@Composable
-private fun ProfileGuideContent(onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        ProfilePageHeader("使用说明", onBack)
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
-                .padding(horizontal = HermesSpacing.page),
-        ) {
-            HermesWelcomeAnimation(
-                modifier = Modifier.size(154.dp).align(Alignment.CenterHorizontally),
-                contentDescription = "Hermes 使用说明引导动画",
-            )
-            Text("Hermes 移动端", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Text(
-                "从连接远程网关到对话、会审、文件、自动任务和连续语音，这里按实际使用顺序说明。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-            )
-            GuideSection("内容导航", listOf(
-                "远程连接与 Profile",
-                "对话、运行控制与消息状态",
-                "专家会审与助理面板",
-                "文件、空间与内容查找",
-                "执行中心、定时任务与通知",
-                "单次语音、连续语音与模型",
-                "记忆、心智、安全与故障排查",
-            ))
-            GuideSection("远程连接与 Profile", listOf(
-                "首次连接：在“我的 → 远程网关”填写服务器地址、账号和密码，先点“验证并更新连接”。连接成功后，APP 会读取该账号可用的 Profile、会话和服务器能力。",
-                "地址与安全：同一局域网可使用内网地址；跨网络访问优先使用 HTTPS、可信 VPN 或安全反向代理，不建议把未加密 HTTP 网关直接暴露到公网。",
-                "Profile 隔离：work、default 等 Profile 的会话、项目、MEMORY.md 与 SOUL.md 相互独立。顶部切换 Profile 后，列表和搜索都会跟随切换。",
-                "连接异常：先确认服务器在线、端口放行、账号密码正确，再进入远程网关页运行诊断；更新 Agent 时不要同时发起新的任务。",
-            ))
-            GuideSection("对话与运行控制", listOf(
-                "新建与查找：点对话页右下角蓝色按钮创建会话；顶部搜索可匹配标题、摘要和近期消息。项目与时间筛选只影响当前列表，不会删除内容。",
-                "发送内容：输入框支持文字、图片、文档、链接、空间文件、单次语音和命令。输入“/”或点命令按钮可查看当前服务器支持的 Hermes 命令。",
-                "运行中追加：Hermes 执行时，可以选择立即追加要求，或排队到下一轮；停止按钮会终止当前生成，但已经完成的工具操作不会自动撤销。",
-                "状态说明：“正在思考”表示尚未输出正文；“正在处理”表示正在调用工具或执行 Agent 步骤；断线后 APP 会尝试重新连接并取回服务器上的完整结果。",
-                "长对话阅读：向上加载更早消息；APP 会保存最近阅读位置。回复完成后可用右侧向下按钮快速回到最新内容。",
-            ))
-            GuideSection("专家会审与助理面板", listOf(
-                "入口：点聊天页右上角助理按钮进入专家会审。会审开关只作用于下一条消息，发送后会自动关闭，避免后续普通问题继续消耗额外 Token。",
-                "深度会审：三位隔离上下文的专家并行分析——证据分析员查事实与假设，反方审查员找盲点和失败条件，落地评审员评估成本与执行。",
-                "群聊展示：三位专家的返回内容会以不同群成员身份分别显示，随后由 Hermes 对共识、关键分歧、证据风险和最终方案做统一裁决。",
-                "快速会审：使用服务器 MoA 参考模型并行分析，速度更快；如果服务器没有配置 MoA 预设，该选项会保持不可用。",
-                "适用场景：高影响决策、方案评审和证据冲突适合会审；简单查询直接用普通对话更快，也更节省 Token。",
-            ))
-            GuideSection("文件、空间与查找", listOf(
-                "发送附件：曲别针面板可选择图片、文本、JSON、XML、YAML、网页链接或空间文件。大文件是否可读取取决于网关和模型的限制。",
-                "空间：集中查看服务器目录和最近产物。Markdown 支持预览、编辑、保存、导出与分享；图片可以点开查看和缩放。",
-                "来源关系：最近产物会保留来源会话，点来源可回到生成该文件的聊天位置；聊天中的网页引用会在回复下方整理成可点击来源。",
-                "敏感信息：密码、API Key、Cookie 和私钥不要作为普通聊天附件发送；应保存在服务器环境变量或系统安全存储中。",
-            ))
-            GuideSection("执行中心、定时任务与通知", listOf(
-                "执行中心：待处理页集中展示审批与澄清请求；进行中页显示当前 Agent 和工具状态；执行记录用于回看最近完成结果与产物。",
-                "定时任务：点右上角蓝色加号填写名称、执行内容和 Cron 表达式。创建后可暂停、恢复、手动执行、编辑或删除。",
-                "审批原则：允许前先核对目标、文件范围、外部收件人和是否会产生不可逆操作；不确定时优先选择“仅本次允许”。",
-                "后台执行：离开聊天后，运行状态会以底部悬浮提示显示；点提示可返回对应会话，也可以直接停止当前任务。",
-                "通知：建议开启对话完成、审批和定时任务提醒。系统省电或后台限制可能延迟通知，可在安卓系统设置中允许 Hermes 后台运行。",
-            ))
-            GuideSection("语音与模型", listOf(
-                "单次语音：聊天输入框的麦克风用于录一段话并转写到输入框，可在语音设置中选择识别后自动发送或先手动确认。",
-                "连续语音：聊天页顶部波形按钮进入连续对话；说完后自动识别、发送并朗读回复，回答过程中点中间按钮可立即打断。",
-                "识别服务：可选择 Agent STT/TTS、手机系统或自动兜底。中文建议使用 zh-CN，并按习惯选择简体、繁体或保留原文。",
-                "模型设置：可分别指定主模型、视觉、网页提取、上下文压缩、技能、审批和维护模型。日常问题不必全部使用最高推理强度。",
-                "语音失败：检查录音权限、STT/TTS 服务、语言和网络；Agent 语音不可用时，可临时切换手机系统识别。",
-            ))
-            GuideSection("记忆、心智与排查", listOf(
-                "“我的记忆”对应当前 Profile 的 MEMORY.md，用于保存长期事实、偏好和经验；“我的心智”对应 SOUL.md，用于定义人格、原则与行为边界。",
-                "修改建议：先阅读原内容再编辑，避免一次覆盖过多；重要文件在服务器保留版本或备份，便于出现偏差时恢复。",
-                "性能排查：会话多时使用项目与时间筛选；超长聊天按需加载历史。若页面卡顿，先退出大图预览或长文编辑再重试。",
-                "连接排查：依次检查服务器进程、网关健康、端口、HTTPS 证书、账号认证和 Agent 版本；不要只反复刷新 APP。",
-                "安全建议：高风险工具开启审批；公网连接使用加密通道；安装更新包前核对来源和签名，不要将网关凭证转发给他人。",
-            ))
             Spacer(Modifier.height(26.dp))
         }
     }
@@ -511,8 +489,8 @@ private fun ProfilePhotoContent(
     onEdit: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val displayName = state.userProfile.displayName.ifBlank { state.username.ifBlank { "Hermes 用户" } }
-    val bio = state.userProfile.bio.ifBlank { "个人工作助理" }
+    val displayName = state.userProfile.displayName.ifBlank { state.username.ifBlank { uiText(R.string.ui_0856, "Hermes 用户") } }
+    val bio = state.userProfile.bio.ifBlank { uiText(R.string.ui_0150, "个人工作助理") }
     val photoHeight by animateDpAsState(
         targetValue = if (expanded) 470.dp else 122.dp,
         animationSpec = tween(360, easing = FastOutSlowInEasing),
@@ -582,7 +560,7 @@ private fun ProfilePhotoContent(
                     onClick = onBack,
                     modifier = Modifier.alpha(detailsAlpha).statusBarsPadding().padding(6.dp).align(Alignment.TopStart),
                 ) {
-                    HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回", tint = Color.White, iconSize = 25.dp)
+                    HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回"), tint = Color.White, iconSize = 25.dp)
                 }
                 Column(Modifier.alpha(detailsAlpha).align(Alignment.BottomStart).padding(horizontal = 16.dp, vertical = 18.dp)) {
                     Text(displayName, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -600,11 +578,11 @@ private fun ProfilePhotoContent(
                 shape = RoundedCornerShape(20.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 15.dp)) {
-                    Text(state.username.ifBlank { "未显示网关账号" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    Text("网关账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
+                    Text(state.username.ifBlank { uiText(R.string.ui_0922, "未显示网关账号") }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                    Text(uiText(R.string.ui_0923, "网关账号"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
                     HorizontalDivider(Modifier.padding(vertical = 13.dp), thickness = 0.5.dp)
                     Text(maskAddress(state.baseUrl), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    Text("远程网关 · 连接正常", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
+                    Text(uiText(R.string.ui_0924, "远程网关 · 连接正常"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
                 }
             }
         }
@@ -660,7 +638,7 @@ private fun ProfilePageHeader(title: String, onBack: () -> Unit) {
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回", iconSize = 24.dp) }
+        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回"), iconSize = 24.dp) }
         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp))
     }
 }
@@ -698,9 +676,9 @@ private fun FrostedProfileActions(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.height(72.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ProfileActionButton("设置照片", HermesIconKind.CAMERA_ADD, onSetPhoto, Modifier.weight(1f), dark = true)
-        ProfileActionButton("编辑信息", HermesIconKind.EDIT, onEdit, Modifier.weight(1f), dark = true)
-        ProfileActionButton("设置", HermesIconKind.SETTINGS, onSettings, Modifier.weight(1f), dark = true)
+        ProfileActionButton(uiText(R.string.ui_0857, "设置照片"), HermesIconKind.CAMERA_ADD, onSetPhoto, Modifier.weight(1f), dark = true)
+        ProfileActionButton(uiText(R.string.ui_0858, "编辑信息"), HermesIconKind.EDIT, onEdit, Modifier.weight(1f), dark = true)
+        ProfileActionButton(uiText(R.string.ui_0859, "设置"), HermesIconKind.SETTINGS, onSettings, Modifier.weight(1f), dark = true)
     }
 }
 
@@ -712,127 +690,20 @@ fun ProfileSettingsScreen(
     onSave: (UserProfilePreferences) -> Unit,
     onUpdateHermesAvatar: (Uri, AvatarCropSpec) -> Unit,
     onResetHermesAvatar: () -> Unit,
+    onUpdateUserAvatar: (Uri, AvatarCropSpec) -> Unit = { _, _ -> },
+    onResetUserAvatar: () -> Unit = {},
 ) {
-    var draftName by remember(state.userProfile.displayName, state.username) {
-        mutableStateOf(state.userProfile.displayName.ifBlank { state.username })
-    }
-    var draftBio by remember(state.userProfile.bio) { mutableStateOf(state.userProfile.bio) }
-    var draftHermesName by remember(state.userProfile.hermesDisplayName) {
-        mutableStateOf(state.userProfile.hermesDisplayName.ifBlank { "Hermes" })
-    }
-    var hermesAvatarCropRequest by remember { mutableStateOf<PendingAvatarCrop?>(null) }
-    val hermesAvatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) hermesAvatarCropRequest = PendingAvatarCrop(uri, AvatarTarget.HERMES)
-    }
-
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            androidx.compose.material3.IconButton(onClick = onBack) {
-                HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回")
-            }
-            Column(Modifier.padding(start = 4.dp)) {
-                Text("编辑信息", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text("设置你与 Hermes 在会话中的显示信息", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = LocalProfileDockInset.current)
-                .padding(horizontal = HermesSpacing.page),
-        ) {
-        GlassPanel(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 4.dp)) {
-                ProfileInputRow("昵称", draftName, "Hermes 用户") { draftName = it.take(24) }
-                ProfileInputRow("个人签名", draftBio, "个人工作助理") { draftBio = it.take(50) }
-                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("网关账号", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                    Text(state.username.ifBlank { "未登录" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-
-        GlassPanel(Modifier.fillMaxWidth().padding(top = 9.dp)) {
-            Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                Text("Hermes 聊天资料", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                    UserAvatar(
-                        uri = state.userProfile.hermesAvatarUri,
-                        displayName = draftHermesName.ifBlank { "Hermes" },
-                        size = 68.dp,
-                        hermesFallback = true,
-                    )
-                    Column(Modifier.weight(1f).padding(start = 13.dp)) {
-                        Text(
-                            "Hermes 头像",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            "独立显示在会话列表、Hermes 回复和助理面板",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                        Row(Modifier.padding(top = 4.dp)) {
-                            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
-                                onClick = { hermesAvatarPicker.launch(arrayOf("image/*")) },
-                                enabled = !state.isAvatarUpdating,
-                            ) { Text(if (state.userProfile.hermesAvatarUri.isBlank()) "设置头像" else "更换头像") }
-                            if (state.userProfile.hermesAvatarUri.isNotBlank()) {
-                                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
-                                    onClick = onResetHermesAvatar,
-                                    enabled = !state.isAvatarUpdating,
-                                ) { Text("恢复默认") }
-                            }
-                        }
-                    }
-                }
-                ProfileInputRow("Hermes 昵称", draftHermesName, "Hermes") { draftHermesName = it.take(24) }
-            }
-        }
-        Text(
-            "“我的”头像请在个人主页设置；Hermes 头像在这里单独设置，两者互不影响。昵称和签名只用于这台手机。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
-        )
-        Button(
-            onClick = {
-                onSave(
-                    state.userProfile.copy(
-                        displayName = draftName.trim(),
-                        bio = draftBio.trim(),
-                        hermesDisplayName = draftHermesName.trim().ifBlank { "Hermes" },
-                    ),
-                )
-                onBack()
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("保存") }
-        Spacer(Modifier.height(26.dp))
-        }
-    }
-
-    hermesAvatarCropRequest?.let { request ->
-        AvatarCropSheet(
-            request = request,
-            onDismiss = { hermesAvatarCropRequest = null },
-            onConfirm = { uri, crop ->
-                hermesAvatarCropRequest = null
-                onUpdateHermesAvatar(uri, crop)
-            },
-        )
-    }
+    IdentityEditorScreen(state, contentPadding, firstRun = false, onBack = onBack,
+        onSave = { onSave(it); onBack() }, onUpdateHermesAvatar = onUpdateHermesAvatar,
+        onResetHermesAvatar = onResetHermesAvatar, onUpdateUserAvatar = onUpdateUserAvatar,
+        onResetUserAvatar = onResetUserAvatar)
 }
 
-private data class PendingAvatarCrop(val uri: Uri, val target: AvatarTarget)
+internal data class PendingAvatarCrop(val uri: Uri, val target: AvatarTarget)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AvatarCropSheet(
+internal fun AvatarCropSheet(
     request: PendingAvatarCrop,
     onDismiss: () -> Unit,
     onConfirm: (Uri, AvatarCropSpec) -> Unit,
@@ -847,13 +718,13 @@ private fun AvatarCropSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                if (request.target == AvatarTarget.USER) "裁剪我的头像" else "裁剪 Hermes 头像",
+                if (request.target == AvatarTarget.USER) uiText(R.string.ui_0937, "裁剪我的头像") else uiText(R.string.ui_0938, "裁剪 Hermes 头像"),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Start),
             )
             Text(
-                "调整缩放和位置，方框内就是最终头像",
+                uiText(R.string.ui_0939, "调整缩放和位置，方框内就是最终头像"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.Start).padding(top = 3.dp, bottom = 14.dp),
@@ -868,7 +739,7 @@ private fun AvatarCropSheet(
                 } else {
                     Image(
                         bitmap = bitmap!!.asImageBitmap(),
-                        contentDescription = "头像裁剪预览",
+                        contentDescription = uiText(R.string.ui_0940, "头像裁剪预览"),
                         contentScale = ContentScale.Crop,
                         alignment = BiasAlignment(horizontal, vertical),
                         modifier = Modifier.fillMaxSize().graphicsLayer {
@@ -881,16 +752,16 @@ private fun AvatarCropSheet(
                     Box(Modifier.fillMaxSize().border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.82f), RoundedCornerShape(24.dp)))
                 }
             }
-            CropSlider("缩放", zoom, 1f..3f) { zoom = it }
-            CropSlider("左右", horizontal, -1f..1f) { horizontal = it }
-            CropSlider("上下", vertical, -1f..1f) { vertical = it }
+            CropSlider(uiText(R.string.ui_0941, "缩放"), zoom, 1f..3f) { zoom = it }
+            CropSlider(uiText(R.string.ui_0942, "左右"), horizontal, -1f..1f) { horizontal = it }
+            CropSlider(uiText(R.string.ui_0943, "上下"), vertical, -1f..1f) { vertical = it }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("取消") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(uiText(R.string.ui_0553, "取消")) }
                 Button(
                     onClick = { onConfirm(request.uri, AvatarCropSpec(zoom, horizontal, vertical)) },
                     enabled = bitmap != null,
                     modifier = Modifier.weight(1f),
-                ) { Text("使用头像") }
+                ) { Text(uiText(R.string.ui_0944, "使用头像")) }
             }
         }
     }
@@ -921,47 +792,9 @@ private fun loadAvatarCropPreview(context: Context, uri: Uri): Bitmap? = runCatc
 }.getOrNull()
 
 @Composable
-private fun ProfileInputRow(label: String, value: String, placeholder: String, onChange: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.35f), maxLines = 1)
-        Surface(
-            modifier = Modifier.weight(0.65f).height(40.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-            tonalElevation = 0.dp,
-        ) {
-            androidx.compose.foundation.text.BasicTextField(
-                value = value,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
-                decorationBox = { inner ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                        if (value.isBlank()) Text(placeholder, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        inner()
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
 private fun IconWell(icon: HermesIconKind) {
-    val tint = when(icon) {
-        HermesIconKind.APPEARANCE, HermesIconKind.SKILLS, HermesIconKind.SOUL, HermesIconKind.AI -> com.qingyu.hermescompanion.ui.theme.HermesColors.extended.purple
-        HermesIconKind.VERIFIED, HermesIconKind.CONVERSATION_STYLE, HermesIconKind.MICROPHONE -> com.qingyu.hermescompanion.ui.theme.HermesColors.extended.success
-        else -> com.qingyu.hermescompanion.ui.component.AssistantBlue
-    }
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = tint.copy(alpha=.10f),
-        tonalElevation = 0.dp,
-    ) {
-        Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-            HermesMulticolorIcon(icon, contentDescription = null, iconSize = 19.dp, tint = tint)
-        }
+    Box(Modifier.size(36.dp).hermesWell(), contentAlignment = Alignment.Center) {
+        HermesMulticolorIcon(icon, null, iconSize = 20.dp, tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -973,15 +806,15 @@ private fun ThemeChoice(mode: ThemeMode, selected: Boolean, onClick: () -> Unit,
         ThemeMode.DARK -> HermesIconKind.DARK_MODE
     }
     val label = when (mode) {
-        ThemeMode.SYSTEM -> "跟随系统"
-        ThemeMode.LIGHT -> "浅色"
-        ThemeMode.DARK -> "深色"
+        ThemeMode.SYSTEM -> uiText(R.string.ui_0945, "跟随系统")
+        ThemeMode.LIGHT -> uiText(R.string.ui_0946, "浅色")
+        ThemeMode.DARK -> uiText(R.string.ui_0947, "深色")
     }
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -994,12 +827,7 @@ private fun ThemeChoice(mode: ThemeMode, selected: Boolean, onClick: () -> Unit,
             modifier = Modifier.weight(1f).padding(start = 12.dp),
             maxLines = 1,
         )
-        HermesMulticolorIcon(
-            if (selected) HermesIconKind.RADIO_SELECTED else HermesIconKind.UNCHECKED,
-            contentDescription = if (selected) "已选择" else null,
-            iconSize = 20.dp,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-        )
+        RadioButton(selected = selected, onClick = null)
     }
 }
 
@@ -1035,6 +863,6 @@ private fun SettingRow(icon: HermesIconKind, title: String, onClick: () -> Unit)
 }
 
 private fun maskAddress(url: String): String {
-    if (url.isBlank()) return "尚未配置"
+    if (url.isBlank()) return uiText(R.string.ui_0948, "尚未配置")
     return url.replace(Regex(":\\d+(?=/|$)"), ":••••")
 }

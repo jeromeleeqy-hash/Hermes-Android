@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.data
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import com.qingyu.hermescompanion.model.ChatMessage
 import com.qingyu.hermescompanion.model.HermesSession
 import com.qingyu.hermescompanion.model.RecentArtifact
@@ -12,7 +16,12 @@ internal fun normalizeArtifactTarget(raw: String, markdownLink: Boolean = false)
     if (value.startsWith("MEDIA:", true)) value = value.substring(6).trim().trim('`', '"', '\'')
     val fileUri = value.startsWith("file://", true)
     val sandboxUri = value.startsWith("sandbox:", true)
-    if (fileUri) value = value.substring(7).removePrefix("localhost")
+    if (fileUri) {
+        value = value.substring(7).removePrefix("localhost")
+        // file:///C:/work and file://server/share are Windows URI spellings.
+        if (Regex("^/[A-Za-z]:/").containsMatchIn(value)) value = value.substring(1)
+        else if (!value.startsWith('/') && !isWindowsRemotePath(value)) value = "//$value"
+    }
     if (sandboxUri) value = value.substring(8)
     if (markdownLink || fileUri || sandboxUri) {
         value = value.substringBefore('#').substringBefore('?')
@@ -30,14 +39,13 @@ internal fun resolveRemoteArtifactPath(path: String, workspace: String): String?
     if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(clean)) return null
     val root = workspace.trim()
     if (root.isBlank()) return null
-    val separator = if ('\\' in root && '/' !in root) '\\' else '/'
-    return root.trimEnd('/', '\\') + separator + clean.removePrefix("./").removePrefix(".\\")
+    return joinServerPath(root, clean.removePrefix("./").removePrefix(".\\"))
 }
 
 /** Recover a stale index only from the original conversation, never another project. */
 internal class ArtifactFileReader(private val client: HermesApiClient) {
     fun read(item: RecentArtifact, sourceSession: HermesSession?, cachedMessages: List<ChatMessage>): WorkspaceDocument {
-        require(sourceSession == null || sourceSession.profile == item.profile) { "文件与来源档案不一致" }
+        require(sourceSession == null || sourceSession.profile == item.profile) { uiText(R.string.ui_0049, "文件与来源档案不一致") }
         var workspace = item.workspacePath.ifBlank { sourceSession?.workspacePath.orEmpty() }
         val tried = linkedSetOf<String>()
         fun readPath(raw: String, base: String = workspace): WorkspaceDocument? {
@@ -84,7 +92,7 @@ internal class ArtifactFileReader(private val client: HermesApiClient) {
             }
             recover(messages)?.let { return it }
         }
-        throw ApiException(404, "找不到「${item.name}」。文件可能已移动或删除，请在项目文件中重新选择，或回到来源对话确认位置。")
+        throw ApiException(404, uiText(R.string.ui_0050, "找不到「%1\$s」。文件可能已移动或删除，请在项目文件中重新选择，或回到来源对话确认位置。", item.name))
     }
 
     private fun truncatedExtensionMatch(old: String, current: String): Boolean =

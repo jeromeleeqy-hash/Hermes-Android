@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.format
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -19,19 +23,19 @@ fun sessionTimeLabel(raw: String, now: Instant = Instant.now()): String {
 
     if (value.toLocalDate() == current.toLocalDate()) {
         return when {
-            seconds < 60 -> "刚刚"
-            seconds < 3600 -> "${seconds / 60}分钟前"
-            seconds < 6 * 3600 -> "${seconds / 3600}小时前"
+            seconds < 60 -> uiText(R.string.ui_0483, "刚刚")
+            seconds < 3600 -> uiText(R.string.ui_0484, "%1\$s分钟前", seconds / 60)
+            seconds < 6 * 3600 -> uiText(R.string.ui_0485, "%1\$s小时前", seconds / 3600)
             else -> value.format(DateTimeFormatter.ofPattern("HH:mm"))
         }
     }
     if (value.toLocalDate() == current.toLocalDate().minusDays(1)) {
-        return "昨天 ${value.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+        return uiText(R.string.ui_0486, "昨天 %1\$s", value.format(DateTimeFormatter.ofPattern("HH:mm")))
     }
     return if (value.year == current.year) {
-        value.format(DateTimeFormatter.ofPattern("M月d日"))
+        value.format(DateTimeFormatter.ofPattern(uiText(R.string.ui_0487, "M月d日"), com.qingyu.hermescompanion.i18n.AppLanguage.locale))
     } else {
-        value.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
+        value.format(DateTimeFormatter.ofPattern(uiText(R.string.ui_0488, "yyyy年M月d日"), com.qingyu.hermescompanion.i18n.AppLanguage.locale))
     }
 }
 
@@ -42,11 +46,11 @@ fun messageTimeLabel(raw: String, now: Instant = Instant.now()): String {
     val current = now.atZone(zone)
     return when (value.toLocalDate()) {
         current.toLocalDate() -> value.format(DateTimeFormatter.ofPattern("HH:mm"))
-        current.toLocalDate().minusDays(1) -> "昨天 ${value.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+        current.toLocalDate().minusDays(1) -> uiText(R.string.ui_0486, "昨天 %1\$s", value.format(DateTimeFormatter.ofPattern("HH:mm")))
         else -> if (value.year == current.year) {
-            value.format(DateTimeFormatter.ofPattern("M月d日 HH:mm"))
+            value.format(DateTimeFormatter.ofPattern(uiText(R.string.ui_0489, "M月d日 HH:mm"), com.qingyu.hermescompanion.i18n.AppLanguage.locale))
         } else {
-            value.format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"))
+            value.format(DateTimeFormatter.ofPattern(uiText(R.string.ui_0490, "yyyy年M月d日 HH:mm"), com.qingyu.hermescompanion.i18n.AppLanguage.locale))
         }
     }
 }

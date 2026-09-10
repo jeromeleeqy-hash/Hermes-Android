@@ -3,10 +3,11 @@ pluginManagement {
     repositories {
         if (!hermesLocalMaven.isNullOrBlank()) {
             maven("$hermesLocalMaven/maven") { isAllowInsecureProtocol = true }
+        } else {
+            google()
+            mavenCentral()
+            gradlePluginPortal()
         }
-        google()
-        mavenCentral()
-        gradlePluginPortal()
     }
 }
 
@@ -16,9 +17,10 @@ dependencyResolutionManagement {
     repositories {
         if (!hermesLocalMaven.isNullOrBlank()) {
             maven("$hermesLocalMaven/maven") { isAllowInsecureProtocol = true }
+        } else {
+            google()
+            mavenCentral()
         }
-        google()
-        mavenCentral()
     }
 }
 

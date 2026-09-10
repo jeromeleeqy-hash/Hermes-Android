@@ -1,0 +1,8 @@
+<resources>
+<string name="launcher_icon_title">App icon</string>
+<string name="icon_partner">Partner</string>
+<string name="icon_sprite">Sprite</string>
+<string name="icon_changed">Icon changed. Your home screen may take a few seconds to refresh.</string>
+<string name="icon_change_failed">Could not change the icon. Please try again.</string>
+<string name="mascot_tap">Play a gesture</string>
+</resources>

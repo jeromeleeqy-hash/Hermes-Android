@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.model
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import java.util.UUID
 
 data class ConnectionConfig(
@@ -179,7 +183,7 @@ data class ServerSettings(
 data class ServerSkill(
     val name: String,
     val description: String = "",
-    val category: String = "其他",
+    val category: String = uiText(R.string.ui_0081, "其他"),
     val enabled: Boolean = true,
     val provenance: String = "",
 )
@@ -219,7 +223,7 @@ data class ChatMessage(
 )
 
 data class ChatImage(
-    val name: String = "图片",
+    val name: String = uiText(R.string.ui_0057, "图片"),
     val source: String,
     val mimeType: String = "image/*",
 )
@@ -466,6 +470,7 @@ enum class VoiceCaptureTarget {
 }
 
 data class VoiceCaptureState(
+    val canRetry: Boolean = false,
     val phase: VoicePhase = VoicePhase.IDLE,
     val target: VoiceCaptureTarget = VoiceCaptureTarget.CHAT_INPUT,
     val transcript: String = "",
@@ -488,7 +493,7 @@ data class SpeechAudio(
 
 data class UserProfilePreferences(
     val displayName: String = "",
-    val bio: String = "个人工作助理",
+    val bio: String = uiText(R.string.ui_0150, "个人工作助理"),
     val avatarUri: String = "",
     val hermesDisplayName: String = "Hermes",
     val hermesAvatarUri: String = "",

@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.storage
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -27,6 +31,22 @@ import org.json.JSONObject
 
 class SecureConfigStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+    private fun dailyConversationKey(server: String, account: String, profile: String): String {
+        val scope = listOf(server.trimEnd('/'), account, profile).joinToString("\u0000")
+        return "daily_conversation_" + java.security.MessageDigest.getInstance("SHA-256")
+            .digest(scope.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    }
+
+    fun readDailyConversation(server: String, account: String, profile: String): String? =
+        preferences.getString(dailyConversationKey(server, account, profile), null)
+
+    fun saveDailyConversation(server: String, account: String, profile: String, id: String?) {
+        val key = dailyConversationKey(server, account, profile)
+        check(preferences.edit().apply { if (id == null) remove(key) else putString(key, id) }.commit()) {
+            uiText(R.string.ui_0172, "未能保存日常对话入口，请检查手机存储空间")
+        }
+    }
 
     private fun projectSelectionKey(profile: String): String =
         "selected_project::${preferences.getString(KEY_GATEWAY_URL, "")}::$profile"
@@ -91,6 +111,13 @@ class SecureConfigStore(context: Context) {
         }
     }
 
+    fun readLanguageMode(): String? = preferences.getString("ui_language", null)
+    fun hasSeenLaunchIntro(): Boolean = preferences.getBoolean("launch_intro_seen", false)
+    fun markLaunchIntroSeen() { preferences.edit { putBoolean("launch_intro_seen", true) } }
+    fun hasConfiguredLocalIdentity(): Boolean = preferences.getBoolean("local_identity_configured", false)
+    fun markLocalIdentityConfigured() { preferences.edit { putBoolean("local_identity_configured", true) } }
+    fun saveLanguageMode(value: String) { preferences.edit { putString("ui_language", value) } }
+
     fun readThemeMode(): String? = runCatching { preferences.getString(KEY_THEME_MODE, null) }.getOrNull()
 
     fun saveThemeMode(value: String) {
@@ -101,6 +128,30 @@ class SecureConfigStore(context: Context) {
 
     fun saveSkinMode(value: String) {
         preferences.edit { putString(KEY_SKIN_MODE, value) }
+    }
+
+    fun readReduceMotion(): Boolean = preferences.getBoolean("reduce_motion", false)
+
+    fun saveReduceMotion(value: Boolean) {
+        preferences.edit { putBoolean("reduce_motion", value) }
+    }
+
+    fun readPromptSnippets(): List<com.qingyu.hermescompanion.model.PromptSnippet> {
+        val raw = preferences.getString("prompt_snippets_v1", null)
+            ?: return com.qingyu.hermescompanion.model.DefaultPromptSnippets
+        return runCatching {
+            val items = JSONArray(raw)
+            List(items.length()) { index ->
+                val item = items.getJSONObject(index)
+                com.qingyu.hermescompanion.model.PromptSnippet(item.getString("id"), item.getString("title"), item.getString("text"))
+            }.filter { it.id.isNotBlank() && it.title.isNotBlank() && it.text.isNotBlank() }.distinctBy { it.id }
+        }.getOrDefault(com.qingyu.hermescompanion.model.DefaultPromptSnippets)
+    }
+
+    fun savePromptSnippets(items: List<com.qingyu.hermescompanion.model.PromptSnippet>) {
+        val json = JSONArray()
+        items.forEach { item -> json.put(JSONObject().put("id", item.id).put("title", item.title).put("text", item.text)) }
+        preferences.edit { putString("prompt_snippets_v1", json.toString()) }
     }
 
     fun readNotificationPreferences(): NotificationPreferences = runCatching {
@@ -133,7 +184,7 @@ class SecureConfigStore(context: Context) {
         val key = "voice_restore::$server::$profile::$session"
         val edit = preferences.edit()
         if (effort == null) edit.remove(key) else edit.putString(key, effort)
-        check(edit.commit()) { "无法保存语音模式恢复信息" }
+        check(edit.commit()) { uiText(R.string.ui_0173, "无法保存语音模式恢复信息") }
     }
 
     fun readVoicePreferences(): VoicePreferences = runCatching {
@@ -169,7 +220,7 @@ class SecureConfigStore(context: Context) {
     fun readUserProfile(): UserProfilePreferences = runCatching {
         UserProfilePreferences(
             displayName = preferences.getString(KEY_PROFILE_NAME, "").orEmpty(),
-            bio = preferences.getString(KEY_PROFILE_BIO, "个人工作助理").orEmpty().ifBlank { "个人工作助理" },
+            bio = preferences.getString(KEY_PROFILE_BIO, uiText(R.string.ui_0150, "个人工作助理")).orEmpty().ifBlank { uiText(R.string.ui_0150, "个人工作助理") },
             avatarUri = preferences.getString(KEY_PROFILE_AVATAR, "").orEmpty(),
             hermesDisplayName = preferences.getString(KEY_HERMES_PROFILE_NAME, "Hermes").orEmpty().ifBlank { "Hermes" },
             hermesAvatarUri = preferences.getString(KEY_HERMES_PROFILE_AVATAR, "").orEmpty(),
@@ -204,6 +255,19 @@ class SecureConfigStore(context: Context) {
             if (value.isBlank()) remove(draftKey(profile, sessionId))
             else putString(draftKey(profile, sessionId), value.take(MAX_DRAFT_LENGTH))
         }
+    }
+
+    @Synchronized fun applyVoiceTranscript(profile: String, sessionId: String, recordingId: String, transcript: String): String {
+        require(profile.isNotBlank() && sessionId.isNotBlank())
+        val key = draftKey(profile, sessionId)
+        val receipt = key + "_voice_receipt"
+        val old = readDraft(profile, sessionId)
+        if (preferences.getString(receipt, null) == recordingId) return old
+        val text = listOf(old, transcript).filter { it.isNotBlank() }.joinToString(" ")
+        require(text.length <= MAX_DRAFT_LENGTH) { uiText(R.string.ui_0174, "当前输入内容过长，录音已保留；请先处理输入框内容再重试") }
+        // Draft and receipt commit together, so a process restart cannot append this transcript twice.
+        check(preferences.edit().putString(key, text).putString(receipt, recordingId).commit()) { uiText(R.string.ui_0175, "无法保存识别文字，录音已保留") }
+        return text
     }
 
     fun clearDraft(profile: String, sessionId: String) {

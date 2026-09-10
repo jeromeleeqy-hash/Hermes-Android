@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- White safe margins retain the girl's headphones, hand and hair in launcher masks. -->
+<!-- Full-bleed artwork: its baked outer corners remain outside the launcher mask. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:insetLeft="20%" android:insetTop="20%"
-    android:insetRight="20%" android:insetBottom="20%">
+    android:insetLeft="13%" android:insetTop="13%"
+    android:insetRight="13%" android:insetBottom="13%">
     <bitmap android:src="@drawable/hermes_launcher_assistant" android:antialias="true" android:filter="true" android:gravity="fill" />
 </inset>

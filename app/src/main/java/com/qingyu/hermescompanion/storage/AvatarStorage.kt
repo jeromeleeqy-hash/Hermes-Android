@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.storage
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -39,10 +43,10 @@ class AvatarStorage(private val context: Context) {
 
     fun save(source: Uri, target: AvatarTarget, crop: AvatarCropSpec? = null): String {
         val mimeType = runCatching { context.contentResolver.getType(source) }.getOrNull()
-        require(mimeType == null || mimeType.startsWith("image/")) { "请选择图片文件" }
+        require(mimeType == null || mimeType.startsWith("image/")) { uiText(R.string.ui_0166, "请选择图片文件") }
 
         val directory = avatarDirectory.apply {
-            check(exists() || mkdirs()) { "无法创建头像目录" }
+            check(exists() || mkdirs()) { uiText(R.string.ui_0167, "无法创建头像目录") }
         }
         val decoded = decodeScaledBitmap(source, if (crop == null) MAX_AVATAR_EDGE else MAX_CROP_SOURCE_EDGE)
         val bitmap = crop?.let { cropAvatarBitmap(decoded, it, MAX_AVATAR_EDGE) } ?: decoded
@@ -51,7 +55,7 @@ class AvatarStorage(private val context: Context) {
         try {
             FileOutputStream(temporary).use { output ->
                 val format = if (bitmap.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
-                check(bitmap.compress(format, AVATAR_QUALITY, output)) { "头像保存失败" }
+                check(bitmap.compress(format, AVATAR_QUALITY, output)) { uiText(R.string.ui_0168, "头像保存失败") }
                 output.fd.sync()
             }
             try {
@@ -111,22 +115,22 @@ class AvatarStorage(private val context: Context) {
         } else {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.contentResolver.openInputStream(source).use { input ->
-                requireNotNull(input) { "无法读取所选图片" }
+                requireNotNull(input) { uiText(R.string.ui_0169, "无法读取所选图片") }
                 BitmapFactory.decodeStream(input, null, bounds)
             }
-            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "所选文件不是有效图片" }
+            require(bounds.outWidth > 0 && bounds.outHeight > 0) { uiText(R.string.ui_0170, "所选文件不是有效图片") }
             var sampleSize = 1
             while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > maxEdge * 2) {
                 sampleSize *= 2
             }
             val decoded = context.contentResolver.openInputStream(source).use { input ->
-                requireNotNull(input) { "无法读取所选图片" }
+                requireNotNull(input) { uiText(R.string.ui_0169, "无法读取所选图片") }
                 BitmapFactory.decodeStream(
                     input,
                     null,
                     BitmapFactory.Options().apply { inSampleSize = sampleSize },
                 )
-            } ?: error("所选文件不是有效图片")
+            } ?: error(uiText(R.string.ui_0170, "所选文件不是有效图片"))
             val longestEdge = maxOf(decoded.width, decoded.height)
             if (longestEdge <= maxEdge) {
                 decoded
@@ -164,7 +168,7 @@ internal fun cropAvatarBitmap(source: Bitmap, spec: AvatarCropSpec, maxEdge: Int
 internal data class AvatarCropBounds(val left: Int, val top: Int, val size: Int)
 
 internal fun avatarCropBounds(width: Int, height: Int, spec: AvatarCropSpec): AvatarCropBounds {
-    require(width > 0 && height > 0) { "图片尺寸无效" }
+    require(width > 0 && height > 0) { uiText(R.string.ui_0171, "图片尺寸无效") }
     val zoom = spec.zoom.coerceIn(1f, 4f)
     val side = (minOf(width, height) / zoom).roundToInt().coerceAtLeast(1)
     val horizontalSpace = (width - side).coerceAtLeast(0)

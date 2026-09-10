@@ -16,20 +16,35 @@ import com.qingyu.hermescompanion.ui.HermesViewModel
 import com.qingyu.hermescompanion.ui.ThemeMode
 import com.qingyu.hermescompanion.ui.theme.HermesCompanionTheme
 
-class MainActivity : ComponentActivity() {
+open class MainActivity : ComponentActivity() {
+    private var createdLanguage = com.qingyu.hermescompanion.i18n.AppLanguageMode.SYSTEM
+
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.qingyu.hermescompanion.i18n.AppLanguage.localizedContext(newBase))
+    }
+
     private val hermesViewModel: HermesViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.qingyu.hermescompanion.i18n.AppLanguage.refresh(this)
+        createdLanguage = com.qingyu.hermescompanion.i18n.AppLanguage.mode
+        hermesViewModel.refreshUiLanguage()
         enableEdgeToEdge()
-        hermesViewModel.handleDeepLink(intent)
-        hermesViewModel.handleShareIntent(intent)
+        // Keep the app's own continuous background visible in three-button mode too.
+        if (android.os.Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        hermesViewModel.handleInitialIntent(intent)
         intent.action = null
         setContent {
             val viewModel = hermesViewModel
             val state = viewModel.uiState
+            androidx.compose.runtime.LaunchedEffect(state.languageMode) {
+                if (android.os.Build.VERSION.SDK_INT < 33 && state.languageMode != createdLanguage) recreate()
+            }
             val systemDark = isSystemInDarkTheme()
-            val darkSystemBars = when (state.themeMode) {
+            val darkSystemBars = if (state.showLaunchIntro) true else when (state.themeMode) {
                 ThemeMode.SYSTEM -> systemDark
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
@@ -87,9 +102,16 @@ class MainActivity : ComponentActivity() {
                         else -> viewModel.closeConnectionSettings()
                     }
                 }
-                HermesApp(viewModel = viewModel, state = state)
+                androidx.compose.runtime.CompositionLocalProvider(com.qingyu.hermescompanion.ui.component.LocalLauncherIcon provides state.launcherIcon) {
+                    HermesApp(viewModel = viewModel, state = state)
+                }
             }
         }
+    }
+
+    override fun onStop() {
+        if (!isChangingConfigurations) hermesViewModel.onAppBackgrounded()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

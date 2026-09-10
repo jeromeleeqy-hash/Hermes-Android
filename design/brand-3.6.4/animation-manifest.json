@@ -1,0 +1,38 @@
+[
+  {
+    "name": "mascot_06_confident",
+    "frames": 120,
+    "duration_ms": 5000,
+    "first_source_bounds": [
+      198,
+      35,
+      420,
+      604
+    ],
+    "union": [
+      184,
+      26,
+      429,
+      627
+    ],
+    "bytes": 3869518
+  },
+  {
+    "name": "mascot_08_stretch",
+    "frames": 120,
+    "duration_ms": 5000,
+    "first_source_bounds": [
+      210,
+      67,
+      418,
+      597
+    ],
+    "union": [
+      83,
+      24,
+      537,
+      629
+    ],
+    "bytes": 4101036
+  }
+]

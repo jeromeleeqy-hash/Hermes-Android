@@ -26,6 +26,7 @@ class ConcurrentSessionsTest {
     private lateinit var vm: HermesViewModel
     private lateinit var client: HermesApiClient
     private val drafts = ConcurrentHashMap<String, String>()
+    private val dailyBindings = ConcurrentHashMap<String, String>()
     private val a = HermesSession(id = "a", title = "Project A", profile = "default", workspacePath = "/projects/a", messageCount = 4)
     private val b = HermesSession(id = "b", title = "Project B", profile = "default", workspacePath = "/projects/b", messageCount = 4)
 
@@ -46,6 +47,15 @@ class ConcurrentSessionsTest {
                 .`when`(store).saveDraft(anyString(), anyString(), anyString())
             doAnswer { drafts.remove("${it.arguments[0]}::${it.arguments[1]}"); null }
                 .`when`(store).clearDraft(anyString(), anyString())
+            `when`(store.readDailyConversation(anyString(), anyString(), anyString())).thenAnswer {
+                dailyBindings[it.arguments.take(3).joinToString("|")]
+            }
+            doAnswer {
+                val key = it.arguments.take(3).joinToString("|")
+                val value = it.arguments[3] as String?
+                if (value == null) dailyBindings.remove(key) else dailyBindings[key] = value
+                null
+            }.`when`(store).saveDailyConversation(anyString(), anyString(), anyString(), any())
         }
         val app = mock(Application::class.java)
         val prefs = mock(SharedPreferences::class.java)
@@ -149,14 +159,72 @@ class ConcurrentSessionsTest {
         vm.selectProject(project.id)
         // createSession captures the selected path before launching its network work.
         val created = a.copy(id = "new-a", runtimeId = "runtime-new-a", messageCount = 0)
-        `when`(client.createSession("/projects/a")).thenReturn(created)
+        `when`(client.createSessionForProfile("/projects/a", "default")).thenReturn(created)
         `when`(client.loadRecentMessagePage(created, 60)).thenReturn(MessagePage(emptyList(), 0, 0))
         vm.createSession()
         assertEquals(project.id, vm.uiState.selectedProjectId)
         dispatcher.scheduler.runCurrent()
         // The IO call is verified with a bounded timeout, not by asserting implementation strings.
-        verify(client, timeout(3000)).createSession("/projects/a")
+        verify(client, timeout(3000)).createSessionForProfile("/projects/a", "default")
         awaitState { vm.uiState.selectedSession?.id == "new-a" && !vm.uiState.isBusy }
+    }
+
+    @Test fun dailyEntryReusesServerConversationAcrossProjectChanges() {
+        val daily = a.copy(id = "daily", title = "日常助理", workspacePath = "/daily")
+        `when`(client.findSessionByTitleForProfile("日常助理", "default")).thenReturn(daily)
+        `when`(client.sessionForProfile("daily", "default")).thenReturn(daily)
+        `when`(client.loadRecentMessagePage(daily, 60)).thenReturn(MessagePage(emptyList(), 0, 0))
+        setState(vm.uiState.copy(route = AppRoute.HOME, selectedProjectId = "unrelated-project"))
+        vm.openDailyConversation(); vm.openDailyConversation()
+        awaitState { vm.uiState.selectedSession?.id == "daily" && !vm.uiState.isDailyOpening && !vm.uiState.isBusy }
+        assertEquals("/daily", vm.uiState.selectedSession!!.workspacePath)
+        setState(vm.uiState.copy(route = AppRoute.HOME, selectedProjectId = "another-project"))
+        vm.openDailyConversation()
+        awaitState { vm.uiState.route == AppRoute.CHAT && !vm.uiState.isDailyOpening && !vm.uiState.isBusy }
+        verify(client, times(1)).findSessionByTitleForProfile("日常助理", "default")
+        verify(client, times(1)).sessionForProfile("daily", "default")
+        verify(client, never()).createSessionForProfile(any(), anyString())
+    }
+
+    @Test fun dailyLookupFailureDoesNotCreateAnEmptyReplacement() {
+        `when`(client.findSessionByTitleForProfile("日常助理", "default")).thenAnswer { throw ApiException(503, "暂时不可用") }
+        setState(vm.uiState.copy(route = AppRoute.HOME))
+        vm.openDailyConversation()
+        awaitState { !vm.uiState.isDailyOpening && vm.uiState.errorMessage != null }
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        verify(client, never()).createSessionForProfile(any(), anyString())
+    }
+
+    @Test fun delayedDailyLookupDoesNotTakeOverAnotherPage() {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val daily = a.copy(id = "daily", title = "日常助理")
+        `when`(client.findSessionByTitleForProfile("日常助理", "default")).thenAnswer {
+            entered.countDown(); check(release.await(3, java.util.concurrent.TimeUnit.SECONDS)); daily
+        }
+        setState(vm.uiState.copy(route = AppRoute.HOME))
+        vm.openDailyConversation(); dispatcher.scheduler.runCurrent()
+        assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS))
+        setState(vm.uiState.copy(route = AppRoute.SESSIONS))
+        release.countDown()
+        awaitState { !vm.uiState.isDailyOpening }
+        assertEquals(AppRoute.SESSIONS, vm.uiState.route)
+    }
+
+    @Test fun sharingToDailyUsesNativeConversationAndDoesNotStartAnotherSession() {
+        val daily = a.copy(id = "daily", title = "日常助理")
+        `when`(client.findSessionByTitleForProfile("日常助理", "default")).thenReturn(daily)
+        `when`(client.loadMessages(daily, 60)).thenReturn(emptyList())
+        setState(vm.uiState.copy(incomingShare = IncomingShare(sharedText = "https://example.com/video", instruction = "记一下这个开头")))
+        vm.sendIncomingShare(com.qingyu.hermescompanion.assistant.DailyConversation.SHARE_TARGET)
+        awaitState { runs().containsKey(daily.scopedId) }
+        val run = runs().getValue(daily.scopedId)
+        assertTrue(run.originalPrompt.contains("记一下这个开头"))
+        assertTrue(run.originalPrompt.contains("https://example.com/video"))
+        assertEquals(run.originalPrompt, com.qingyu.hermescompanion.assistant.AssistantPrompts.visibleText(run.submittedPrompt))
+        assertFalse(run.submittedPrompt.contains("hermes-assistant-"))
+        assertNull(vm.uiState.incomingShare)
+        verify(client, never()).createSessionForProfile(any(), anyString())
     }
 
     private fun awaitState(predicate: () -> Boolean) {
@@ -171,7 +239,7 @@ class ConcurrentSessionsTest {
 
     @Test fun emptyNewRuntimeDoesNotReadUnpersistedHistoryEvenWhenReopened() {
         val created = HermesSession(id = "fresh", title = "新会话", runtimeId = "runtime-fresh")
-        `when`(client.createSession(null)).thenReturn(created)
+        `when`(client.createSessionForProfile(null, "default")).thenReturn(created)
         `when`(client.loadRecentMessagePage(created, 60)).thenAnswer { throw ApiException(404, "Session not found") }
         vm.createSession()
         awaitState { vm.uiState.selectedSession?.id == "fresh" && !vm.uiState.isBusy }
@@ -185,7 +253,7 @@ class ConcurrentSessionsTest {
 
     @Test fun newConversationCanStartWhileAnotherTaskContinues() {
         val created = HermesSession(id = "fresh", title = "新会话", runtimeId = "runtime-fresh")
-        `when`(client.createSession(null)).thenReturn(created)
+        `when`(client.createSessionForProfile(null, "default")).thenReturn(created)
         vm.updateDraft("A question")
         vm.sendMessage()
         val runningA = runs().getValue(a.scopedId)
@@ -209,7 +277,7 @@ class ConcurrentSessionsTest {
 
     @Test fun homeStartsWithDraftAndReturnsHomeWithoutSending() {
         val created = HermesSession(id = "home-new", title = "新对话", runtimeId = "runtime-home")
-        `when`(client.createSession(null)).thenReturn(created)
+        `when`(client.createSessionForProfile(null, "default")).thenReturn(created)
         setState(vm.uiState.copy(route = AppRoute.HOME, selectedSession = null))
         vm.startFromHome("整理今天的运营记录")
         awaitState { vm.uiState.selectedSession?.id == created.id && !vm.uiState.isBusy }
@@ -236,7 +304,7 @@ class ConcurrentSessionsTest {
         val project = HermesProject("pb", "Project B", "/projects/b")
         val created = b.copy(id = "home-b", runtimeId = "runtime-home-b", messageCount = 0)
         // Complete stubbing before the background stream can touch this mock.
-        `when`(client.createSession("/projects/b")).thenReturn(created)
+        `when`(client.createSessionForProfile("/projects/b", "default")).thenReturn(created)
         vm.updateDraft("A question"); vm.sendMessage()
         val run = runs().getValue(a.scopedId)
         setState(vm.uiState.copy(route = AppRoute.HOME, projects = listOf(project), selectedProjectId = project.id))
@@ -250,7 +318,7 @@ class ConcurrentSessionsTest {
 
     @Test fun homeVoiceEntryIsConsumedOnceAfterCreatingSession() {
         val created = HermesSession(id="home-voice", title="新对话", runtimeId="runtime-voice")
-        `when`(client.createSession(null)).thenReturn(created)
+        `when`(client.createSessionForProfile(null, "default")).thenReturn(created)
         setState(vm.uiState.copy(route=AppRoute.HOME, selectedSession=null))
         vm.startWithVoiceFromHome("已有草稿")
         awaitState { vm.uiState.selectedSession?.id == created.id && !vm.uiState.isBusy }

@@ -180,6 +180,32 @@ class ConcurrentGatewayTest {
         assertEquals(1, events.count { it == StreamEvent.Completed })
     }
 
+    @Test fun newAssistantSessionUsesCapturedProfileEvenIfClientSelectionChanged() {
+        client.setProfile("personal")
+        val session = client.createSessionForProfile("/work/company", "work")
+        assertEquals("work", session.profile)
+        assertEquals("/work/company", session.workspacePath)
+        val scopedCalls = calls.filter { it.optString("method") in setOf("session.create", "session.cwd.set") }
+        assertEquals(2, scopedCalls.size)
+        assertTrue(scopedCalls.all { it.getJSONObject("params").getString("profile") == "work" })
+    }
+
+    @Test fun quickTextTurnKeepsAttachmentsAndRestoresReasoningWithoutChangingTheModel() {
+        reasoning = "high"
+        val task = workers.submit {
+            client.streamVoiceMessage(StreamController(), HermesSession("quick", "快问", profile="work"), "这份资料说了什么", true, {}, {},
+                attachments = listOf(com.qingyu.hermescompanion.model.PendingAttachment(name="sample.txt", mimeType="text/plain", textContent="CONTENT_SAMPLE_42")))
+        }
+        assertEquals("runtime-quick", submitted.poll(15, TimeUnit.SECONDS))
+        val prompt = calls.single { it.optString("method") == "prompt.submit" }.getJSONObject("params")
+        assertTrue(prompt.getString("text").contains("CONTENT_SAMPLE_42"))
+        assertEquals("work", prompt.getString("profile"))
+        event("runtime-quick", "message.complete", "这是资料摘要。")
+        task.get(15, TimeUnit.SECONDS)
+        assertTrue(calls.none { it.optString("method") == "slash.exec" })
+        assertEquals(listOf("none", "high"), calls.filter { it.optString("method") == "config.set" }.map { it.getJSONObject("params").getString("value") })
+    }
+
     @Test fun unsupportedVoiceReasoningStillSendsWithoutChangingConfig() {
         reasoning = null
         val notices = CopyOnWriteArrayList<String>()

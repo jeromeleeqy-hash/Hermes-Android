@@ -29,7 +29,7 @@ import java.io.File
 
 @OptIn(ExperimentalComposeUiApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w390dp-h844dp-mdpi")
+@Config(sdk = [35], qualifiers = "zh-rCN-w390dp-h844dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AssistantLayoutTest {
     @get:Rule val compose = createComposeRule()
@@ -64,7 +64,7 @@ class AssistantLayoutTest {
     }
     @Test fun homeKeepsRealContentWithoutComposer() {
         render()
-        compose.onNodeWithText("这周的内容，先优化哪个方向？").assertIsDisplayed()
+        compose.onNodeWithText("这周的内容，先优化哪个方向？").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("本周运营复盘").assertExists()
         compose.onNodeWithTag("home_input").assertDoesNotExist()
         compose.onNodeWithTag("home_composer").assertDoesNotExist()
@@ -74,7 +74,7 @@ class AssistantLayoutTest {
         assertTrue("Scrollable home extends behind the floating dock",root.bottom >= dock.bottom)
         capture("home-light-320")
     }
-    @Test @Config(qualifiers="w360dp-h800dp-mdpi") fun homeLargeTextStillReachesItsLastRow() {
+    @Test @Config(qualifiers="zh-rCN-w360dp-h800dp-mdpi") fun homeLargeTextStillReachesItsLastRow() {
         render(fontScale=1.3f)
         compose.onNodeWithText("本周运营复盘").performScrollTo().assertIsDisplayed()
         capture("home-large-320")
@@ -83,20 +83,16 @@ class AssistantLayoutTest {
         var started=false
         render(preview=state.copy(pendingAgentRequests=emptyList()),onStart={started=true})
         compose.onNodeWithText("接着聊聊").assertDoesNotExist()
-        compose.onNodeWithText("开个新话题").performClick()
+        compose.onNodeWithText("跟我说").performClick()
         assertTrue(started)
         compose.onNodeWithText("1 件事正在处理").assertDoesNotExist()
         compose.onNodeWithText("暂时没有待确认事项").assertDoesNotExist()
         val portrait = compose.onNodeWithTag("home_hermes_portrait").fetchSemanticsNode().boundsInRoot
-        val card = compose.onNodeWithTag("home_featured_card").fetchSemanticsNode().boundsInRoot
-        assertEquals("Portrait flat base touches the card", card.top, portrait.bottom, .1f)
-        val bitmap = capture("home-simplified-320")
-        val backdrop = bitmap.getPixel(0, portrait.center.y.toInt())
-        for (fraction in listOf(.35f, .5f, .65f)) {
-            assertNotEquals("The flat portrait base must contain artwork", backdrop,
-                bitmap.getPixel((portrait.left + portrait.width * fraction).toInt(), portrait.bottom.toInt() - 2))
-        }
+        val button = compose.onNodeWithTag("daily_conversation_entry").fetchSemanticsNode().boundsInRoot
+        assertTrue("The character must not cover the daily action", portrait.left >= button.right || portrait.top >= button.bottom || portrait.bottom <= button.top)
+        capture("home-simplified-320")
     }
+
     @Test fun darkHomeUsesTheSamePortraitWithoutWhiteRectangle() {
         render(dark=true)
         compose.onNodeWithTag("home_hermes_portrait").assertIsDisplayed()
@@ -211,9 +207,8 @@ class AssistantLayoutTest {
             }
         } }
         compose.onNodeWithTag("new_conversation").assertIsDisplayed()
-        val visible=compose.onNodeWithTag("conversation_create_visual",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
         val touch=compose.onNodeWithTag("new_conversation").fetchSemanticsNode().boundsInRoot
-        assertEquals(45f,visible.width,.1f);assertTrue(touch.width>=48f)
+        assertTrue(touch.width>=48f); assertTrue(touch.top < 130f)
         capture("sessions-unified")
     }
 
@@ -243,7 +238,7 @@ class AssistantLayoutTest {
         val preview=state.copy(route=AppRoute.PROFILE,sessions=emptyList(),pendingAgentRequests=emptyList(),runningRuns=emptyList())
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
             Scaffold(bottomBar={ReferenceBottomDock(AppRoute.PROFILE,false,{})},contentWindowInsets=WindowInsets(0,0,0,0)) { padding ->
-                ProfileScreen(state=preview,contentPadding=padding,onOpenSettings={},onBackToProfile={},onThemeChange={_ -> },onConnectionSettings={},onNotificationSettings={},onVoiceSettings={},onSkillsTools={},onModelSettings={},onConversationStyle={},onApprovalSettings={},onMemoryContext={},onOpenMemoryFile={},onOpenSoulFile={},onArchivedSessions={},onProfileSettings={},onUpdateUserAvatar={_,_ -> },onAbout={},onChangeLog={},showSettings=true)
+                ProfileScreen(state=preview,contentPadding=padding,onOpenSettings={},onBackToProfile={},onThemeChange={_ -> },onSkinChange={_ -> },onConnectionSettings={},onNotificationSettings={},onVoiceSettings={},onSkillsTools={},onModelSettings={},onConversationStyle={},onApprovalSettings={},onMemoryContext={},onOpenMemoryFile={},onOpenSoulFile={},onArchivedSessions={},onProfileSettings={},onUpdateUserAvatar={_,_ -> },onAbout={},onChangeLog={},showSettings=true)
             }
         } }
         compose.onNodeWithText("我的").assertExists()
@@ -297,15 +292,13 @@ class AssistantLayoutTest {
         capture("voice-listening-320")
     }
 
-    @Test fun homeMenuKeepsOnlyUsefulDestinations() {
+    @Test fun homeBrandHasNoRedundantMenuAndKeepsSearch() {
         render()
-        compose.onNodeWithText("执行中心").assertDoesNotExist()
-        compose.onNodeWithTag("home_menu_anchor").performClick()
-        compose.onNodeWithText("项目与档案").assertIsDisplayed()
-        compose.onNodeWithText("执行中心").assertIsDisplayed()
-        compose.onNodeWithText("文件与成果").assertIsDisplayed()
-        compose.onNodeWithText("刷新").assertDoesNotExist()
-        capture("home-menu",compose.onNodeWithTag("home_menu"))
+        compose.onNodeWithTag("home_menu_anchor").assertDoesNotExist()
+        compose.onNodeWithTag("home_menu").assertDoesNotExist()
+        compose.onNodeWithContentDescription("搜索对话").assertIsDisplayed()
+        compose.onNodeWithTag("nav_TASKS").assertIsDisplayed()
+        compose.onNodeWithTag("nav_WORKSPACE").assertIsDisplayed()
     }
 
     @Test fun composerCommandsOpenPaletteAndChatMenuIsSimplified() {
@@ -319,7 +312,7 @@ class AssistantLayoutTest {
         compose.onNodeWithContentDescription("对话菜单").performClick()
         compose.onNodeWithText("对话详情").assertDoesNotExist()
         compose.onNodeWithText("快捷命令").assertDoesNotExist()
-        compose.onNodeWithText("查看完整对话").performClick()
+        compose.onNodeWithText("完整对话").performClick()
         compose.onNodeWithContentDescription("添加内容").performClick()
         compose.onNodeWithText("链接").assertDoesNotExist()
         compose.onNodeWithText("命令").assertIsDisplayed()

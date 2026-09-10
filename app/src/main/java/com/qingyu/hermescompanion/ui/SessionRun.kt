@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import com.qingyu.hermescompanion.data.StreamController
 import com.qingyu.hermescompanion.model.*
 import kotlinx.coroutines.Job
@@ -26,7 +30,7 @@ internal class SessionRun(
     var artifacts: List<ChatArtifact> = emptyList()
     var todos: List<ChatTodo> = emptyList()
     var queued: QueuedRunMessage? = null
-    var stage = "正在连接 Hermes"
+    var stage = uiText(R.string.ui_0435, "正在连接 Hermes")
     var lastActivityAtMillis = startedAtMillis
     var recovering = false
     var isSteering = false

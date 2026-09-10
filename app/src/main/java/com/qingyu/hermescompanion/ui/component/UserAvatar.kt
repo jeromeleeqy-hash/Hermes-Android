@@ -49,9 +49,8 @@ fun UserAvatar(
             modifier = framedModifier,
         )
     } else if (hermesFallback) {
-        Box(modifier = framedModifier, contentAlignment = Alignment.Center) {
-            HermesMark(compact = true, requestedSize = size)
-        }
+        Image(painter = painterResource(R.drawable.hermes_default_avatar),
+            contentDescription = displayName, contentScale = ContentScale.Crop, modifier = framedModifier)
     } else {
         Image(
             painter = painterResource(R.drawable.fixed_user_avatar),

@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <queries>
         <intent>
@@ -17,6 +18,7 @@
 
     <application
         android:name=".HermesCompanionApplication"
+        android:localeConfig="@xml/locale_config"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -41,13 +43,9 @@
                 android:resource="@xml/file_paths" />
         </provider>
         <activity
-            android:name=".MainActivity"
+            android:name=".HermesHostActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -59,6 +57,27 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
+        <!-- Keep the existing launcher component for upgrades and pinned home-screen shortcuts.
+             HermesHostActivity remains enabled for shares and notifications regardless of icon choice. -->
+        <activity-alias android:name="com.qingyu.hermescompanion.MainActivity"
+            android:targetActivity=".HermesHostActivity" android:enabled="true" android:exported="true"
+            android:icon="@mipmap/ic_launcher" android:label="${hermesAppLabel}">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.qingyu.hermescompanion.launcher.SpriteIcon"
+            android:targetActivity=".HermesHostActivity" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/ic_launcher_sprite" android:label="${hermesAppLabel}">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <receiver android:name=".appearance.LauncherIconRestoreReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
         <receiver
             android:name=".notification.CronNotificationReceiver"
             android:enabled="true"
@@ -67,6 +86,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="com.qingyu.hermescompanion.POLL_CRON" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".assistant.AssistantReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

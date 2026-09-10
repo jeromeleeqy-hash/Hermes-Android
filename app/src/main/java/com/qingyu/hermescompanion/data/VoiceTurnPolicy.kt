@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.data
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import com.qingyu.hermescompanion.model.ServerTtsSettings
 
 /** Raw peak dBFS is deliberately separate from the amplified animation envelope.
@@ -98,7 +102,7 @@ internal fun speechLanguage(text: String, preferred: String): String =
 /** Strip presentation syntax, preserving Chinese, punctuation and the actual answer. */
 internal fun spokenReply(markdown: String): String = markdown
     .replace(Regex("(?s)<think>.*?</think>"), "")
-    .replace(Regex("(?s)```.*?```"), "\n代码已放在对话中。\n")
+    .replace(Regex("(?s)```.*?```"), uiText(R.string.ui_0149, "\n代码已放在对话中。\n"))
     .replace(Regex("!\\[([^]]*)]\\([^)]+\\)"), "$1")
     .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
     .replace(Regex("https?://\\S+"), "")

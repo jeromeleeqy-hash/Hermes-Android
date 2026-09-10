@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.BackHandler
@@ -64,7 +68,7 @@ fun PreviewableImage(
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = "预览 $name",
+                contentDescription = uiText(R.string.ui_0447, "预览 %1\$s", name),
                 modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.Crop,
             )
@@ -76,7 +80,7 @@ fun PreviewableImage(
                 HermesMulticolorIcon(HermesIconKind.PHOTO, contentDescription = null, iconSize = 28.dp)
                 Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("点击打开图片", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(uiText(R.string.ui_0448, "点击打开图片"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -122,7 +126,7 @@ fun ImagePreviewDialog(image: ImagePreview, onDismiss: () -> Unit) {
                     contentScale = ContentScale.Fit,
                 )
             } else {
-                Text("无法显示这张图片", color = Color.White, modifier = Modifier.align(Alignment.Center))
+                Text(uiText(R.string.ui_0449, "无法显示这张图片"), color = Color.White, modifier = Modifier.align(Alignment.Center))
             }
             Row(
                 modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(start = 14.dp, end = 8.dp, top = 28.dp),
@@ -133,7 +137,7 @@ fun ImagePreviewDialog(image: ImagePreview, onDismiss: () -> Unit) {
                     Text(image.mimeType, color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
                 }
                 IconButton(onClick = onDismiss) {
-                    HermesMulticolorIcon(HermesIconKind.CLOSE, contentDescription = "关闭预览", tint = Color.White)
+                    HermesMulticolorIcon(HermesIconKind.CLOSE, contentDescription = uiText(R.string.ui_0450, "关闭预览"), tint = Color.White)
                 }
             }
             if (scale > 1f) {
@@ -164,7 +168,7 @@ fun ImageLoadingDialog() {
                     horizontalArrangement = Arrangement.spacedBy(11.dp),
                 ) {
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.2.dp)
-                    Text("正在打开图片")
+                    Text(uiText(R.string.ui_0451, "正在打开图片"))
                 }
             }
         }

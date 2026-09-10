@@ -1,0 +1,69 @@
+{
+  "version": "3.6.5",
+  "versionCode": 365,
+  "revision": "compact-chat-menu",
+  "package": "com.qingyu.hermescompanion.preview",
+  "tests": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "testSuites": 1,
+  "suites": [
+    {
+      "name": "com.qingyu.hermescompanion.ui.screen.UiRefinement363Test",
+      "tests": "1",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-09-10T04:31:20.250Z",
+      "hostname": "localhost",
+      "time": "12.045"
+    }
+  ],
+  "uiChecks": [
+    "Chat overflow menu: all three skins, Chinese/English, light/dark (12 native renderings).",
+    "Chinese default width 128dp; English sizes to the translated labels (below 200dp at the checked scale).",
+    "Centered labels render on a single line without ellipsis; menu height does not exceed 168dp.",
+    "48dp minimum item height is retained; selecting voice calls the action and dismisses the menu in all 12 combinations.",
+    "Theme corners: Warm 16dp, Glass 12dp, Quiet 10dp. Other dropdowns retain their existing theme radius."
+  ],
+  "previousHomeValidation": {
+    "tests": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "uiChecks": [
+      "Native Android rendering of all three home skins in Chinese and English at 360x780 and 390x844.",
+      "Warm portrait layout aligns the greeting top and primary action bottom without overlapping the action.",
+      "Both recent entries stay above the navigation dock without scrolling at normal font scale.",
+      "Caption line extents fit within two lines without ellipsis at the checked viewports.",
+      "48 Chinese quotes, maximum 11 code points including punctuation; corresponding English translations.",
+      "Date/weekday refresh across midnight; quotes remain stable during a minute tick and skin/language changes, refresh on the next day or home visit."
+    ],
+    "scope": "Completed on the initial 3.6.5 build; home code is unchanged in this revision."
+  },
+  "physicalDeviceValidation": false,
+  "apk": {
+    "sha256": "05be0dee3862c1e6a390aac0688189a1dfa8d45dd447a7db5d2b870c6d14bcbb",
+    "bytes": 64741012,
+    "zipCRC": "passed",
+    "dex": [
+      {
+        "file": "classes.dex",
+        "bytes": 4089480,
+        "checksum": "passed"
+      }
+    ],
+    "signatureScheme": "v2",
+    "signerSha256": "741c1844bb9267547e06af30d56c0da5bfcbf01491d3670496d88837a2860ad6",
+    "sameSignerAsInitial365": true,
+    "zipalign16KB": "passed",
+    "debuggable": false,
+    "releaseBuild": "successful",
+    "lintVital": "passed"
+  }
+}

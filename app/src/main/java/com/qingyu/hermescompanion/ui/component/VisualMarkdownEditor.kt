@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.os.Handler
@@ -116,16 +120,16 @@ private fun VisualEditorToolbar(onCommand: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            EditorTextAction("正文") { onCommand("p") }
-            EditorTextAction("标题 1") { onCommand("h1") }
-            EditorTextAction("标题 2") { onCommand("h2") }
-            EditorTextAction("标题 3") { onCommand("h3") }
-            EditorIconAction(HermesIconKind.BOLD, "粗体") { onCommand("bold") }
-            EditorIconAction(HermesIconKind.ITALIC, "斜体") { onCommand("italic") }
-            EditorIconAction(HermesIconKind.BULLET_LIST, "项目列表") { onCommand("ul") }
-            EditorIconAction(HermesIconKind.NUMBERED_LIST, "编号列表") { onCommand("ol") }
-            EditorIconAction(HermesIconKind.QUOTE, "引用") { onCommand("quote") }
-            EditorIconAction(HermesIconKind.HORIZONTAL_RULE, "分割线") { onCommand("hr") }
+            EditorTextAction(uiText(R.string.ui_0456, "正文")) { onCommand("p") }
+            EditorTextAction(uiText(R.string.ui_0457, "标题 1")) { onCommand("h1") }
+            EditorTextAction(uiText(R.string.ui_0458, "标题 2")) { onCommand("h2") }
+            EditorTextAction(uiText(R.string.ui_0459, "标题 3")) { onCommand("h3") }
+            EditorIconAction(HermesIconKind.BOLD, uiText(R.string.ui_0460, "粗体")) { onCommand("bold") }
+            EditorIconAction(HermesIconKind.ITALIC, uiText(R.string.ui_0461, "斜体")) { onCommand("italic") }
+            EditorIconAction(HermesIconKind.BULLET_LIST, uiText(R.string.ui_0462, "项目列表")) { onCommand("ul") }
+            EditorIconAction(HermesIconKind.NUMBERED_LIST, uiText(R.string.ui_0463, "编号列表")) { onCommand("ol") }
+            EditorIconAction(HermesIconKind.QUOTE, uiText(R.string.ui_0464, "引用")) { onCommand("quote") }
+            EditorIconAction(HermesIconKind.HORIZONTAL_RULE, uiText(R.string.ui_0465, "分割线")) { onCommand("hr") }
         }
     }
 }
@@ -205,7 +209,7 @@ private fun editableDocumentHtml(
           const tag=node.tagName.toLowerCase(); const body=Array.from(node.childNodes).map(inlineNode).join('');
           if(tag==='strong'||tag==='b')return '**'+body+'**'; if(tag==='em'||tag==='i')return '*'+body+'*';
           if(tag==='s'||tag==='del'||tag==='strike')return '~~'+body+'~~'; if(tag==='code'&&node.parentElement.tagName.toLowerCase()!=='pre')return '`'+(node.textContent||'')+'`';
-          if(tag==='a')return '['+body+']('+(node.getAttribute('href')||'')+')'; if(tag==='img')return '!['+(node.getAttribute('alt')||'图片')+']('+(node.getAttribute('src')||'')+')';
+          if(tag==='a')return '['+body+']('+(node.getAttribute('href')||'')+')'; if(tag==='img')return '!['+(node.getAttribute('alt')||'image')+']('+(node.getAttribute('src')||'')+')';
           if(tag==='br')return '\n'; return body;
         }
         function blockNode(el){

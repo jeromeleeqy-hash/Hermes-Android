@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -139,7 +143,7 @@ fun PdfDocumentPreview(document: WorkspaceDocument, modifier: Modifier = Modifie
             if (current.totalPages > current.pages.size) {
                 item {
                     Text(
-                        "文件共 ${current.totalPages} 页，为控制内存仅预览前 ${current.pages.size} 页；可下载后查看完整内容。",
+                        uiText(R.string.ui_0441, "文件共 %1\$s 页，为控制内存仅预览前 %2\$s 页；可下载后查看完整内容。", current.totalPages, current.pages.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth().padding(6.dp),
@@ -149,14 +153,14 @@ fun PdfDocumentPreview(document: WorkspaceDocument, modifier: Modifier = Modifie
             itemsIndexed(current.pages) { index, bitmap ->
                 Column(Modifier.fillMaxWidth()) {
                     Text(
-                        "第 ${index + 1} 页",
+                        uiText(R.string.ui_0442, "第 %1\$s 页", index + 1),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                     Image(
                         bitmap = bitmap,
-                        contentDescription = "PDF 第 ${index + 1} 页",
+                        contentDescription = uiText(R.string.ui_0443, "PDF 第 %1\$s 页", index + 1),
                         modifier = Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color.White),
                         contentScale = ContentScale.FillWidth,
                     )
@@ -173,7 +177,7 @@ private sealed interface PdfPreviewState {
 }
 
 private fun renderPdf(cacheDir: File, bytes: ByteArray): PdfPreviewState {
-    if (bytes.isEmpty()) return PdfPreviewState.Failed("PDF 内容为空")
+    if (bytes.isEmpty()) return PdfPreviewState.Failed(uiText(R.string.ui_0444, "PDF 内容为空"))
     val file = File.createTempFile("hermes-preview-", ".pdf", cacheDir)
     return runCatching {
         file.writeBytes(bytes)
@@ -196,7 +200,7 @@ private fun renderPdf(cacheDir: File, bytes: ByteArray): PdfPreviewState {
                 PdfPreviewState.Ready(pages, renderer.pageCount)
             }
         }
-    }.getOrElse { PdfPreviewState.Failed("无法预览这份 PDF，可下载后使用系统应用打开") }
+    }.getOrElse { PdfPreviewState.Failed(uiText(R.string.ui_0445, "无法预览这份 PDF，可下载后使用系统应用打开")) }
         .also { file.delete() }
 }
 

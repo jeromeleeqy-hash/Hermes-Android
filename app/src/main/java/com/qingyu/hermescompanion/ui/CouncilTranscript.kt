@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 internal data class CouncilAgentMessage(
     val index: Int,
     val total: Int,
@@ -22,7 +26,7 @@ private val syntheticProcessingStatus = Regex(
     "^\\s*(?:Hermes\\s*)?正在处理(?:中|当前任务|当前问题)?(?:\\s*[·•]\\s*\\d+\\s*项进行中)?[。.!！…]*\\s*$",
     RegexOption.IGNORE_CASE,
 )
-private val fallbackExpertNames = listOf("证据分析员", "反方审查员", "落地评审员")
+private val fallbackExpertNames get() = listOf(uiText(R.string.ui_0182, "证据分析员"), uiText(R.string.ui_0183, "反方审查员"), uiText(R.string.ui_0184, "落地评审员"))
 
 internal fun parseCouncilAgentMessages(text: String): List<CouncilAgentMessage> {
     if (!councilBatchMarker.containsMatchIn(text)) return emptyList()
@@ -42,7 +46,7 @@ internal fun parseCouncilAgentMessages(text: String): List<CouncilAgentMessage> 
         val identitySource = "$heading\n${rawBody.take(240)}"
         val name = councilExpertName.find(identitySource)?.groupValues?.get(1)?.trim()
             ?.takeIf(String::isNotBlank)
-            ?: fallbackExpertNames.getOrElse(position) { "专家 ${position + 1}" }
+            ?: fallbackExpertNames.getOrElse(position) { uiText(R.string.ui_0185, "专家 %1\$s", position + 1) }
         val task = heading
             .replace(councilExpertName, "")
             .replace(Regex("^\\s*[。:：·—-]+\\s*"), "")

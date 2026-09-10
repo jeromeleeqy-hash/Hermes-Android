@@ -1,5 +1,12 @@
 package com.qingyu.hermescompanion.ui.screen
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,16 +26,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import com.qingyu.hermescompanion.ui.component.hermesInputWell
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.qingyu.hermescompanion.ui.component.HermesAlertDialog as AlertDialog
+import com.qingyu.hermescompanion.ui.component.HermesButton as Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.qingyu.hermescompanion.ui.component.HermesOutlinedButton as OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,7 +80,7 @@ import com.qingyu.hermescompanion.ui.format.ellipsizeSessionTitle
 import com.qingyu.hermescompanion.ui.format.sessionTimeLabel
 import com.qingyu.hermescompanion.ui.theme.HermesSpacing
 
-private enum class CapabilityTab(val label: String) { SKILLS("技能"), TOOLS("工具集"), MCP("MCP") }
+private enum class CapabilityTab(val label: String) { SKILLS(uiText(R.string.ui_0426, "技能")), TOOLS(uiText(R.string.ui_0492, "工具集")), MCP("MCP") }
 
 @Composable
 fun SkillsToolsScreen(
@@ -86,7 +96,7 @@ fun SkillsToolsScreen(
 ) {
     var tab by remember { mutableStateOf(CapabilityTab.SKILLS) }
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
-        SettingsHeader("技能与工具", "修改后通常从下次会话生效", onBack, onRefresh, state.isAdvancedSettingsLoading)
+        SettingsHeader(uiText(R.string.ui_0493, "技能与工具"), uiText(R.string.ui_0494, "修改后通常从下次会话生效"), onBack, onRefresh, state.isAdvancedSettingsLoading)
         HermesSegmentedControl(
             items = CapabilityTab.entries.map(CapabilityTab::label),
             selectedIndex = tab.ordinal,
@@ -112,7 +122,7 @@ fun SkillsToolsScreen(
                     CapabilityTab.TOOLS -> items(state.toolsets, key = { it.name }) { tool ->
                         CapabilityRow(
                             title = tool.label,
-                            subtitle = tool.description.ifBlank { "${tool.tools.size} 个工具" },
+                            subtitle = tool.description.ifBlank { uiText(R.string.ui_0495, "%1\$s 个工具", tool.tools.size) },
                             icon = HermesIconKind.TODO,
                             checked = tool.enabled,
                             busy = state.settingsActionKey == "toolset:${tool.name}",
@@ -123,7 +133,7 @@ fun SkillsToolsScreen(
                     CapabilityTab.MCP -> items(state.mcpServers, key = { it.name }) { server ->
                         CapabilityRow(
                             title = server.name,
-                            subtitle = listOf(server.transport, server.status, "${server.toolCount} 个工具").filter(String::isNotBlank).joinToString(" · "),
+                            subtitle = listOf(server.transport, server.status, uiText(R.string.ui_0495, "%1\$s 个工具", server.toolCount)).filter(String::isNotBlank).joinToString(" · "),
                             icon = HermesIconKind.CONNECTION,
                             checked = server.enabled,
                             busy = state.settingsActionKey == "mcp:${server.name}",
@@ -153,9 +163,9 @@ fun SkillsToolsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCloseSkill) { Text("关闭") } },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onCloseSkill) { Text(uiText(R.string.ui_0196, "关闭")) } },
             dismissButton = {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onSkillToggle(skill) }) { Text(if (skill.enabled) "停用技能" else "启用技能") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onSkillToggle(skill) }) { Text(if (skill.enabled) uiText(R.string.ui_0496, "停用技能") else uiText(R.string.ui_0497, "启用技能")) }
             },
         )
     }
@@ -175,8 +185,8 @@ private fun CapabilityRow(
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             HermesMulticolorIcon(icon, null, iconSize = 18.dp)
             Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
             else HermesSwitch(checked = checked, onCheckedChange = { onToggle() })
@@ -213,48 +223,56 @@ fun ModelSettingsScreen(
     var showProviderDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
-        SettingsHeader("模型设置", "配置 Hermes 新会话使用的模型", onBack, busy = state.isAdvancedSettingsLoading)
+        SettingsHeader(uiText(R.string.ui_0498, "模型设置"), uiText(R.string.ui_0499, "配置 Hermes 新会话使用的模型"), onBack, busy = state.isAdvancedSettingsLoading)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(horizontal = HermesSpacing.page),
         ) {
-        SettingsSection {
-            SelectRow("模型", modelChoiceLabel(main)) { pickerTarget = ModelPickerTarget("main") }
+        SettingsSection(uiText(R.string.ui_0500, "主要对话"), uiText(R.string.ui_0501, "新会话默认使用")) {
+            SelectRow(uiText(R.string.ui_0422, "模型"), modelChoiceLabel(main)) { pickerTarget = ModelPickerTarget("main") }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-            SelectRow("推理强度", reasoningLabel(effort)) { showEffort = true }
+            SelectRow(uiText(R.string.ui_0502, "推理强度"), reasoningLabel(effort)) { showEffort = true }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-            NumberField("上下文窗口（tokens）", contextLength) { contextLength = it.filter(Char::isDigit) }
+            NumberField(uiText(R.string.ui_0503, "上下文窗口（tokens）"), contextLength) { contextLength = it.filter(Char::isDigit) }
         }
-        SettingsSection {
-            AUXILIARY_LABELS.forEachIndexed { index, (key, label) ->
+        SettingsSection(uiText(R.string.ui_0504, "理解与资料处理"), "") {
+            AUXILIARY_LABELS.take(3).forEachIndexed { index, (key, label) ->
                 SelectRow(label, modelChoiceLabel(auxiliary[key] ?: ModelChoice())) {
                     pickerTarget = ModelPickerTarget("aux", key)
                 }
-                if (index != AUXILIARY_LABELS.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+                if (index != 2) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
             }
         }
-        SettingsSection {
+        SettingsSection(uiText(R.string.ui_0505, "工具与运行"), "") {
+            AUXILIARY_LABELS.drop(3).forEachIndexed { index, (key, label) ->
+                SelectRow(label, modelChoiceLabel(auxiliary[key] ?: ModelChoice())) {
+                    pickerTarget = ModelPickerTarget("aux", key)
+                }
+                if (index != AUXILIARY_LABELS.drop(3).lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+            }
+        }
+        SettingsSection(uiText(R.string.ui_0506, "多模型参考"), uiText(R.string.ui_0507, "需要第二意见时参与分析的模型")) {
             references.forEachIndexed { index, spec ->
-                EditableModelRow("参考模型 ${index + 1}", spec, onEdit = { pickerTarget = ModelPickerTarget("reference", index.toString()) }) {
+                EditableModelRow(uiText(R.string.ui_0508, "参考模型 %1\$s", index + 1), spec, onEdit = { pickerTarget = ModelPickerTarget("reference", index.toString()) }) {
                     references.removeAt(index)
                 }
             }
             TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { pickerTarget = ModelPickerTarget("reference", "new") }) {
-                HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text("添加参考模型", modifier = Modifier.padding(start = 6.dp))
+                HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text(uiText(R.string.ui_0509, "添加参考模型"), modifier = Modifier.padding(start = 6.dp))
             }
-            SelectRow("聚合模型", aggregator.ifBlank { "未指定" }) { pickerTarget = ModelPickerTarget("aggregator") }
+            SelectRow(uiText(R.string.ui_0510, "聚合模型"), aggregator.ifBlank { uiText(R.string.ui_0019, "未指定") }) { pickerTarget = ModelPickerTarget("aggregator") }
         }
-        SettingsSection {
+        SettingsSection(uiText(R.string.ui_0511, "备用模型"), uiText(R.string.ui_0512, "主模型不可用时按顺序尝试")) {
             fallbacks.forEachIndexed { index, fallback ->
-                EditableModelRow("备用模型 ${index + 1}", "${fallback.provider}:${fallback.model}", onEdit = { pickerTarget = ModelPickerTarget("fallback", index.toString()) }) {
+                EditableModelRow(uiText(R.string.ui_0513, "备用模型 %1\$s", index + 1), "${fallback.provider}:${fallback.model}", onEdit = { pickerTarget = ModelPickerTarget("fallback", index.toString()) }) {
                     fallbacks.removeAt(index)
                 }
             }
             TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { pickerTarget = ModelPickerTarget("fallback", "new") }) {
-                HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text("添加备用模型", modifier = Modifier.padding(start = 6.dp))
+                HermesMulticolorIcon(HermesIconKind.ADD, null, iconSize = 18.dp); Text(uiText(R.string.ui_0514, "添加备用模型"), modifier = Modifier.padding(start = 6.dp))
             }
         }
-        OutlinedButton(colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showProviderDialog = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("增加模型提供商") }
+        OutlinedButton(colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showProviderDialog = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text(uiText(R.string.ui_0515, "增加模型提供商")) }
         Button(
             onClick = {
                 onSave(
@@ -272,7 +290,7 @@ fun ModelSettingsScreen(
             },
             enabled = !state.isAdvancedSettingsLoading && main.provider.isNotBlank() && main.model.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 28.dp),
-        ) { Text("保存模型设置") }
+        ) { Text(uiText(R.string.ui_0516, "保存模型设置")) }
         }
     }
 
@@ -296,7 +314,7 @@ fun ModelSettingsScreen(
             },
         )
     }
-    if (showEffort) ChoiceDialog("默认推理强度", REASONING_LEVELS, effort, { showEffort = false }) { effort = it; showEffort = false }
+    if (showEffort) ChoiceDialog(uiText(R.string.ui_0517, "默认推理强度"), REASONING_LEVELS, effort, { showEffort = false }) { effort = it; showEffort = false }
     if (showProviderDialog) AddProviderDialog(
         busy = state.isAdvancedSettingsLoading,
         onDismiss = { showProviderDialog = false },
@@ -317,18 +335,18 @@ fun ConversationStyleScreen(
     var showReasoning by remember(settings) { mutableStateOf(settings.showReasoning) }
     var choosePersonality by remember { mutableStateOf(false) }
     var chooseTimezone by remember { mutableStateOf(false) }
-    SettingsForm("对话风格", "控制 Hermes 的表达方式与时间基准", contentPadding, onBack) {
+    SettingsForm(uiText(R.string.ui_0518, "对话风格"), uiText(R.string.ui_0519, "控制 Hermes 的表达方式与时间基准"), contentPadding, onBack) {
         SettingsSection {
-            SelectRow("人格", personalityLabel(personality)) { choosePersonality = true }
+            SelectRow(uiText(R.string.ui_0520, "人格"), personalityLabel(personality)) { choosePersonality = true }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-            SelectRow("时区", timezone) { chooseTimezone = true }
+            SelectRow(uiText(R.string.ui_0521, "时区"), timezone) { chooseTimezone = true }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-            ToggleSetting("显示推理过程", "在支持的模型上显示思考内容", showReasoning) { showReasoning = it }
+            ToggleSetting(uiText(R.string.ui_0522, "显示推理过程"), uiText(R.string.ui_0523, "在支持的模型上显示思考内容"), showReasoning) { showReasoning = it }
         }
-        SaveButton("保存对话风格", loading) { onSave(ConversationStyleSettings(personality, timezone, showReasoning)) }
+        SaveButton(uiText(R.string.ui_0524, "保存对话风格"), loading) { onSave(ConversationStyleSettings(personality, timezone, showReasoning)) }
     }
-    if (choosePersonality) ChoiceDialog("选择人格", PERSONALITIES.map { it.first }, personality, { choosePersonality = false }) { personality = it; choosePersonality = false }
-    if (chooseTimezone) ChoiceDialog("选择时区", TIMEZONES, timezone, { chooseTimezone = false }) { timezone = it; chooseTimezone = false }
+    if (choosePersonality) ChoiceDialog(uiText(R.string.ui_0525, "选择人格"), PERSONALITIES.map { it.first }, personality, { choosePersonality = false }) { personality = it; choosePersonality = false }
+    if (chooseTimezone) ChoiceDialog(uiText(R.string.ui_0526, "选择时区"), TIMEZONES, timezone, { chooseTimezone = false }) { timezone = it; chooseTimezone = false }
 }
 
 @Composable
@@ -342,16 +360,16 @@ fun ApprovalSettingsScreen(
     var mode by remember(settings) { mutableStateOf(settings.mode) }
     var timeout by remember(settings) { mutableStateOf(settings.timeoutSeconds.toString()) }
     var chooseMode by remember { mutableStateOf(false) }
-    SettingsForm("审批模式", "控制危险命令的人工确认方式", contentPadding, onBack) {
+    SettingsForm(uiText(R.string.ui_0527, "审批模式"), uiText(R.string.ui_0528, "控制危险命令的人工确认方式"), contentPadding, onBack) {
         SettingsSection {
-            SelectRow("审批模式", approvalModeLabel(mode)) { chooseMode = true }
+            SelectRow(uiText(R.string.ui_0527, "审批模式"), approvalModeLabel(mode)) { chooseMode = true }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
-            NumberField("审批超时（秒）", timeout) { timeout = it.filter(Char::isDigit) }
+            NumberField(uiText(R.string.ui_0529, "审批超时（秒）"), timeout) { timeout = it.filter(Char::isDigit) }
         }
-        if (mode == "off") Text("关闭审批会跳过危险命令确认，仅建议在可信的隔离环境中使用。", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        SaveButton("保存审批设置", loading) { onSave(ApprovalSettings(mode, timeout.toIntOrNull() ?: 60)) }
+        if (mode == "off") Text(uiText(R.string.ui_0530, "关闭审批会跳过危险命令确认，仅建议在可信的隔离环境中使用。"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        SaveButton(uiText(R.string.ui_0531, "保存审批设置"), loading) { onSave(ApprovalSettings(mode, timeout.toIntOrNull() ?: 60)) }
     }
-    if (chooseMode) ChoiceDialog("选择审批模式", APPROVAL_MODES.map { it.first }, mode, { chooseMode = false }) { mode = it; chooseMode = false }
+    if (chooseMode) ChoiceDialog(uiText(R.string.ui_0532, "选择审批模式"), APPROVAL_MODES.map { it.first }, mode, { chooseMode = false }) { mode = it; chooseMode = false }
 }
 
 @Composable
@@ -370,20 +388,20 @@ fun MemoryContextScreen(
     var threshold by remember(settings) { mutableStateOf(settings.compressionThreshold.toString()) }
     var target by remember(settings) { mutableStateOf(settings.compressionTargetRatio.toString()) }
     var protect by remember(settings) { mutableStateOf(settings.protectLastMessages.toString()) }
-    SettingsForm("记忆与上下文", "管理持久记忆、用户画像与自动压缩", contentPadding, onBack) {
+    SettingsForm(uiText(R.string.ui_0533, "记忆与上下文"), uiText(R.string.ui_0534, "管理持久记忆、用户画像与自动压缩"), contentPadding, onBack) {
         SettingsSection {
-            ToggleSetting("持久记忆", "允许 Hermes 跨会话维护 MEMORY.md", memoryEnabled) { memoryEnabled = it }
-            ToggleSetting("用户画像", "允许 Hermes 维护 USER.md 用户画像", profileEnabled) { profileEnabled = it }
-            NumberField("记忆预算长度（字符）", memoryBudget) { memoryBudget = it.filter(Char::isDigit) }
-            NumberField("画像预算长度（字符）", profileBudget) { profileBudget = it.filter(Char::isDigit) }
+            ToggleSetting(uiText(R.string.ui_0535, "持久记忆"), uiText(R.string.ui_0536, "允许 Hermes 跨会话维护 MEMORY.md"), memoryEnabled) { memoryEnabled = it }
+            ToggleSetting(uiText(R.string.ui_0537, "用户画像"), uiText(R.string.ui_0538, "允许 Hermes 维护 USER.md 用户画像"), profileEnabled) { profileEnabled = it }
+            NumberField(uiText(R.string.ui_0539, "记忆预算长度（字符）"), memoryBudget) { memoryBudget = it.filter(Char::isDigit) }
+            NumberField(uiText(R.string.ui_0540, "画像预算长度（字符）"), profileBudget) { profileBudget = it.filter(Char::isDigit) }
         }
         SettingsSection {
-            ToggleSetting("自动压缩", "接近上下文窗口时自动总结旧消息", compressionEnabled) { compressionEnabled = it }
-            DecimalField("压缩阈值（0.10–0.95）", threshold) { threshold = it.filter { ch -> ch.isDigit() || ch == '.' } }
-            DecimalField("压缩目标（0.05–0.80）", target) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
-            NumberField("保护最近消息数", protect) { protect = it.filter(Char::isDigit) }
+            ToggleSetting(uiText(R.string.ui_0541, "自动压缩"), uiText(R.string.ui_0542, "接近上下文窗口时自动总结旧消息"), compressionEnabled) { compressionEnabled = it }
+            DecimalField(uiText(R.string.ui_0543, "压缩阈值（0.10–0.95）"), threshold) { threshold = it.filter { ch -> ch.isDigit() || ch == '.' } }
+            DecimalField(uiText(R.string.ui_0544, "压缩目标（0.05–0.80）"), target) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
+            NumberField(uiText(R.string.ui_0545, "保护最近消息数"), protect) { protect = it.filter(Char::isDigit) }
         }
-        SaveButton("保存记忆与上下文", loading) {
+        SaveButton(uiText(R.string.ui_0546, "保存记忆与上下文"), loading) {
             onSave(
                 MemoryContextSettings(
                     memoryEnabled,
@@ -411,21 +429,21 @@ fun ArchivedSessionsScreen(
 ) {
     var deleteTarget by remember { mutableStateOf<HermesSession?>(null) }
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
-        SettingsHeader("已归档对话", "恢复后会重新出现在首页", onBack, onRefresh, state.isAdvancedSettingsLoading)
+        SettingsHeader(uiText(R.string.ui_0547, "已归档对话"), uiText(R.string.ui_0548, "恢复后会重新出现在首页"), onBack, onRefresh, state.isAdvancedSettingsLoading)
         when {
             state.isAdvancedSettingsLoading && state.archivedSessions.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.archivedSessions.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无归档对话", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            state.archivedSessions.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(uiText(R.string.ui_0549, "暂无归档对话"), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             else -> LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp)) {
                 items(state.archivedSessions, key = { it.id }) { session ->
                     GlassPanel(Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
                         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             HermesMulticolorIcon(HermesIconKind.ARCHIVE, null, iconSize = 23.dp)
                             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                Text(ellipsizeSessionTitle(session.title), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(ellipsizeSessionTitle(session.title), fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                 Text(sessionTimeLabel(session.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onRestore(session) }, enabled = state.settingsActionKey == null) { Text("恢复") }
-                            IconButton(onClick = { deleteTarget = session }, enabled = state.settingsActionKey == null) { HermesMulticolorIcon(HermesIconKind.DELETE, "删除") }
+                            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onRestore(session) }, enabled = state.settingsActionKey == null) { Text(uiText(R.string.ui_0550, "恢复")) }
+                            IconButton(onClick = { deleteTarget = session }, enabled = state.settingsActionKey == null) { HermesMulticolorIcon(HermesIconKind.DELETE, uiText(R.string.ui_0469, "删除")) }
                         }
                     }
                 }
@@ -435,10 +453,10 @@ fun ArchivedSessionsScreen(
     deleteTarget?.let { session ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("永久删除归档会话？") },
-            text = { Text("“${ellipsizeSessionTitle(session.title)}”及消息记录将无法恢复。") },
-            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDelete(session); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text("取消") } },
+            title = { Text(uiText(R.string.ui_0551, "永久删除归档会话？")) },
+            text = { Text(uiText(R.string.ui_0552, "“%1\$s”及消息记录将无法恢复。", ellipsizeSessionTitle(session.title))) },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDelete(session); deleteTarget = null }) { Text(uiText(R.string.ui_0469, "删除"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text(uiText(R.string.ui_0553, "取消")) } },
         )
     }
 }
@@ -446,19 +464,19 @@ fun ArchivedSessionsScreen(
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit, onRefresh: (() -> Unit)? = null, busy: Boolean = false) {
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, "返回") }
+        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, uiText(R.string.ui_0554, "返回")) }
         Column(Modifier.weight(1f).padding(start = 3.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-        else if (onRefresh != null) IconButton(onClick = onRefresh) { HermesMulticolorIcon(HermesIconKind.REFRESH, "刷新") }
+        else if (onRefresh != null) IconButton(onClick = onRefresh) { HermesMulticolorIcon(HermesIconKind.REFRESH, uiText(R.string.ui_0555, "刷新")) }
     }
 }
 
 @Composable
 private fun SettingsForm(title: String, subtitle: String, padding: PaddingValues, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().padding(padding)) {
+    Column(Modifier.fillMaxSize().padding(padding).navigationBarsPadding().imePadding()) {
         SettingsHeader(title, subtitle, onBack)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
@@ -471,60 +489,42 @@ private fun SettingsForm(title: String, subtitle: String, padding: PaddingValues
 }
 
 @Composable
-private fun SettingsSection(content: @Composable ColumnScope.() -> Unit) {
-    GlassPanel(Modifier.fillMaxWidth().padding(top = 7.dp), shape = RoundedCornerShape(15.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp), content = content)
+private fun SettingsSection(title: String = "", subtitle: String = "", content: @Composable ColumnScope.() -> Unit) {
+    com.qingyu.hermescompanion.ui.component.SettingsBlock(title, subtitle) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), content = content)
     }
+
 }
 
 @Composable
 private fun SelectRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).clickable(onClick = onClick).padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.42f), maxLines = 1)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(0.52f).padding(start = 8.dp),
-        )
-        HermesMulticolorIcon(HermesIconKind.CHEVRON_RIGHT, null, modifier = Modifier.padding(start = 7.dp), iconSize = 13.dp)
-    }
+    com.qingyu.hermescompanion.ui.component.SettingsChoice(label, value,
+        model = label.contains(uiText(R.string.ui_0422, "模型"), ignoreCase = true) || value.contains(" · "), horizontalPadding = 0, onClick = onClick)
+
 }
 
 @Composable
 private fun EditableModelRow(label: String, value: String, onEdit: () -> Unit, onDelete: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable(onClick = onEdit).padding(vertical = 2.dp)) {
+        Column(Modifier.weight(1f).clip(MaterialTheme.shapes.small).clickable(onClick = onEdit).padding(vertical = 2.dp)) {
             Text(label, fontWeight = FontWeight.Medium)
             Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            HermesMulticolorIcon(HermesIconKind.DELETE, "移除", iconSize = 18.dp, tint = MaterialTheme.colorScheme.error)
+        IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+            HermesMulticolorIcon(HermesIconKind.DELETE, uiText(R.string.ui_0556, "移除"), iconSize = 18.dp, tint = MaterialTheme.colorScheme.error)
         }
     }
 }
 
 @Composable
 private fun ToggleSetting(title: String, subtitle: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        HermesSwitch(checked = value, onCheckedChange = onChange)
-    }
+    com.qingyu.hermescompanion.ui.component.SettingsToggle(title, subtitle, value, horizontalPadding = 0, onCheckedChange = onChange)
 }
 
 @Composable
 private fun NumberField(label: String, value: String, onChange: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1)
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).padding(end = 10.dp))
         CompactValueField(value, KeyboardType.Number, 118.dp, onChange)
     }
 }
@@ -532,7 +532,7 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
 @Composable
 private fun DecimalField(label: String, value: String, onChange: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1)
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).padding(end = 10.dp))
         CompactValueField(value, KeyboardType.Decimal, 104.dp, onChange)
     }
 }
@@ -544,10 +544,11 @@ private fun CompactValueField(
     width: androidx.compose.ui.unit.Dp,
     onChange: (String) -> Unit,
 ) {
+    var focused by remember { mutableStateOf(false) }
     Surface(
-        modifier = Modifier.width(width).height(36.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        modifier = Modifier.width(width).heightIn(min = 48.dp).hermesInputWell(MaterialTheme.shapes.small, focused),
+        shape = MaterialTheme.shapes.small,
+        color = if (com.qingyu.hermescompanion.ui.theme.HermesSkin.current.glass) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
         tonalElevation = 0.dp,
     ) {
         BasicTextField(
@@ -559,10 +560,11 @@ private fun CompactValueField(
                 textAlign = TextAlign.End,
             ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.fillMaxSize().padding(horizontal = 9.dp, vertical = 7.dp),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.onFocusChanged { focused = it.isFocused }.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
             decorationBox = { inner ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                    if (value.isBlank()) Text("自动", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    if (value.isBlank()) Text(uiText(R.string.ui_0557, "自动"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     inner()
                 }
             },
@@ -572,7 +574,7 @@ private fun CompactValueField(
 
 @Composable
 private fun SaveButton(label: String, loading: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = !loading, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+    Button(onClick = onClick, enabled = !loading, modifier = Modifier.fillMaxWidth().padding(top = 24.dp).heightIn(min = 48.dp)) {
         if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text(label)
     }
 }
@@ -580,22 +582,31 @@ private fun SaveButton(label: String, loading: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ModelPickerDialog(catalog: ModelCatalog, allowAutomatic: Boolean, onDismiss: () -> Unit, onSelect: (ModelChoice) -> Unit) {
     var provider by remember { mutableStateOf<ModelProvider?>(null) }
+    var selected by remember { mutableStateOf<ModelChoice?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (provider == null) "选择模型供应商" else provider?.name.orEmpty()) },
+        title = { Text(if (provider == null) uiText(R.string.ui_0558, "选择模型服务商") else provider?.name.orEmpty()) },
         text = {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 if (provider == null) {
-                    if (allowAutomatic) item("auto") { ChoiceRow("自动（使用主模型）") { onSelect(ModelChoice()) } }
-                    items(catalog.providers, key = { it.slug }) { item -> ChoiceRow(item.name) { provider = item } }
+                    if (allowAutomatic) item("auto") { ChoiceRow(uiText(R.string.ui_0559, "跟随主模型") + if(selected == ModelChoice()) "  ✓" else "") { selected = ModelChoice() } }
+                    items(catalog.providers, key = { it.slug }) { item -> ChoiceRow(item.name + "  ›") { provider = item; selected = null } }
                 } else {
-                    items(provider?.models.orEmpty(), key = { it }) { model -> ChoiceRow(model) { onSelect(ModelChoice(provider?.slug.orEmpty(), model)) } }
+                    items(provider?.models.orEmpty(), key = { it }) { model ->
+                        ChoiceRow(model + if (selected?.model == model) "  ✓" else "") { selected = ModelChoice(provider?.slug.orEmpty(), model) }
+                    }
                 }
             }
         },
-        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("取消") } },
-        dismissButton = if (provider != null) ({ TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { provider = null }) { Text("返回") } }) else null,
+        confirmButton = { Button(onClick = { selected?.let(onSelect) }, enabled = selected != null) { Text(uiText(R.string.ui_0560, "使用此模型")) } },
+        dismissButton = {
+            Row {
+                if (provider != null) TextButton(onClick = { provider = null; selected = null }) { Text(uiText(R.string.ui_0554, "返回")) }
+                TextButton(onClick = onDismiss) { Text(uiText(R.string.ui_0553, "取消")) }
+            }
+        },
     )
+
 }
 
 @Composable
@@ -604,7 +615,7 @@ private fun ChoiceDialog(title: String, values: List<String>, selected: String, 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { LazyColumn(Modifier.heightIn(max = 500.dp)) { items(values) { value -> ChoiceRow(if (value == selected) "✓ ${choiceLabel(value)}" else choiceLabel(value)) { onSelect(value) } } } },
-        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text(uiText(R.string.ui_0553, "取消")) } },
     )
 }
 
@@ -613,7 +624,7 @@ private fun ChoiceRow(label: String, onClick: () -> Unit) {
     Text(
         label,
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 10.dp),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
@@ -621,6 +632,7 @@ private fun ChoiceRow(label: String, onClick: () -> Unit) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun AddProviderDialog(busy: Boolean, onDismiss: () -> Unit, onAdd: (String, String, String, String, String) -> Unit) {
     var id by remember { mutableStateOf("") }
@@ -628,22 +640,32 @@ private fun AddProviderDialog(busy: Boolean, onDismiss: () -> Unit, onAdd: (Stri
     var url by remember { mutableStateOf("") }
     var model by remember { mutableStateOf("") }
     var key by remember { mutableStateOf("") }
-    AlertDialog(
+    com.qingyu.hermescompanion.ui.component.HermesModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("增加模型提供商") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                DialogCompactField("提供商标识", id, "如 groq") { id = it }
-                DialogCompactField("显示名称", name, "可选") { name = it }
-                DialogCompactField("接口地址", url, "OpenAI 兼容接口地址", KeyboardType.Uri) { url = it }
-                DialogCompactField("默认模型", model, "模型 ID") { model = it }
-                DialogCompactField("API Key", key, "可留空") { key = it }
-                Text("密钥会写入 Hermes .env，界面不会保存明文。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        tintAlpha = .94f,
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 640.dp).padding(horizontal = 20.dp)) {
+            Text(uiText(R.string.ui_0515, "增加模型提供商"), style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 16.dp))
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DialogCompactField(uiText(R.string.ui_0561, "提供商标识"), id, uiText(R.string.ui_0562, "如 groq")) { id = it }
+                DialogCompactField(uiText(R.string.ui_0563, "显示名称"), name, uiText(R.string.ui_0564, "可选")) { name = it }
+                DialogCompactField(uiText(R.string.ui_0565, "接口地址"), url, uiText(R.string.ui_0566, "OpenAI 兼容接口地址"), KeyboardType.Uri) { url = it }
+                DialogCompactField(uiText(R.string.ui_0567, "默认模型"), model, uiText(R.string.ui_0568, "模型 ID")) { model = it }
+                DialogCompactField("API Key", key, uiText(R.string.ui_0569, "可留空")) { key = it }
+                Text(uiText(R.string.ui_0570, "密钥会写入 Hermes .env，界面不会保存明文。"),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-        confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onAdd(id, name, url, model, key) }, enabled = !busy && id.isNotBlank() && url.isNotBlank() && model.isNotBlank()) { Text("添加") } },
-        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss, enabled = !busy) { Text("取消") } },
-    )
+            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onDismiss, enabled = !busy, modifier = Modifier.weight(1f)) { Text(uiText(R.string.ui_0553, "取消")) }
+                Button(onClick = { onAdd(id, name, url, model, key) },
+                    enabled = !busy && id.isNotBlank() && url.isNotBlank() && model.isNotBlank(),
+                    modifier = Modifier.weight(1f)) { Text(uiText(R.string.ui_0571, "添加")) }
+            }
+        }
+    }
 }
 
 @Composable
@@ -654,12 +676,13 @@ private fun DialogCompactField(
     keyboardType: KeyboardType = KeyboardType.Text,
     onChange: (String) -> Unit,
 ) {
+    var focused by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 2.dp, bottom = 3.dp))
         Surface(
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+            modifier = Modifier.fillMaxWidth().height(48.dp).hermesInputWell(MaterialTheme.shapes.small, focused),
+            shape = MaterialTheme.shapes.small,
+            color = if (com.qingyu.hermescompanion.ui.theme.HermesSkin.current.glass) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
             tonalElevation = 0.dp,
         ) {
             BasicTextField(
@@ -668,7 +691,8 @@ private fun DialogCompactField(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 9.dp),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.onFocusChanged { focused = it.isFocused }.fillMaxSize().padding(horizontal = 10.dp, vertical = 9.dp),
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                         if (value.isBlank()) Text(placeholder, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -681,14 +705,14 @@ private fun DialogCompactField(
 }
 
 private fun modelChoiceLabel(choice: ModelChoice): String = when {
-    choice.provider == "auto" && choice.model.isBlank() -> "自动（使用主模型）"
+    choice.provider == "auto" && choice.model.isBlank() -> uiText(R.string.ui_0572, "自动（使用主模型）")
     choice.provider.isBlank() && choice.model.isNotBlank() -> choice.model
-    choice.provider.isBlank() -> "未配置"
+    choice.provider.isBlank() -> uiText(R.string.ui_0573, "未配置")
     choice.model.isBlank() -> choice.provider
     else -> "${choice.provider} · ${choice.model}"
 }
 private fun ModelChoice.toSpec(): String = if (provider.isBlank()) model else "$provider:$model"
-private fun reasoningLabel(value: String): String = mapOf("none" to "不启用", "minimal" to "最少", "low" to "低", "medium" to "中", "high" to "高", "xhigh" to "很高", "max" to "最大", "ultra" to "极致")[value] ?: value
+private fun reasoningLabel(value: String): String = mapOf("none" to uiText(R.string.ui_0574, "不启用"), "minimal" to uiText(R.string.ui_0575, "最少"), "low" to uiText(R.string.ui_0576, "低"), "medium" to uiText(R.string.ui_0577, "中"), "high" to uiText(R.string.ui_0578, "高"), "xhigh" to uiText(R.string.ui_0579, "很高"), "max" to uiText(R.string.ui_0580, "最大"), "ultra" to uiText(R.string.ui_0581, "极致"))[value] ?: value
 private fun choiceLabel(value: String): String = PERSONALITIES.firstOrNull { it.first == value }?.second
     ?: APPROVAL_MODES.firstOrNull { it.first == value }?.second
     ?: reasoningLabel(value)
@@ -696,17 +720,17 @@ private fun personalityLabel(value: String): String = PERSONALITIES.firstOrNull 
 private fun approvalModeLabel(value: String): String = APPROVAL_MODES.firstOrNull { it.first == value }?.second ?: value
 
 private val AUXILIARY_LABELS = listOf(
-    "vision" to "视觉模型", "web_extract" to "网页提取", "compression" to "上下文压缩", "skills_hub" to "技能中心",
-    "approval" to "审批模型", "mcp" to "MCP 调度", "title_generation" to "标题生成", "curator" to "维护器",
+    "vision" to uiText(R.string.ui_0582, "视觉模型"), "web_extract" to uiText(R.string.ui_0583, "网页提取"), "compression" to uiText(R.string.ui_0584, "上下文压缩"), "skills_hub" to uiText(R.string.ui_0585, "技能中心"),
+    "approval" to uiText(R.string.ui_0586, "审批模型"), "mcp" to uiText(R.string.ui_0587, "MCP 调度"), "title_generation" to uiText(R.string.ui_0588, "标题生成"), "curator" to uiText(R.string.ui_0589, "维护器"),
 )
 private val REASONING_LEVELS = listOf("none", "low", "medium", "high", "max")
 private val PERSONALITIES = listOf(
-    "helpful" to "通用助理", "concise" to "简洁直接", "technical" to "技术专家", "creative" to "创意伙伴", "teacher" to "耐心教师",
-    "philosopher" to "深度思考", "kawaii" to "可爱活泼", "noir" to "冷峻侦探", "hype" to "高能鼓励",
+    "helpful" to uiText(R.string.ui_0590, "通用助理"), "concise" to uiText(R.string.ui_0591, "简洁直接"), "technical" to uiText(R.string.ui_0592, "技术专家"), "creative" to uiText(R.string.ui_0593, "创意伙伴"), "teacher" to uiText(R.string.ui_0594, "耐心教师"),
+    "philosopher" to uiText(R.string.ui_0595, "深度思考"), "kawaii" to uiText(R.string.ui_0596, "可爱活泼"), "noir" to uiText(R.string.ui_0597, "冷峻侦探"), "hype" to uiText(R.string.ui_0598, "高能鼓励"),
 )
 private val TIMEZONES = listOf("Asia/Shanghai", "Asia/Hong_Kong", "Asia/Tokyo", "Asia/Singapore", "UTC", "Europe/London", "America/New_York", "America/Los_Angeles")
 private val APPROVAL_MODES = listOf(
-    Triple("smart", "智能审批", "由辅助模型判断风险，不确定时再询问"),
-    Triple("manual", "手动审批", "危险命令始终等待你的确认"),
-    Triple("off", "关闭审批", "跳过危险命令确认（高风险）"),
+    Triple("smart", uiText(R.string.ui_0599, "智能审批"), uiText(R.string.ui_0600, "由辅助模型判断风险，不确定时再询问")),
+    Triple("manual", uiText(R.string.ui_0601, "手动审批"), uiText(R.string.ui_0602, "危险命令始终等待你的确认")),
+    Triple("off", uiText(R.string.ui_0603, "关闭审批"), uiText(R.string.ui_0604, "跳过危险命令确认（高风险）")),
 )

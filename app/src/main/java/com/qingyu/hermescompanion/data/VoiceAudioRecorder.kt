@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.data
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
@@ -10,9 +14,9 @@ class VoiceAudioRecorder(private val context: Context) {
     private var outputFile: File? = null
 
     @Suppress("DEPRECATION")
-    fun start() {
+    fun start(destination: File? = null) {
         cancel()
-        val file = File.createTempFile("hermes-voice-", ".m4a", context.cacheDir)
+        val file = destination ?: File.createTempFile("hermes-voice-", ".m4a", context.cacheDir)
         val activeRecorder = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()
         outputFile = file
         recorder = activeRecorder
@@ -29,20 +33,24 @@ class VoiceAudioRecorder(private val context: Context) {
         } catch (error: Exception) { cancel(); throw error }
     }
 
-    fun stop(): Pair<ByteArray, String> {
-        val activeRecorder = recorder ?: error("语音录制尚未开始")
-        val file = outputFile ?: error("没有找到录音文件")
+    fun stopToFile(): File {
+        val activeRecorder = recorder ?: error(uiText(R.string.ui_0135, "语音录制尚未开始"))
+        val file = outputFile ?: error(uiText(R.string.ui_0136, "没有找到录音文件"))
         recorder = null
         outputFile = null
-        val bytes = try {
+        try {
             activeRecorder.stop()
-            file.readBytes()
-        } finally {
-            activeRecorder.release()
+        } catch (error: Exception) {
             file.delete()
-        }
-        require(bytes.isNotEmpty()) { "录音内容为空，请靠近麦克风后重试" }
-        return bytes to "audio/mp4"
+            throw IllegalStateException(uiText(R.string.ui_0137, "录音过短或被中断，请重新录制"), error)
+        } finally { activeRecorder.release() }
+        require(file.length() >= 128) { uiText(R.string.ui_0138, "录音内容为空，请靠近麦克风后重试") }
+        return file
+    }
+
+    fun stop(): Pair<ByteArray, String> {
+        val file = stopToFile()
+        return try { file.readBytes() to "audio/mp4" } finally { file.delete() }
     }
 
     fun inputSample(): VoiceInputSample {

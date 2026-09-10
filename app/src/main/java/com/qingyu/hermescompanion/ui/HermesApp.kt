@@ -1,7 +1,11 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
+import com.qingyu.hermescompanion.ui.component.HermesAlertDialog as AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Scaffold
@@ -13,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,6 +75,24 @@ import com.qingyu.hermescompanion.ui.component.ImagePreviewDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
+    if (state.showLaunchIntro) {
+        com.qingyu.hermescompanion.ui.screen.LaunchIntroScreen(state.reduceMotion, viewModel::finishLaunchIntro)
+        return
+    }
+    if (state.needsIdentitySetup) {
+        AmbientBackground { com.qingyu.hermescompanion.ui.component.HermesScene {
+            com.qingyu.hermescompanion.ui.screen.IdentityEditorScreen(state, firstRun = true,
+                onSave = viewModel::completeLocalIdentity, onUpdateHermesAvatar = viewModel::updateHermesAvatar,
+                onResetHermesAvatar = viewModel::resetHermesAvatar, onSkinChange = viewModel::setSkinMode,
+                onLanguageChange = viewModel::setLanguageMode)
+        } }
+        return
+    }
+    val showsDock = state.workspaceAttachmentTarget == null && state.route in setOf(
+        AppRoute.HOME, AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)
+    val sceneBottomClip = if (showsDock && com.qingyu.hermescompanion.ui.theme.HermesSkin.current.glass) {
+        with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.navigationBars.getBottom(this).toDp() } + 8.dp
+    } else 0.dp
     val snackbarHostState = remember { SnackbarHostState() }
     val message = state.errorMessage ?: state.noticeMessage
 
@@ -88,7 +111,13 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         }
     }
 
-    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+    LaunchedEffect(state.baseUrl, state.username, state.activeProfile, state.route, state.selectedSession?.id, state.hasSavedConnection) {
+        viewModel.restoreVoiceDraft()
+    }
+    CompositionLocalProvider(LocalRippleConfiguration provides null,
+        com.qingyu.hermescompanion.ui.component.LocalReduceMotion provides state.reduceMotion,
+        com.qingyu.hermescompanion.ui.component.LocalVoiceRecovery provides com.qingyu.hermescompanion.ui.component.VoiceRecoveryActions(
+            state.voiceCapture, viewModel::retrySingleVoiceInput, viewModel::discardSingleVoiceInput)) {
         AmbientBackground {
             Scaffold(
         containerColor = Color.Transparent,
@@ -146,21 +175,25 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         },
         contentColor = MaterialTheme.colorScheme.onBackground,
             ) { padding ->
+                com.qingyu.hermescompanion.ui.component.HermesScene(contentBottomClip = sceneBottomClip) {
                 com.qingyu.hermescompanion.ui.component.AssistantPageTransition(state.route) {
                 when (state.route) {
             AppRoute.HOME -> AssistantHomeScreen(
                 state, padding, viewModel::startFromHome, viewModel::openSession,
                 viewModel::showSessions, viewModel::showTasks, viewModel::showWorkspace,
                 viewModel::respondToAgentRequest, viewModel::showSessionSearch,
+                onDaily = viewModel::openDailyConversation,
+                onWelcomed = viewModel::markHomeWelcomed,
             )
             AppRoute.SETUP -> ConnectionScreen(
                 state = state,
                 contentPadding = padding,
                 onConnect = viewModel::connect,
+                onLanguageChange = viewModel::setLanguageMode,
                 onDiagnose = viewModel::diagnoseConnection,
                 onCheckAgentUpdate = viewModel::checkAgentUpdate,
                 onApplyAgentUpdate = viewModel::applyAgentUpdate,
-                onBack = if (state.hasSavedConnection) viewModel::closeConnectionSettings else null,
+                onBack = if (state.hasSavedConnection) viewModel::closeConnectionSettings else viewModel::editFirstRunIdentity,
                 onDisconnect = if (state.hasSavedConnection) viewModel::disconnect else null,
             )
 
@@ -225,6 +258,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onLoadInlineImages = viewModel::loadInlineChatImages,
                 onLoadOlderMessages = viewModel::loadOlderMessages,
                 onScrollPositionChange = viewModel::saveChatScrollPosition,
+                onSnippetsChange = viewModel::updatePromptSnippets,
             )
 
             AppRoute.WORKSPACE -> WorkspaceScreen(
@@ -247,7 +281,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onSave = viewModel::saveWorkspaceDocument,
                 onExportDocument = viewModel::exportWorkspaceDocument,
                 onShareDocument = viewModel::shareWorkspaceDocument,
-                onUnsupportedFile = { viewModel.showNotice("$it 暂不支持在 APP 内预览；当前版本优先支持 Markdown") },
+                onUnsupportedFile = { viewModel.showNotice(uiText(R.string.ui_0188, "%1\$s 暂不支持在 APP 内预览；当前版本优先支持 Markdown", it)) },
             )
 
             AppRoute.TASKS -> TasksScreen(
@@ -286,6 +320,9 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onOpenSettings = viewModel::showSettings,
                 onBackToProfile = viewModel::showProfile,
                 onThemeChange = viewModel::setThemeMode,
+                onSkinChange = viewModel::setSkinMode,
+                onLanguageChange = viewModel::setLanguageMode,
+                onReduceMotionChange = viewModel::setReduceMotion,
                 onConnectionSettings = viewModel::openConnectionSettings,
                 onNotificationSettings = viewModel::showNotificationSettings,
                 onVoiceSettings = viewModel::showVoiceSettings,
@@ -301,6 +338,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onUpdateUserAvatar = viewModel::updateUserAvatar,
                 onAbout = viewModel::showAbout,
                 onChangeLog = viewModel::showChangeLog,
+                onReplayIntro = viewModel::replayLaunchIntro,
+                onLauncherIconChange = viewModel::setLauncherIcon,
             )
 
             AppRoute.SETTINGS -> ProfileScreen(
@@ -310,6 +349,9 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onOpenSettings = viewModel::showSettings,
                 onBackToProfile = viewModel::showProfile,
                 onThemeChange = viewModel::setThemeMode,
+                onSkinChange = viewModel::setSkinMode,
+                onLanguageChange = viewModel::setLanguageMode,
+                onReduceMotionChange = viewModel::setReduceMotion,
                 onConnectionSettings = viewModel::openConnectionSettings,
                 onNotificationSettings = viewModel::showNotificationSettings,
                 onVoiceSettings = viewModel::showVoiceSettings,
@@ -325,6 +367,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onUpdateUserAvatar = viewModel::updateUserAvatar,
                 onAbout = viewModel::showAbout,
                 onChangeLog = viewModel::showChangeLog,
+                onReplayIntro = viewModel::replayLaunchIntro,
+                onLauncherIconChange = viewModel::setLauncherIcon,
             )
 
             AppRoute.PROFILE_FILE -> ProfileFileScreen(
@@ -343,6 +387,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onSave = viewModel::updateUserProfile,
                 onUpdateHermesAvatar = viewModel::updateHermesAvatar,
                 onResetHermesAvatar = viewModel::resetHermesAvatar,
+                onUpdateUserAvatar = viewModel::updateUserAvatar,
+                onResetUserAvatar = viewModel::resetUserAvatar,
             )
 
             AppRoute.SKILLS_TOOLS -> SkillsToolsScreen(
@@ -446,6 +492,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         }
         }
         }
+        }
         if (state.isImageLoading) ImageLoadingDialog()
         state.imagePreview?.let { image ->
             ImagePreviewDialog(image = image, onDismiss = viewModel::closeImagePreview)
@@ -486,16 +533,16 @@ private fun GlobalRunStatusPill(
         ) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.2.dp)
             Text(
-                "${state.runningRuns.size} 段对话运行中 · ${state.runStage.ifBlank { "Hermes 正在处理当前任务" }}",
+                uiText(R.string.ui_0189, "%1\$s 段对话运行中 · %2\$s", state.runningRuns.size, state.runStage.ifBlank { uiText(R.string.ui_0190, "Hermes 正在处理当前任务") }),
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(start = 10.dp),
             )
             if (state.pendingAgentRequests.isNotEmpty()) {
-                Text("待处理 ${state.pendingAgentRequests.size}", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
+                Text(uiText(R.string.ui_0191, "待处理 %1\$s", state.pendingAgentRequests.size), color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
             }
-            if (state.runningRuns.size == 1) TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text("停止") }
+            if (state.runningRuns.size == 1) TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text(uiText(R.string.ui_0192, "停止")) }
         }
     }
 }
@@ -505,11 +552,11 @@ private fun CrashReportDialog(report: String, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("检测到上次闪退") },
+        title = { Text(uiText(R.string.ui_0193, "检测到上次闪退")) },
         text = {
             Column {
                 Text(
-                    "已暂停自动恢复登录，应用会停留在安全页面。请复制下面的诊断信息发给开发者。",
+                    uiText(R.string.ui_0194, "已暂停自动恢复登录，应用会停留在安全页面。请复制下面的诊断信息发给开发者。"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SelectionContainer {
@@ -531,10 +578,10 @@ private fun CrashReportDialog(report: String, onDismiss: () -> Unit) {
                     clipboard.setText(AnnotatedString(report))
                     onDismiss()
                 },
-            ) { Text("复制并关闭") }
+            ) { Text(uiText(R.string.ui_0195, "复制并关闭")) }
         },
         dismissButton = {
-            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text("关闭") }
+            TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDismiss) { Text(uiText(R.string.ui_0196, "关闭")) }
         },
     )
 }

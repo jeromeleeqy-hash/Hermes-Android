@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import java.net.URI
 
 data class CitationSource(
@@ -136,4 +140,4 @@ private fun normalizeReferenceId(raw: String): String = cleanCitationLabel(raw).
 
 private fun citationHost(url: String): String = runCatching {
     URI(url).host?.removePrefix("www.")?.takeIf(String::isNotBlank)
-}.getOrNull() ?: "网页来源"
+}.getOrNull() ?: uiText(R.string.ui_0176, "网页来源")

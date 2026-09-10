@@ -1,4 +1,9 @@
 package com.qingyu.hermescompanion.ui.screen
+import com.qingyu.hermescompanion.ui.component.HermesOutlinedTextField as OutlinedTextField
+
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,13 +24,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.qingyu.hermescompanion.ui.component.HermesAlertDialog as AlertDialog
+import com.qingyu.hermescompanion.ui.component.HermesButton as Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,10 +71,10 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private enum class TaskTab(val label: String) {
-    PENDING("待处理"),
-    RUNNING("进行中"),
-    SCHEDULED("定时任务"),
-    COMPLETED("执行记录"),
+    PENDING(uiText(R.string.ui_1271, "待处理")),
+    RUNNING(uiText(R.string.ui_0622, "进行中")),
+    SCHEDULED(uiText(R.string.ui_0116, "定时任务")),
+    COMPLETED(uiText(R.string.ui_1272, "执行记录")),
 }
 
 @Composable
@@ -148,9 +152,9 @@ fun TasksScreen(
         when (selectedTab) {
             TaskTab.PENDING -> {
                 if (state.pendingAgentRequests.isEmpty()) {
-                    TaskEmptyState(HermesIconKind.CHECK_CIRCLE, "没有待处理请求", "Hermes 需要确认操作或补充信息时，会集中显示在这里。")
+                    TaskEmptyState(HermesIconKind.CHECK_CIRCLE, uiText(R.string.ui_1273, "没有待处理请求"), uiText(R.string.ui_1274, "Hermes 需要确认操作或补充信息时，会集中显示在这里。"))
                 } else {
-                    Text("需要你的决定", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
+                    Text(uiText(R.string.ui_1275, "需要你的决定"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
                     state.pendingAgentRequests.forEach { request ->
                         TaskAgentRequestCard(request, onRespondRequest)
                     }
@@ -159,10 +163,10 @@ fun TasksScreen(
 
             TaskTab.RUNNING -> {
                 if (state.isStreaming || runningCronJobs.isNotEmpty()) {
-                    Text("当前运行", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
+                    Text(uiText(R.string.ui_1276, "当前运行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
                     state.runningRuns.forEach { run ->
                         ActiveRunCard(
-                            title = run.session.title.ifBlank { "Hermes 任务" },
+                            title = run.session.title.ifBlank { uiText(R.string.ui_0159, "Hermes 任务") },
                             stage = run.stage,
                             recovering = run.recovering,
                             startedAtMillis = run.startedAtMillis,
@@ -184,9 +188,9 @@ fun TasksScreen(
                 } else {
                     TaskEmptyState(
                         icon = HermesIconKind.TASK,
-                        title = "没有正在运行的任务",
-                        description = "在对话中发起任务后，当前工具执行状态会显示在这里。",
-                        actionLabel = "发起新任务",
+                        title = uiText(R.string.ui_1277, "没有正在运行的任务"),
+                        description = uiText(R.string.ui_1278, "在对话中发起任务后，当前工具执行状态会显示在这里。"),
+                        actionLabel = uiText(R.string.ui_1279, "发起新任务"),
                         onAction = onStartConversation,
                     )
                 }
@@ -196,13 +200,13 @@ fun TasksScreen(
                 if (state.cronJobs.isEmpty() && !state.isCronLoading) {
                     TaskEmptyState(
                         icon = HermesIconKind.RECENT,
-                        title = "还没有定时任务",
-                        description = "可以让 Hermes 按 Cron 计划自动执行日报、检查与提醒。",
-                        actionLabel = "新建定时任务",
+                        title = uiText(R.string.ui_1280, "还没有定时任务"),
+                        description = uiText(R.string.ui_1281, "可以让 Hermes 按 Cron 计划自动执行日报、检查与提醒。"),
+                        actionLabel = uiText(R.string.ui_1282, "新建定时任务"),
                         onAction = { showCreate = true },
                     )
                 } else {
-                    Text("自动执行", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
+                    Text(uiText(R.string.ui_1283, "自动执行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
                     state.cronJobs.forEach { job ->
                         CronJobCard(
                             job = job,
@@ -219,14 +223,14 @@ fun TasksScreen(
             TaskTab.COMPLETED -> {
                 val history = state.cronJobs.filter { it.lastRunAt.isNotBlank() }
                 if (history.isEmpty() && regularCompletions.isEmpty() && cronSessions.isEmpty()) {
-                    TaskEmptyState(HermesIconKind.ARCHIVE, "暂无执行记录", "对话任务或定时任务完成后，会在这里保留最近结果。")
+                    TaskEmptyState(HermesIconKind.ARCHIVE, uiText(R.string.ui_1284, "暂无执行记录"), uiText(R.string.ui_1285, "对话任务或定时任务完成后，会在这里保留最近结果。"))
                 } else {
-                    Text("最近执行", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
+                    Text(uiText(R.string.ui_1286, "最近执行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
                     regularCompletions.forEach { completion ->
                         RunCompletionCard(completion, { onOpenCompletion(completion) }, onOpenArtifact)
                     }
                     if (cronSessions.isNotEmpty()) {
-                        Text("Cron 会话", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
+                        Text(uiText(R.string.ui_1287, "Cron 会话"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
                         cronSessions.forEach { session ->
                             CronSessionCard(session, onClick = { onOpenCronSession(session) })
                         }
@@ -254,10 +258,10 @@ fun TasksScreen(
     deleteTarget?.let { job ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("删除定时任务？") },
-            text = { Text("“${job.name}”将停止自动执行，已有会话记录不会删除。") },
-            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDeleteCron(job); deleteTarget = null }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text("取消") } },
+            title = { Text(uiText(R.string.ui_0827, "删除定时任务？")) },
+            text = { Text(uiText(R.string.ui_0828, "“%1\$s”将停止自动执行，已有会话记录不会删除。", job.name)) },
+            confirmButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { onDeleteCron(job); deleteTarget = null }) { Text(uiText(R.string.ui_0469, "删除"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { deleteTarget = null }) { Text(uiText(R.string.ui_0553, "取消")) } },
         )
     }
 }
@@ -274,11 +278,11 @@ private fun TaskPageHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("执行中心", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(uiText(R.string.ui_1288, "执行中心"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HermesStatusIcon(if (running > 0) HermesStatusKind.BUSY else HermesStatusKind.CONNECTED)
                 Text(
-                    if (running > 0) "$running 个 Agent 正在工作" else "Agent 当前空闲",
+                    if (running > 0) uiText(R.string.ui_1289, "%1\$s 个 Agent 正在工作", running) else uiText(R.string.ui_1290, "Agent 当前空闲"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 6.dp),
@@ -289,12 +293,12 @@ private fun TaskPageHeader(
             if (refreshing) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp)
             else HermesMulticolorIcon(
                 HermesIconKind.REFRESH,
-                contentDescription = "刷新",
+                contentDescription = uiText(R.string.ui_0555, "刷新"),
                 iconSize = 21.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        com.qingyu.hermescompanion.ui.component.AssistantCreateButton("新建任务",onCreate)
+        com.qingyu.hermescompanion.ui.component.AssistantCreateButton(uiText(R.string.ui_1291, "新建任务"),onCreate)
 
     }
 }
@@ -319,16 +323,16 @@ private fun ActiveRunCard(
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        if (recovering) "连接中断，正在自动取回结果" else stage.ifBlank { "Hermes 正在执行" },
+                        if (recovering) uiText(R.string.ui_1292, "连接中断，正在自动取回结果") else stage.ifBlank { uiText(R.string.ui_0373, "Hermes 正在执行") },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(if (elapsedMinutes < 1) "刚刚" else "${elapsedMinutes} 分钟", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(if (elapsedMinutes < 1) uiText(R.string.ui_0483, "刚刚") else uiText(R.string.ui_1293, "%1\$s 分钟", elapsedMinutes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             Row(Modifier.align(Alignment.End).padding(top = 4.dp)) {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpen) { Text("打开会话") }
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text("停止", color = MaterialTheme.colorScheme.error) }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpen) { Text(uiText(R.string.ui_0162, "打开会话")) }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text(uiText(R.string.ui_0192, "停止"), color = MaterialTheme.colorScheme.error) }
             }
         }
     }
@@ -362,7 +366,7 @@ private fun RunCompletionCard(
                     shape = RoundedCornerShape(9.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                 ) {
-                    Text("打开产物 · ${artifact.name}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(9.dp))
+                    Text(uiText(R.string.ui_1294, "打开产物 · %1\$s", artifact.name), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(9.dp))
                 }
             }
         }
@@ -396,7 +400,7 @@ private fun CronJobCard(
                 Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        job.schedule.display.ifBlank { job.schedule.expression.ifBlank { "未设置计划" } },
+                        job.schedule.display.ifBlank { job.schedule.expression.ifBlank { uiText(R.string.ui_1295, "未设置计划") } },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -409,16 +413,16 @@ private fun CronJobCard(
             }
             Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (job.nextRunAt.isBlank()) "等待服务器计算下次时间" else "下次 ${cronTimeLabel(job.nextRunAt)}",
+                    if (job.nextRunAt.isBlank()) uiText(R.string.ui_1296, "等待服务器计算下次时间") else uiText(R.string.ui_1297, "下次 %1\$s", cronTimeLabel(job.nextRunAt)),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onTrigger, enabled = !busy, modifier = Modifier.size(36.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.PLAY, contentDescription = "立即运行", iconSize = 20.dp)
+                    HermesMulticolorIcon(HermesIconKind.PLAY, contentDescription = uiText(R.string.ui_0822, "立即运行"), iconSize = 20.dp)
                 }
                 IconButton(onClick = onDelete, enabled = !busy, modifier = Modifier.size(36.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.DELETE, contentDescription = "删除任务", iconSize = 19.dp)
+                    HermesMulticolorIcon(HermesIconKind.DELETE, contentDescription = uiText(R.string.ui_0826, "删除任务"), iconSize = 19.dp)
                 }
             }
         }
@@ -459,14 +463,14 @@ private fun CronSessionCard(session: HermesSession, onClick: () -> Unit) {
             }
             Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(
-                    session.title.ifBlank { "定时任务会话" },
+                    session.title.ifBlank { uiText(R.string.ui_1298, "定时任务会话") },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    session.preview.ifBlank { "点按查看完整执行内容" },
+                    com.qingyu.hermescompanion.ui.format.conversationPreview(session.preview).ifBlank { uiText(R.string.ui_1299, "点按查看完整执行内容") },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -500,42 +504,42 @@ private fun CronDetailDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(18.dp),
-        title = { Text(if (editing) "编辑定时任务" else "定时任务详情") },
+        title = { Text(if (editing) uiText(R.string.ui_0802, "编辑定时任务") else uiText(R.string.ui_0803, "定时任务详情")) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 510.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 if (editing) {
-                    OutlinedTextField(name, { name = it }, label = { Text("任务名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(prompt, { prompt = it }, label = { Text("让 Hermes 做什么") }, minLines = 3, maxLines = 6, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(name, { name = it }, label = { Text(uiText(R.string.ui_0806, "任务名称")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(prompt, { prompt = it }, label = { Text(uiText(R.string.ui_1300, "让 Hermes 做什么")) }, minLines = 3, maxLines = 6, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(
                         schedule,
                         { schedule = it },
-                        label = { Text("Cron 表达式") },
-                        supportingText = { Text("示例：每天 9:00 = 0 9 * * *") },
+                        label = { Text(uiText(R.string.ui_1301, "Cron 表达式")) },
+                        supportingText = { Text(uiText(R.string.ui_1302, "示例：每天 9:00 = 0 9 * * *")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
                     Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    DetailRow("状态", if (job.enabled) job.state.ifBlank { "已启用" } else "已暂停")
-                    DetailRow("执行计划", job.schedule.display.ifBlank { job.schedule.expression.ifBlank { "未设置" } })
-                    DetailRow("下次执行", job.nextRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: "等待服务器计算")
-                    DetailRow("上次执行", job.lastRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: "暂无")
-                    job.lastStatus.takeIf(String::isNotBlank)?.let { DetailRow("上次状态", it) }
-                    (job.model.ifBlank { job.provider }).takeIf(String::isNotBlank)?.let { DetailRow("运行模型", it) }
+                    DetailRow(uiText(R.string.ui_1303, "状态"), if (job.enabled) job.state.ifBlank { uiText(R.string.ui_1304, "已启用") } else uiText(R.string.ui_0805, "已暂停"))
+                    DetailRow(uiText(R.string.ui_0808, "执行计划"), job.schedule.display.ifBlank { job.schedule.expression.ifBlank { uiText(R.string.ui_0115, "未设置") } })
+                    DetailRow(uiText(R.string.ui_1305, "下次执行"), job.nextRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: uiText(R.string.ui_0813, "等待服务器计算"))
+                    DetailRow(uiText(R.string.ui_1306, "上次执行"), job.lastRunAt.takeIf(String::isNotBlank)?.let(::cronTimeLabel) ?: uiText(R.string.ui_1307, "暂无"))
+                    job.lastStatus.takeIf(String::isNotBlank)?.let { DetailRow(uiText(R.string.ui_1308, "上次状态"), it) }
+                    (job.model.ifBlank { job.provider }).takeIf(String::isNotBlank)?.let { DetailRow(uiText(R.string.ui_1309, "运行模型"), it) }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                    Text("执行内容", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(job.prompt.ifBlank { "未填写" }, style = MaterialTheme.typography.bodyMedium)
+                    Text(uiText(R.string.ui_1310, "执行内容"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(job.prompt.ifBlank { uiText(R.string.ui_1311, "未填写") }, style = MaterialTheme.typography.bodyMedium)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onTrigger, enabled = !busy) { Text("立即运行") }
-                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onToggle, enabled = !busy) { Text(if (job.enabled) "暂停" else "启用") }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onTrigger, enabled = !busy) { Text(uiText(R.string.ui_0822, "立即运行")) }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onToggle, enabled = !busy) { Text(if (job.enabled) uiText(R.string.ui_1312, "暂停") else uiText(R.string.ui_1313, "启用")) }
                         Spacer(Modifier.weight(1f))
-                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDelete, enabled = !busy) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                        TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onDelete, enabled = !busy) { Text(uiText(R.string.ui_0469, "删除"), color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
@@ -545,14 +549,14 @@ private fun CronDetailDialog(
                 TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), 
                     enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(),
                     onClick = { onSave(name, prompt, schedule) },
-                ) { Text("保存") }
+                ) { Text(uiText(R.string.ui_0936, "保存")) }
             } else {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = { editing = true }) { Text("编辑") }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = { editing = true }) { Text(uiText(R.string.ui_1314, "编辑")) }
             }
         },
         dismissButton = {
             TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = { if (editing) editing = false else onDismiss() }) {
-                Text(if (editing) "取消编辑" else "关闭")
+                Text(if (editing) uiText(R.string.ui_0820, "取消编辑") else uiText(R.string.ui_0196, "关闭"))
             }
         },
     )
@@ -573,20 +577,20 @@ private fun CreateCronDialog(busy: Boolean, onDismiss: () -> Unit, onCreate: (St
     var schedule by remember { mutableStateOf("0 9 * * *") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新建定时任务") },
+        title = { Text(uiText(R.string.ui_1282, "新建定时任务")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("任务名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(prompt, { prompt = it }, label = { Text("让 Hermes 做什么") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(schedule, { schedule = it }, label = { Text("Cron 表达式") }, supportingText = { Text("示例：每天 9:00 = 0 9 * * *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text(uiText(R.string.ui_0806, "任务名称")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(prompt, { prompt = it }, label = { Text(uiText(R.string.ui_1300, "让 Hermes 做什么")) }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(schedule, { schedule = it }, label = { Text(uiText(R.string.ui_1301, "Cron 表达式")) }, supportingText = { Text(uiText(R.string.ui_1302, "示例：每天 9:00 = 0 9 * * *")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy && name.isNotBlank() && prompt.isNotBlank() && schedule.isNotBlank(), onClick = { onCreate(name, prompt, schedule) }) {
-                Text("创建")
+                Text(uiText(R.string.ui_0978, "创建"))
             }
         },
-        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), enabled = !busy, onClick = onDismiss) { Text(uiText(R.string.ui_0553, "取消")) } },
     )
 }
 
@@ -604,10 +608,10 @@ private fun TaskSummaryStrip(
     ) {
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TaskSummaryMetric("待处理", pending.toString(), Modifier.weight(1f))
-                TaskSummaryMetric("运行中", running.toString(), Modifier.weight(1f))
-                TaskSummaryMetric("定时", enabled.toString(), Modifier.weight(1f))
-                TaskSummaryMetric("记录", completed.toString(), Modifier.weight(1f))
+                TaskSummaryMetric(uiText(R.string.ui_1271, "待处理"), pending.toString(), Modifier.weight(1f))
+                TaskSummaryMetric(uiText(R.string.ui_1315, "运行中"), running.toString(), Modifier.weight(1f))
+                TaskSummaryMetric(uiText(R.string.ui_1316, "定时"), enabled.toString(), Modifier.weight(1f))
+                TaskSummaryMetric(uiText(R.string.ui_1317, "记录"), completed.toString(), Modifier.weight(1f))
             }
         }
     }
@@ -682,10 +686,10 @@ private fun TaskEmptyState(icon: HermesIconKind, title: String, description: Str
 
 private fun cronTimeLabel(raw: String): String {
     if (raw.isBlank()) return ""
-    val instant = runCatching { Instant.parse(raw) }.getOrNull()
+    val instant = com.qingyu.hermescompanion.ui.format.parseHermesInstant(raw)
         ?: runCatching { OffsetDateTime.parse(raw).toInstant() }.getOrNull()
         ?: return raw
-    return DateTimeFormatter.ofPattern("M月d日 HH:mm").withZone(ZoneId.systemDefault()).format(instant)
+    return DateTimeFormatter.ofPattern(uiText(R.string.ui_0489, "M月d日 HH:mm")).withZone(ZoneId.systemDefault()).format(instant)
 }
 
 private val CronJob.isRunning: Boolean

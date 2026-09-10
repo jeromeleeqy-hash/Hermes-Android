@@ -1,0 +1,16 @@
+{
+  "tests": 255,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "version": "3.6.0-preview",
+  "applicationId": "com.qingyu.hermescompanion.preview",
+  "versionCode": 360,
+  "apkSha256": "1129f07b41389955771116aaceb5fb6086888b4b8a61a10bd4e07f701e517847",
+  "certificateSha256": "741c1844bb9267547e06af30d56c0da5bfcbf01491d3670496d88837a2860ad6",
+  "dex": [
+    "classes.dex"
+  ],
+  "render": "Android/Robolectric native graphics",
+  "physicalDeviceTested": false
+}

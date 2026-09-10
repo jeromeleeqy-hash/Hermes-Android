@@ -1,0 +1,566 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "connect",
+      "title": {
+        "zh": "开始与连接",
+        "en": "Getting connected"
+      },
+      "hint": {
+        "zh": "首次使用、更换网关、连接排查",
+        "en": "First launch, gateways and connection problems"
+      },
+      "articles": [
+        {
+          "id": "first-connect",
+          "title": {
+            "zh": "第一次连接 Agent",
+            "en": "Connect to an Agent for the first time"
+          },
+          "steps": {
+            "zh": [
+              "首次打开后观看或跳过开场动画，在“认识彼此”里选择助理头像、填写助理昵称和你的称呼。",
+              "点击“下一步 · 连接网关”。在电脑端远程访问设置中复制远程 URL，填写到手机的服务器地址。",
+              "填写电脑端设置的网关用户名和密码，点击“验证并连接”。成功后进入助理页。"
+            ],
+            "en": [
+              "Watch or skip the welcome clip. Choose an assistant avatar and name, then optionally enter your own name.",
+              "Tap “Next · Connect a gateway”. Copy the Remote URL from the desktop remote-access settings into the server address field.",
+              "Enter the gateway username and password configured on the computer, then tap “Verify and connect”. A successful connection opens the assistant home."
+            ]
+          },
+          "tip": {
+            "zh": "昵称只改变手机上的显示，不会更改 Agent、Profile 或网关账号。",
+            "en": "Display names only affect this app. They do not rename the Agent, Profile or gateway account."
+          }
+        },
+        {
+          "id": "change-gateway",
+          "title": {
+            "zh": "更换服务器或重新登录",
+            "en": "Change servers or sign in again"
+          },
+          "steps": {
+            "zh": [
+              "进入“我的 → 设置 → 远程网关”。",
+              "修改服务器地址或用户名，重新输入密码。",
+              "点击“验证并更新连接”，等待成功提示。需要退出当前连接时，使用页面底部的“清除连接并退出”。"
+            ],
+            "en": [
+              "Open Me → Settings → Remote gateway.",
+              "Change the server address or username and re-enter the password.",
+              "Tap “Verify and update connection” and wait for confirmation. To sign out, use “Clear connection and sign out” at the bottom."
+            ]
+          },
+          "tip": {
+            "zh": "清除连接会退出网关；手机里的昵称、头像和外观选择会保留。",
+            "en": "Signing out clears the gateway connection while keeping local names, avatars and appearance choices."
+          }
+        },
+        {
+          "id": "connection-failed",
+          "title": {
+            "zh": "连接失败时怎么排查",
+            "en": "Troubleshoot a failed connection"
+          },
+          "steps": {
+            "zh": [
+              "核对完整远程 URL，确认没有额外追加 /api 或 /v1；点地址下方“在哪里找到地址？”可查看填写方法。",
+              "确认服务器和网关正在运行，手机能访问该地址，再核对用户名、密码。",
+              "已经保存过连接时，展开“诊断与 Agent 版本”，点击“诊断当前连接”，按失败项目处理后重试。"
+            ],
+            "en": [
+              "Check the complete Remote URL and remove any extra /api or /v1 suffix. Tap “Where do I find the address?” for help.",
+              "Confirm that the server and gateway are running, that your phone can reach them, and that the credentials are correct.",
+              "For a saved connection, expand “Diagnostics and Agent version” and tap “Diagnose current connection”. Resolve the reported failing step and retry."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat",
+      "title": {
+        "zh": "日常对话",
+        "en": "Conversations"
+      },
+      "hint": {
+        "zh": "开始新对话、查找记录、添加资料",
+        "en": "Start chats, find history and add material"
+      },
+      "articles": [
+        {
+          "id": "start-chat",
+          "title": {
+            "zh": "开始或继续一段对话",
+            "en": "Start or continue a conversation"
+          },
+          "steps": {
+            "zh": [
+              "在助理页点击“跟我说”，进入日常助理对话；也可以点“接着上次的事”里的记录继续聊。",
+              "想开启独立话题时，进入“回看”，点击右上角的新建按钮。",
+              "在输入框写下需求并发送；右上角“⋯ → 完整对话”可以查看前后文。"
+            ],
+            "en": [
+              "Tap “Talk to me” on the assistant home for your daily conversation, or choose a recent conversation to continue it.",
+              "For a separate topic, open History and tap the compose button at the top right.",
+              "Type and send your request. Use ⋯ → Full conversation to read the surrounding messages."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "find-chat",
+          "title": {
+            "zh": "查找以前的对话",
+            "en": "Find an earlier conversation"
+          },
+          "steps": {
+            "zh": [
+              "进入底部“回看”，点右上角放大镜，输入标题或记得的关键词。",
+              "需要缩小范围时，回到列表，使用项目和时间筛选。",
+              "点开结果后选择“完整对话”，向上滚动查看更早的消息。"
+            ],
+            "en": [
+              "Open History, tap the search icon at the top right and enter a title or remembered keyword.",
+              "Use the project and time filters on the list to narrow the results.",
+              "Open a result and choose Full conversation, then scroll up to earlier messages."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "add-material",
+          "title": {
+            "zh": "把文件或图片交给助理",
+            "en": "Add a file or image to a chat"
+          },
+          "steps": {
+            "zh": [
+              "在对话输入框左侧点击“＋”。",
+              "选择“文件”或“图片”从手机添加资料；选择“空间”可以挑选服务器上的文件。",
+              "确认资料已经出现在输入区，再补充你希望如何处理它，最后发送。"
+            ],
+            "en": [
+              "Tap + to the left of the chat input.",
+              "Choose File or Image for material on your phone, or Workspace to pick a file on the server.",
+              "Wait for the attachment to appear in the input area, describe what you want done and send the message."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "prompt-snippets",
+          "title": {
+            "zh": "设置自己的提示词片段",
+            "en": "Create reusable prompt snippets"
+          },
+          "steps": {
+            "zh": [
+              "在对话中点击“＋”，找到“提示词片段”，点击旁边的“管理”。",
+              "新增或编辑片段，填写名称和正文后保存；也可以调整顺序或删除不再使用的片段。",
+              "返回添加面板，点一个片段将内容放入输入框，检查并修改后再发送。"
+            ],
+            "en": [
+              "Tap + in a chat, find Prompt snippets and tap Manage.",
+              "Add or edit a snippet, enter its name and text and save. You can also reorder or remove snippets.",
+              "Return to the add panel and tap a snippet to insert it into the draft. Review or edit the text before sending."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "title": {
+        "zh": "语音交流",
+        "en": "Voice conversations"
+      },
+      "hint": {
+        "zh": "语音输入、连续语音、识别排查",
+        "en": "Dictation, continuous voice and recognition problems"
+      },
+      "articles": [
+        {
+          "id": "voice-input",
+          "title": {
+            "zh": "用语音补充一句",
+            "en": "Dictate a message"
+          },
+          "steps": {
+            "zh": [
+              "进入“我的 → 设置 → 语音设置”，确认“启用语音功能”已打开。",
+              "回到对话，点击输入框旁的语音按钮，首次使用时允许麦克风权限。",
+              "说完后结束录音，检查识别出来的内容，再按页面提示发送或继续对话。"
+            ],
+            "en": [
+              "Open Me → Settings → Voice settings and turn on Enable voice.",
+              "Return to a chat and tap the voice button beside the input. Grant microphone permission when first asked.",
+              "Finish recording, review the recognized text and use the available send or continue action."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "continuous-voice",
+          "title": {
+            "zh": "开始连续语音并中途打断",
+            "en": "Start and interrupt continuous voice"
+          },
+          "steps": {
+            "zh": [
+              "在对话右上角点击“⋯ → 连续语音”。",
+              "允许录音后开始说话；助理回答时，按照页面上的打断按钮暂停它，再继续说。",
+              "返回对话即可退出连续语音。停留在前台连续语音页面时，屏幕会保持点亮。"
+            ],
+            "en": [
+              "Open ⋯ → Voice chat at the top right of a chat.",
+              "Allow recording and speak. While the assistant is answering, use the interrupt control to stop it and speak again.",
+              "Return to the chat to leave continuous voice. The screen stays awake while this voice page is in the foreground."
+            ]
+          },
+          "tip": {
+            "zh": "切到后台或退出语音页后，恢复系统正常息屏；手动锁屏仍然有效。",
+            "en": "Normal screen timeout resumes in the background or after leaving the voice page. You can still lock the phone manually."
+          }
+        },
+        {
+          "id": "voice-failed",
+          "title": {
+            "zh": "语音听不清或无法识别",
+            "en": "Fix voice recognition problems"
+          },
+          "steps": {
+            "zh": [
+              "先到手机系统设置确认 Hermes 的麦克风权限已允许，并检查网络连接。",
+              "进入“我的 → 设置 → 语音设置”，检查语音引擎和收音环境。",
+              "Agent 语音服务不可用时，可尝试自动或手机系统引擎，再用一句短话测试；中文转写形式可以在同页调整。"
+            ],
+            "en": [
+              "Check that Hermes has microphone permission in Android settings, then check your connection.",
+              "Open Me → Settings → Voice settings and review the voice engine and recording environment.",
+              "If Agent voice services are unavailable, try the automatic or device engine and test a short sentence. Chinese transcription style can be changed on the same page."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "title": {
+        "zh": "项目与文件",
+        "en": "Projects and files"
+      },
+      "hint": {
+        "zh": "工作目录、预览编辑、分享文件",
+        "en": "Workspace paths, previews, editing and sharing"
+      },
+      "articles": [
+        {
+          "id": "workspace-path",
+          "title": {
+            "zh": "设置项目工作目录",
+            "en": "Set a project workspace"
+          },
+          "steps": {
+            "zh": [
+              "进入“回看”，在顶部视图筛选中切换到“项目”，点击“新建项目”。",
+              "填写项目名称和服务器上的绝对工作目录，也可以点击“浏览目录”选择。",
+              "Windows 示例为 D:\\Hermes\\workspace；Linux 示例为 /home/user/workspace。确认后创建项目。"
+            ],
+            "en": [
+              "Open History, switch the top view filter to Projects and tap New project.",
+              "Enter a project name and an absolute directory on the server, or use Browse directories.",
+              "For Windows, use a path such as D:\\Hermes\\workspace; for Linux, use /home/user/workspace. Confirm to create the project."
+            ]
+          },
+          "tip": {
+            "zh": "填写的是运行 Agent 的电脑目录，不是手机存储路径。",
+            "en": "This is a directory on the computer running the Agent, not on your phone."
+          }
+        },
+        {
+          "id": "edit-file",
+          "title": {
+            "zh": "查看并编辑文件",
+            "en": "Preview and edit a file"
+          },
+          "steps": {
+            "zh": [
+              "进入底部“文件”，选择目录并点开目标文件。",
+              "Markdown 等可编辑文本可以切换到编辑界面；修改正文后点击保存。",
+              "返回列表前确认保存成功；不支持编辑的文件使用预览或下载功能。"
+            ],
+            "en": [
+              "Open Files, browse to the directory and open the file.",
+              "For editable text such as Markdown, switch to the editor, make your changes and save.",
+              "Confirm that saving succeeded before leaving. Use preview or download for other file types."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "share-file",
+          "title": {
+            "zh": "分享助理生成的文件",
+            "en": "Share a file created by the assistant"
+          },
+          "steps": {
+            "zh": [
+              "点击回答中的文件卡片，或到“文件”中找到对应文件。",
+              "打开预览后点击分享按钮，选择目标应用。",
+              "如果目标应用不能接收该类型文件，先下载文件，再从手机的文件管理器分享。"
+            ],
+            "en": [
+              "Tap the file card in a reply, or find the file in Files.",
+              "Open the preview, tap Share and choose an app.",
+              "If the app cannot accept that file type, download it first and share it from your phone’s file manager."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "title": {
+        "zh": "任务与审批",
+        "en": "Tasks and approvals"
+      },
+      "hint": {
+        "zh": "定时执行、查看结果、处理确认",
+        "en": "Schedules, results and approval requests"
+      },
+      "articles": [
+        {
+          "id": "create-task",
+          "title": {
+            "zh": "建立每天执行的任务",
+            "en": "Create a daily task"
+          },
+          "steps": {
+            "zh": [
+              "进入底部“任务”，点击新建按钮，填写任务名称。",
+              "在“让 Hermes 做什么”中写清任务要求，再设置 Cron 表达式；每天 9 点可填写 0 9 * * *。",
+              "点击创建，打开任务详情检查时间和内容；查看首次执行结果，再按需要调整。"
+            ],
+            "en": [
+              "Open Tasks, tap New task and enter a name.",
+              "Describe the work in “What should Hermes do?” and set a Cron expression. For 9:00 every day, enter 0 9 * * *.",
+              "Create the task, then check its schedule and prompt in the details. Review the first result and adjust as needed."
+            ]
+          },
+          "tip": {
+            "zh": "执行时间取决于服务器任务调度所用时区，请核对任务详情。",
+            "en": "Execution time follows the server scheduler’s time zone. Check the task details."
+          }
+        },
+        {
+          "id": "task-results",
+          "title": {
+            "zh": "查看结果或暂停定时任务",
+            "en": "Review results or pause a scheduled task"
+          },
+          "steps": {
+            "zh": [
+              "在“任务”的定时列表中点开目标任务。",
+              "查看最近运行状态和结果；需要立即验证时使用立即运行。",
+              "暂时不用时关闭或暂停任务，之后可重新启用。"
+            ],
+            "en": [
+              "Select a task in the scheduled list on Tasks.",
+              "Review the latest run status and output. Use Run now when you want to test it immediately.",
+              "Disable or pause a task you do not currently need, and enable it again later."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "handle-approval",
+          "title": {
+            "zh": "处理需要你确认的操作",
+            "en": "Handle an approval request"
+          },
+          "steps": {
+            "zh": [
+              "在“任务”的待处理项或对话中的审批卡片里打开请求。",
+              "阅读将执行的操作和涉及内容，确认是否符合你的意图。",
+              "选择允许或拒绝，再回到对话查看助理是否继续执行。"
+            ],
+            "en": [
+              "Open the request from pending items in Tasks or from its approval card in the chat.",
+              "Read the proposed action and affected material, and check it matches your intent.",
+              "Allow or reject it, then return to the conversation to see the result."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "personal",
+      "title": {
+        "zh": "个人偏好",
+        "en": "Make it yours"
+      },
+      "hint": {
+        "zh": "昵称头像、主题语言、长期记忆",
+        "en": "Names, avatars, appearance, language and memory"
+      },
+      "articles": [
+        {
+          "id": "edit-identity",
+          "title": {
+            "zh": "更换助理昵称和双方头像",
+            "en": "Change names and avatars"
+          },
+          "steps": {
+            "zh": [
+              "进入“我的 → 编辑信息”。",
+              "在“你的助理”中更换头像、修改昵称；在“你的信息”中修改自己的头像、称呼或签名。",
+              "点击保存。助理页会显示“我是 + 助理昵称”，其他页面也使用更新后的资料。"
+            ],
+            "en": [
+              "Open Me → Edit profile.",
+              "Under Your assistant, change the avatar or name. Under Your profile, change your own avatar, name or bio.",
+              "Save your changes. The home header displays “I’m” followed by the assistant name, and other pages use the updated profile."
+            ]
+          },
+          "tip": {
+            "zh": "",
+            "en": ""
+          }
+        },
+        {
+          "id": "theme-language",
+          "title": {
+            "zh": "切换主题或中英文",
+            "en": "Change the skin or language"
+          },
+          "steps": {
+            "zh": [
+              "进入“我的 → 设置 → 外观”，选择温暖、玻璃或安静风格。",
+              "在同一面板选择浅色、深色或跟随系统；如果希望减少动态效果，可开启减少动画。",
+              "返回设置，进入“语言”选择简体中文、English 或跟随系统。"
+            ],
+            "en": [
+              "Open Me → Settings → Appearance and choose the warm, glass or quiet skin.",
+              "Choose light, dark or system colors in the same panel. Enable reduced motion if you prefer fewer animations.",
+              "Return to Settings and open Language to choose Simplified Chinese, English or the system language."
+            ]
+          },
+          "tip": {
+            "zh": "语言切换只影响软件界面，不会自动翻译已有对话和服务器文件。",
+            "en": "The language setting changes the app interface. It does not translate existing chats or server files."
+          }
+        },
+        {
+          "id": "launcher-icon",
+          "title": {
+            "zh": "切换桌面图标",
+            "en": "Change the app icon"
+          },
+          "steps": {
+            "zh": [
+              "进入“我的 → 设置 → 外观”，下滑到“桌面图标”。",
+              "选择“白发伙伴”或“耳机精灵”，出现成功提示后返回手机桌面。",
+              "桌面可能需要几秒刷新。切换只改变软件图标，不会修改对话里的头像。"
+            ],
+            "en": [
+              "Open Me → Settings → Appearance, then scroll to App icon.",
+              "Choose Partner or Sprite. After the confirmation, return to your home screen.",
+              "Your launcher may take a few seconds to refresh. This only changes the app icon, not conversation avatars."
+            ]
+          },
+          "tip": {
+            "zh": "图标选择会保留，下次打开和升级后无需重新设置。",
+            "en": "Your selection is kept across app restarts and upgrades."
+          }
+        },
+        {
+          "id": "mascot-interaction",
+          "title": {
+            "zh": "点击人物播放互动动作",
+            "en": "Play an assistant gesture"
+          },
+          "steps": {
+            "zh": [
+              "在助理首页点一下白发女孩，播放一个互动动作。",
+              "动作结束后再点，会播放另一款；播放中连续点击不会重新开始。",
+              "如需静态人物，进入“我的 → 设置 → 外观”开启“减少动态效果”。"
+            ],
+            "en": [
+              "Tap the white-haired assistant on Home to play a gesture.",
+              "After it finishes, tap again for the other gesture. Repeated taps during playback do not restart it.",
+              "For a still character, enable Reduce Motion in Me → Settings → Appearance."
+            ]
+          },
+          "tip": {
+            "zh": "离开首页或切到后台会结束本次互动；Android 8 设备使用静态人物。",
+            "en": "Leaving Home or backgrounding ends the gesture. Android 8 devices use still artwork."
+          }
+        },
+        {
+          "id": "edit-memory",
+          "title": {
+            "zh": "修改助理的长期记忆",
+            "en": "Edit the assistant’s long-term memory"
+          },
+          "steps": {
+            "zh": [
+              "在“我的”页面打开“我的记忆”，先阅读当前内容。",
+              "进入编辑，补充或修改需要长期保留的偏好与事实。",
+              "保存后再次打开核对；若要调整人格与行为方式，使用“我的心智”。"
+            ],
+            "en": [
+              "Open My memory on the Me page and read the current content.",
+              "Enter the editor and add or revise the facts and preferences you want to retain.",
+              "Save, reopen and review your changes. To adjust personality and behavior, use My mind instead."
+            ]
+          },
+          "tip": {
+            "zh": "这些内容属于当前 Agent Profile，与手机上的头像和昵称设置分开。",
+            "en": "These files belong to the current Agent Profile and are separate from local names and avatars."
+          }
+        }
+      ]
+    }
+  ]
+}

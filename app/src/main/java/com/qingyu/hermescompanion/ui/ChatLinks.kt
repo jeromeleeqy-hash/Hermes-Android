@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 internal data class ChatFileLink(
     val label: String,
     val target: String,
@@ -46,7 +50,7 @@ internal fun parseChatImageLinkLine(rawLine: String): ChatImageLink? {
     if (line.startsWith("@image:", ignoreCase = true)) {
         val target = line.substringAfter(':').trim().trim('`', '"', '\'')
         return target.takeIf(String::isImagePath)?.let {
-            ChatImageLink(label = it.fileName().ifBlank { "聊天图片" }, target = it)
+            ChatImageLink(label = it.fileName().ifBlank { uiText(R.string.ui_0177, "聊天图片") }, target = it)
         }
     }
 
@@ -54,7 +58,7 @@ internal fun parseChatImageLinkLine(rawLine: String): ChatImageLink? {
         val target = match.groupValues[2].trim().trim('`', '"', '\'')
         if (target.isImagePath()) {
             return ChatImageLink(
-                label = match.groupValues[1].trim().ifBlank { target.fileName().ifBlank { "聊天图片" } },
+                label = match.groupValues[1].trim().ifBlank { target.fileName().ifBlank { uiText(R.string.ui_0177, "聊天图片") } },
                 target = target,
             )
         }
@@ -77,4 +81,4 @@ private fun String.isImagePath(): Boolean =
         substringBefore('#').substringBefore('?').substringAfterLast('.', "").lowercase() in imageExtensions
 
 private fun String.fileName(): String =
-    substringBefore('#').substringBefore('?').substringAfterLast('/').ifBlank { "Markdown 文档" }
+    substringBefore('#').substringBefore('?').substringAfterLast('/').ifBlank { uiText(R.string.ui_0178, "Markdown 文档") }

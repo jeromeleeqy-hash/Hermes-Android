@@ -1,5 +1,8 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,27 +37,18 @@ import androidx.compose.ui.unit.*
 import com.qingyu.hermescompanion.R
 import com.qingyu.hermescompanion.ui.AppRoute
 
-val AssistantBlue: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < .5f) Color(0xFF69D4FF) else Color(0xFF0078AD)
-val NavigationSelected: Color
-    @Composable get() = if(MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFFB1C5FF) else Color(0xFF586CCA)
-val NavigationIdle: Color
-    @Composable get() = if(MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFF9CA7B5) else Color(0xFF6C7585)
-
-val NavigationGradientStart: Color
-    @Composable get() = if(MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFF8EDFFF) else Color(0xFF168DD0)
-val NavigationGradientEnd: Color
-    @Composable get() = if(MaterialTheme.colorScheme.background.luminance()<.5f) Color(0xFFC6ACFF) else Color(0xFF8860DA)
-
-val AssistantAccent = Color(0xFF009BDE)
-val AssistantMint = Color(0xFF06B9A9)
-val AssistantPurple = Color(0xFF8260E7)
+val AssistantBlue: Color @Composable get() = MaterialTheme.colorScheme.primary
+val NavigationSelected: Color @Composable get() = MaterialTheme.colorScheme.primary
+val NavigationIdle: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+val NavigationGradientStart: Color @Composable get() = MaterialTheme.colorScheme.primary
+val NavigationGradientEnd: Color @Composable get() = MaterialTheme.colorScheme.primary
+val AssistantAccent: Color @Composable get() = MaterialTheme.colorScheme.primary
+val AssistantMint: Color @Composable get() = com.qingyu.hermescompanion.ui.theme.HermesColors.extended.success
+val AssistantPurple: Color @Composable get() = MaterialTheme.colorScheme.primary
 
 @Composable
 fun AssistantPanel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Surface(modifier, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f)),
-        shadowElevation = 0.dp, content = content)
+    GlassPanel(modifier) { content() }
 }
 
 /** A native contour clip removes the rectangular backdrop without tinting the face.
@@ -107,6 +101,7 @@ fun AssistantGlyph(kind: String, modifier: Modifier = Modifier.size(24.dp), tint
             val stroke = Stroke(1.65f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             fun line(x: Float, y: Float, x2: Float, y2: Float) = drawLine(tint, Offset(x,y), Offset(x2,y2), 1.65f, StrokeCap.Round)
             when (kind) {
+                "spark" -> { val p = Path().apply { moveTo(12f,2f); quadraticTo(13.5f,10.5f,22f,12f); quadraticTo(13.5f,13.5f,12f,22f); quadraticTo(10.5f,13.5f,2f,12f); quadraticTo(10.5f,10.5f,12f,2f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
                 "home" -> { val p = Path().apply { moveTo(3f,11f); lineTo(12f,3f); lineTo(21f,11f); lineTo(21f,21f); lineTo(15f,21f); lineTo(15f,15f); lineTo(9f,15f); lineTo(9f,21f); lineTo(3f,21f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
                 "history" -> { if(filled) { drawCircle(ink,9f,Offset(12f,12f)); drawLine(cutout,Offset(12f,6f),Offset(12f,12f),1.8f,StrokeCap.Round); drawLine(cutout,Offset(12f,12f),Offset(17f,12f),1.8f,StrokeCap.Round) } else { drawCircle(tint,9f,Offset(12f,12f),style=stroke); line(12f,6f,12f,12f);line(12f,12f,17f,12f) } }
                 "user" -> { drawCircle(ink,4.1f,Offset(12f,6.5f),style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke); val p=Path().apply{moveTo(3f,22f);cubicTo(3f,10f,21f,10f,21f,22f);close()};drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
@@ -143,8 +138,10 @@ fun AssistantGlyph(kind: String, modifier: Modifier = Modifier.size(24.dp), tint
 
 @Composable
 fun AssistantIconWell(kind: String, color: Color, modifier: Modifier = Modifier.size(36.dp)) {
-    Surface(modifier, shape = RoundedCornerShape(12.dp), color = color.copy(alpha = .10f)) {
-        Box(contentAlignment = Alignment.Center) { AssistantGlyph(kind, Modifier.size(21.dp), color) }
+    val paper = com.qingyu.hermescompanion.ui.theme.HermesSkin.current.mode == com.qingyu.hermescompanion.ui.SkinMode.PAPER
+    val ink = MaterialTheme.colorScheme.primary
+    Box(modifier.hermesWell()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { AssistantGlyph(kind, Modifier.size(21.dp), ink) }
     }
 }
 
@@ -158,36 +155,48 @@ private fun HermesNavigationPortrait(brush:Brush,modifier:Modifier=Modifier) {
         },colorFilter=ColorFilter.tint(Color.White))
 }
 
-/** Five tabs share one opaque lower backing, with no selected icon background. */
+/** The same five destinations, with a different surface and selection grammar per skin. */
 @Composable
 fun ReferenceBottomDock(selected: AppRoute, hasUnread: Boolean, onSelect: (AppRoute) -> Unit,
     navigationInsets: WindowInsets = WindowInsets.navigationBars) {
-    Column(Modifier.fillMaxWidth().padding(top=8.dp).background(MaterialTheme.colorScheme.background)
-        .testTag("bottom_dock_occlusion").windowInsetsPadding(navigationInsets).padding(bottom=8.dp)) {
-    Surface(Modifier.fillMaxWidth().padding(horizontal=14.dp).testTag("floating_bottom_dock"),
-        shape=RoundedCornerShape(26.dp), color=MaterialTheme.colorScheme.surface,
-        shadowElevation=5.dp) {
-        Row(Modifier.fillMaxWidth().heightIn(min=64.dp).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-            listOf(Triple(AppRoute.HOME,"助理","home"),Triple(AppRoute.SESSIONS,"回看","history"),Triple(AppRoute.TASKS,"任务","tasks"),Triple(AppRoute.WORKSPACE,"文件","folder"),Triple(AppRoute.PROFILE,"我的","user")).forEach { (route,label,icon) ->
-                val active=selected==route
-                val progress by animateFloatAsState(if(active) 1f else 0f,spring(dampingRatio=.78f,stiffness=Spring.StiffnessLow),label="navSelection")
-                val brush = Brush.verticalGradient(listOf(lerp(NavigationIdle,NavigationGradientStart,progress.coerceIn(0f,1f)),
-                    lerp(NavigationIdle,NavigationGradientEnd,progress.coerceIn(0f,1f))))
-                val color by animateColorAsState(if(active) NavigationSelected else NavigationIdle,tween(220),label="navColor")
-                Column(Modifier.weight(1f).heightIn(min=48.dp).testTag("nav_${route.name}").selectable(selected=active,role=Role.Tab,interactionSource=remember { MutableInteractionSource() },indication=null,onClick={if(!active)onSelect(route)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                    Box(Modifier.size(25.dp).graphicsLayer { scaleX=1f+.10f*progress;scaleY=scaleX;translationY=-1.dp.toPx()*progress },contentAlignment=Alignment.Center) {
-                        if(route==AppRoute.HOME) HermesNavigationPortrait(brush,Modifier.size(29.dp,28.dp))
-                        else {
-                            AssistantGlyph(icon,Modifier.fillMaxSize().graphicsLayer { alpha=1f-progress.coerceIn(0f,1f) },color)
-                            AssistantGlyph(icon,Modifier.fillMaxSize().graphicsLayer { alpha=progress.coerceIn(0f,1f) },color,filled=true,fillBrush=brush)
+    val skin = com.qingyu.hermescompanion.ui.theme.HermesSkin.current
+    val paper = skin.mode == com.qingyu.hermescompanion.ui.SkinMode.PAPER
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().testTag("bottom_dock_occlusion")
+        .then(if (skin.glass) Modifier else Modifier.background(colors.background))
+        .windowInsetsPadding(navigationInsets.only(WindowInsetsSides.Horizontal))) {
+        if (!skin.glass) HorizontalDivider(color = colors.outlineVariant, thickness = .5.dp)
+        val dock = Modifier.fillMaxWidth().padding(horizontal = if (skin.glass) 16.dp else 8.dp)
+            .trackFloatingDock()
+            .testTag("floating_bottom_dock")
+        Box(if (skin.glass) dock.hermesChrome(RoundedCornerShape(skin.dockRadius.dp), tintAlpha = .42f) else dock) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(Triple(AppRoute.HOME,uiText(R.string.ui_0437, "助理"),"home"), Triple(AppRoute.SESSIONS,uiText(R.string.ui_0438, "回看"),"history"),
+                    Triple(AppRoute.TASKS,uiText(R.string.ui_0440, "任务"),"tasks"), Triple(AppRoute.WORKSPACE,uiText(R.string.ui_0064, "文件"),"folder"),
+                    Triple(AppRoute.PROFILE,uiText(R.string.ui_0439, "我的"),"user")).forEach { (route,label,icon) ->
+                    val active = selected == route
+                    val tint by animateColorAsState(if (active) colors.primary else colors.onSurfaceVariant, tween(180), label = "navColor")
+                    Column(Modifier.weight(1f).heightIn(min = 52.dp).testTag("nav_${route.name}")
+                        .selectable(selected = active, role = Role.Tab, onClick = { if (!active) onSelect(route) }),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Box(Modifier.size(48.dp, 30.dp).background(
+                            if (active && !paper) colors.primaryContainer else Color.Transparent,
+                            RoundedCornerShape(if (skin.glass) 16.dp else 10.dp)), contentAlignment = Alignment.Center) {
+                            if (route == AppRoute.HOME) AssistantGlyph("spark", Modifier.size(25.dp), tint, filled = active && !paper)
+                            else AssistantGlyph(icon, Modifier.size(23.dp), tint, filled = active && !paper)
+                            if (route == AppRoute.SESSIONS && hasUnread) Box(Modifier.align(Alignment.TopEnd).padding(end=5.dp).size(5.dp).background(colors.error, CircleShape))
                         }
-                        if(route==AppRoute.SESSIONS && hasUnread) Surface(Modifier.align(Alignment.TopEnd).size(5.dp),shape=CircleShape,color=AssistantMint) {}
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = if (active) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal)
+                        if (paper) Box(Modifier.size(16.dp, 2.dp).background(if (active) tint else Color.Transparent))
                     }
-                    Text(label,style=MaterialTheme.typography.labelMedium,color=color)
                 }
             }
         }
-    }
+        // HermesScene clips route content below the floating dock. This spacer
+        // stays transparent so the full-screen ambient background is continuous.
+        val bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) { navigationInsets.getBottom(this).toDp() }
+        Spacer(Modifier.fillMaxWidth().height(bottomInset + if (skin.glass) 8.dp else 0.dp)
+            .then(if (skin.glass) Modifier else Modifier.background(colors.background)).testTag("dock_safe_area"))
     }
 }
 
@@ -220,6 +229,7 @@ fun AssistantCreateButton(label:String,onClick:()->Unit,modifier:Modifier=Modifi
 @Composable
 fun AssistantPageTransition(route:AppRoute,content:@Composable ()->Unit) {
     val progress=remember { Animatable(1f) }
-    LaunchedEffect(route) { progress.snapTo(0f);progress.animateTo(1f,tween(240,easing=FastOutSlowInEasing)) }
+    val reduceMotion = LocalReduceMotion.current
+    LaunchedEffect(route, reduceMotion) { if (reduceMotion) progress.snapTo(1f) else { progress.snapTo(0f);progress.animateTo(1f,tween(240,easing=FastOutSlowInEasing)) } }
     Box(Modifier.fillMaxSize().graphicsLayer { alpha=.6f+.4f*progress.value;translationY=10.dp.toPx()*(1f-progress.value) }) { content() }
 }

@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.screen
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import com.qingyu.hermescompanion.ui.component.HermesModalBottomSheet as ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +50,6 @@ import com.qingyu.hermescompanion.model.TodoStatus
 import com.qingyu.hermescompanion.ui.AppUiState
 import com.qingyu.hermescompanion.ui.CouncilMode
 import com.qingyu.hermescompanion.ui.component.HermesIconKind
-import com.qingyu.hermescompanion.ui.component.HermesMark
 import com.qingyu.hermescompanion.ui.component.HermesMulticolorIcon
 import com.qingyu.hermescompanion.ui.component.UserAvatar
 import com.qingyu.hermescompanion.ui.theme.HermesSkin
@@ -112,54 +115,50 @@ private fun AssistantHome(
     val hermesName = state.userProfile.hermesDisplayName.ifBlank { "Hermes" }
     val model = state.selectedSession?.model.orEmpty()
         .ifBlank { state.modelCatalog.currentModel }
-        .ifBlank { "跟随 Hermes 默认模型" }
+        .ifBlank { uiText(R.string.ui_0628, "跟随 Hermes 默认模型") }
     Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 28.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state.userProfile.hermesAvatarUri.isNotBlank()) {
-                UserAvatar(
-                    state.userProfile.hermesAvatarUri,
-                    hermesName,
-                    48.dp,
-                    hermesFallback = true,
-                )
-            } else {
-                HermesMark()
-            }
+            UserAvatar(
+                state.userProfile.hermesAvatarUri,
+                hermesName,
+                48.dp,
+                hermesFallback = true,
+            )
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text("$hermesName 助理面板", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text("管理当前对话，不改变其他会话", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(uiText(R.string.ui_0629, "%1\$s 助理面板", hermesName), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(uiText(R.string.ui_0630, "管理当前对话，不改变其他会话"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.size(18.dp))
         AssistantEntry(
             icon = HermesIconKind.MODEL,
-            title = "切换模型",
+            title = uiText(R.string.ui_0631, "切换模型"),
             subtitle = model.substringAfterLast('/'),
             background = MaterialTheme.colorScheme.primaryContainer,
             onClick = { onNavigate(AssistantPage.MODELS) },
         )
         AssistantEntry(
             icon = HermesIconKind.COUNCIL,
-            title = "专家会审",
+            title = uiText(R.string.ui_0632, "专家会审"),
             subtitle = when (state.councilMode) {
-                CouncilMode.DEEP -> "深度会审 · 已开启"
-                CouncilMode.QUICK -> "快速 MoA · 已开启"
-                CouncilMode.OFF -> "为下一条消息选择会审方式"
+                CouncilMode.DEEP -> uiText(R.string.ui_0633, "深度会审 · 已开启")
+                CouncilMode.QUICK -> uiText(R.string.ui_0634, "快速 MoA · 已开启")
+                CouncilMode.OFF -> uiText(R.string.ui_0635, "为下一条消息选择会审方式")
             },
             background = HermesColors.extended.purpleContainer,
             onClick = onOpenCouncil,
         )
         AssistantEntry(
             icon = HermesIconKind.ARTIFACT,
-            title = "聊天产物",
-            subtitle = if (state.chatArtifacts.isEmpty()) "暂未识别到文件" else "${state.chatArtifacts.size} 个文件或文档",
+            title = uiText(R.string.ui_0636, "聊天产物"),
+            subtitle = if (state.chatArtifacts.isEmpty()) uiText(R.string.ui_0637, "暂未识别到文件") else uiText(R.string.ui_0638, "%1\$s 个文件或文档", state.chatArtifacts.size),
             background = HermesColors.extended.successContainer,
             onClick = { onNavigate(AssistantPage.ARTIFACTS) },
         )
         AssistantEntry(
             icon = HermesIconKind.TODO,
-            title = "待办列表",
-            subtitle = if (state.chatTodos.isEmpty()) "当前对话暂无待办" else "${state.chatTodos.count { it.status == TodoStatus.COMPLETED }}/${state.chatTodos.size} 已完成",
+            title = uiText(R.string.ui_0639, "待办列表"),
+            subtitle = if (state.chatTodos.isEmpty()) uiText(R.string.ui_0640, "当前对话暂无待办") else uiText(R.string.ui_0641, "%1\$s/%2\$s 已完成", state.chatTodos.count { it.status == TodoStatus.COMPLETED }, state.chatTodos.size),
             background = HermesColors.extended.warningContainer,
             onClick = { onNavigate(AssistantPage.TODOS) },
         )
@@ -196,7 +195,7 @@ private fun AssistantEntry(
 @Composable
 private fun SheetHeader(title: String, subtitle: String, onBack: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = "返回") }
+        IconButton(onClick = onBack) { HermesMulticolorIcon(HermesIconKind.BACK, contentDescription = uiText(R.string.ui_0554, "返回")) }
         Column(modifier = Modifier.padding(start = 2.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -226,7 +225,7 @@ private fun ModelPickerContent(
         }
     }
     Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.84f).padding(bottom = 18.dp)) {
-        SheetHeader("切换模型", "仅影响当前会话", onBack)
+        SheetHeader(uiText(R.string.ui_0631, "切换模型"), uiText(R.string.ui_0642, "仅影响当前会话"), onBack)
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             shape = RoundedCornerShape(15.dp),
@@ -241,14 +240,14 @@ private fun ModelPickerContent(
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     modifier = Modifier.weight(1f).padding(start = 9.dp),
                     decorationBox = { inner ->
-                        Box { if (query.isBlank()) Text("搜索已配置模型", color = MaterialTheme.colorScheme.onSurfaceVariant); inner() }
+                        Box { if (query.isBlank()) Text(uiText(R.string.ui_0643, "搜索已配置模型"), color = MaterialTheme.colorScheme.onSurfaceVariant); inner() }
                     },
                 )
             }
         }
         when {
-            state.isModelsLoading -> SheetLoading("正在读取可用模型…")
-            providers.isEmpty() -> SheetEmpty("没有找到已配置的模型", "请先在 Hermes 服务器完成模型配置")
+            state.isModelsLoading -> SheetLoading(uiText(R.string.ui_0644, "正在读取可用模型…"))
+            providers.isEmpty() -> SheetEmpty(uiText(R.string.ui_0645, "没有找到已配置的模型"), uiText(R.string.ui_0646, "请先在 Hermes 服务器完成模型配置"))
             else -> LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp),
@@ -300,7 +299,7 @@ private fun ModelRow(model: String, selected: Boolean, enabled: Boolean, switchi
         Text(model.substringAfterLast('/'), modifier = Modifier.weight(1f).padding(start = 11.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         when {
             switching -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            selected -> HermesMulticolorIcon(HermesIconKind.CHECK, contentDescription = "当前模型")
+            selected -> HermesMulticolorIcon(HermesIconKind.CHECK, contentDescription = uiText(R.string.ui_0647, "当前模型"))
         }
     }
     HorizontalDivider(modifier = Modifier.padding(start = 64.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
@@ -309,9 +308,9 @@ private fun ModelRow(model: String, selected: Boolean, enabled: Boolean, switchi
 @Composable
 private fun ArtifactContent(state: AppUiState, onBack: () -> Unit, onOpenArtifact: (ChatArtifact) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-        SheetHeader("聊天产物", "从当前会话的回复与工具结果中整理", onBack)
+        SheetHeader(uiText(R.string.ui_0636, "聊天产物"), uiText(R.string.ui_0648, "从当前会话的回复与工具结果中整理"), onBack)
         if (state.chatArtifacts.isEmpty()) {
-            SheetEmpty("还没有聊天产物", "Hermes 生成文档、图片或安装包后会显示在这里")
+            SheetEmpty(uiText(R.string.ui_0649, "还没有聊天产物"), uiText(R.string.ui_0650, "Hermes 生成文档、图片或安装包后会显示在这里"))
         } else {
             LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
                 items(state.chatArtifacts, key = ChatArtifact::path) { artifact ->
@@ -337,9 +336,9 @@ private fun ArtifactContent(state: AppUiState, onBack: () -> Unit, onOpenArtifac
 @Composable
 private fun TodoContent(state: AppUiState, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-        SheetHeader("待办列表", "同步 Hermes 在当前会话中维护的计划", onBack)
+        SheetHeader(uiText(R.string.ui_0639, "待办列表"), uiText(R.string.ui_0651, "同步 Hermes 在当前会话中维护的计划"), onBack)
         if (state.chatTodos.isEmpty()) {
-            SheetEmpty("当前没有待办", "当 Hermes 使用待办工具规划任务时会自动出现")
+            SheetEmpty(uiText(R.string.ui_0652, "当前没有待办"), uiText(R.string.ui_0653, "当 Hermes 使用待办工具规划任务时会自动出现"))
         } else {
             LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
                 items(state.chatTodos, key = { it.id }) { todo ->

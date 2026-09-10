@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.app.Application
 import android.app.ActivityManager
 import android.content.Intent
@@ -9,7 +13,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.core.content.FileProvider
+import com.qingyu.hermescompanion.data.isAbsoluteRemotePath
+import com.qingyu.hermescompanion.data.remotePathsEqual
+import com.qingyu.hermescompanion.data.isRemotePathWithin
 import com.qingyu.hermescompanion.data.ApiException
+import com.qingyu.hermescompanion.assistant.DailyConversation
 import com.qingyu.hermescompanion.data.ArtifactFileReader
 import com.qingyu.hermescompanion.data.resolveRemoteArtifactPath
 import com.qingyu.hermescompanion.data.AttachmentReader
@@ -126,8 +134,9 @@ enum class ThemeMode {
 }
 
 enum class SkinMode {
-    CLEAN,
-    GLASS,
+    CLEAN,  // 温暖灵动
+    GLASS,  // 液态玻璃
+    PAPER,  // 安静耐看
 }
 
 enum class CouncilMode {
@@ -149,6 +158,8 @@ data class AppUiState(
     val baseUrl: String = "",
     val username: String = "",
     val hasSavedConnection: Boolean = false,
+    val showLaunchIntro: Boolean = false,
+    val needsIdentitySetup: Boolean = false,
     val sessions: List<HermesSession> = emptyList(),
     val sessionTotalCount: Int = 0,
     val projects: List<HermesProject> = emptyList(),
@@ -175,6 +186,7 @@ data class AppUiState(
     val councilMode: CouncilMode = CouncilMode.OFF,
     val activeCouncilMode: CouncilMode = CouncilMode.OFF,
     val isBusy: Boolean = false,
+    val isDailyOpening: Boolean = false,
     val isStreaming: Boolean = false,
     val runningSessions: List<HermesSession> = emptyList(),
     val runningRuns: List<RunUiState> = emptyList(),
@@ -215,8 +227,14 @@ data class AppUiState(
     val isProjectsLoading: Boolean = false,
     val sessionActionId: String? = null,
     val isBatchRenaming: Boolean = false,
+    val languageMode: com.qingyu.hermescompanion.i18n.AppLanguageMode = com.qingyu.hermescompanion.i18n.AppLanguage.mode,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val skinMode: SkinMode = SkinMode.CLEAN,
+    val launcherIcon: com.qingyu.hermescompanion.appearance.LauncherIcon = com.qingyu.hermescompanion.appearance.LauncherIcon.PARTNER,
+    val isIconChanging: Boolean = false,
+    val reduceMotion: Boolean = false,
+    val homeWelcomed: Boolean = false,
+    val promptSnippets: List<com.qingyu.hermescompanion.model.PromptSnippet> = com.qingyu.hermescompanion.model.DefaultPromptSnippets,
     val workspaceListing: WorkspaceListing? = null,
     val projectPickerListing: WorkspaceListing? = null,
     val isProjectPickerLoading: Boolean = false,
@@ -263,6 +281,48 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private val avatarStorage = AvatarStorage(application)
     private val cookieJar = SecureCookieJar(configStore)
     private var apiClient: HermesApiClient? = null
+    private var dailyOpenJob: Job? = null
+    private var dailyOpenToken: Any? = null
+    private val dailyLiveSessions = java.util.concurrent.ConcurrentHashMap<String, HermesSession>()
+    private fun dailyScope(server: String, account: String, profile: String) = listOf(server.trimEnd('/'), account, profile).joinToString("\u0000")
+
+    private fun resolveDailyConversation(client: HermesApiClient, server: String, account: String, profile: String): HermesSession {
+        val key = dailyScope(server, account, profile)
+        dailyLiveSessions[key]?.let { return it.copy(title = DailyConversation.stableTitle(it)) }
+        return DailyConversation.resolve(client, profile, configStore.readDailyConversation(server, account, profile)) { session ->
+            configStore.saveDailyConversation(server, account, profile, session.id)
+            if (session.messageCount == 0 && !session.runtimeId.isNullOrBlank()) dailyLiveSessions[key] = session
+        }
+    }
+
+    private fun isDailyConversation(session: HermesSession): Boolean = DailyConversation.isDailyTitle(session.title) ||
+        configStore.readDailyConversation(uiState.baseUrl, uiState.username, session.profile) == session.id
+
+    fun openDailyConversation() {
+        val client = apiClient ?: return showNotice(uiText(R.string.ui_0197, "请先连接 Hermes"))
+        if (uiState.isDailyOpening || uiState.isShareSending || uiState.isProfileSwitching) return
+        val server = uiState.baseUrl; val account = uiState.username; val profile = uiState.activeProfile
+        val origin = uiState.route
+        val running = activeRuns.values.firstOrNull { it.session.profile == profile && isDailyConversation(it.session) }
+        if (running != null) { openSession(running.session); return }
+        val token = Any()
+        dailyOpenToken = token
+        uiState = uiState.copy(isDailyOpening = true, errorMessage = null)
+        dailyOpenJob = viewModelScope.launch {
+            try {
+                val session = withContext(Dispatchers.IO) { resolveDailyConversation(client, server, account, profile) }
+                if (dailyOpenToken !== token || apiClient !== client || uiState.activeProfile != profile) return@launch
+                uiState = uiState.copy(sessions = (listOf(session) + uiState.sessions).distinctBy(HermesSession::scopedId))
+                if (session.messageCount == 0 && !session.runtimeId.isNullOrBlank()) messageCache[session.scopedId] = emptyList()
+                if (uiState.route == origin) openSession(session)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                if (dailyOpenToken === token && apiClient === client && uiState.activeProfile == profile && uiState.route == origin) handleFailure(error)
+            } finally {
+                if (dailyOpenToken === token && apiClient === client && uiState.activeProfile == profile) uiState = uiState.copy(isDailyOpening = false)
+            }
+        }
+    }
     private val activeRuns = LinkedHashMap<String, SessionRun>()
     private val titleRefreshJobs = mutableMapOf<String, Job>()
     private val failedSends = mutableMapOf<String, FailedSend>()
@@ -288,6 +348,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private var pendingDeepLink: HermesDeepLink? = null
     private val recoveredProfiles = mutableSetOf<String>()
     private val voiceRecorder = VoiceAudioRecorder(application)
+    private val voiceDrafts by lazy { com.qingyu.hermescompanion.data.VoiceDraftStore(File(application.filesDir, "voice-drafts")) }
+    private var singleVoiceDraft: com.qingyu.hermescompanion.data.VoiceDraft? = null
+    @Volatile private var voiceHttpCall: okhttp3.Call? = null
+    private var voiceLimitJob: Job? = null
     private val voicePlayback = VoicePlaybackController(application)
     private var voiceReturnRoute: AppRoute = AppRoute.CHAT
 
@@ -304,15 +368,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val savedTheme = configStore.readThemeMode()
             ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
             ?: ThemeMode.SYSTEM
-        // 2.1 unifies the old clean/glass split into one interface language.
-        // Persist CLEAN once so upgraded installs do not carry a hidden skin
-        // preference that can make screens disagree.
-        val savedSkin = SkinMode.CLEAN
-        configStore.saveSkinMode(savedSkin.name)
+        val savedSkin = configStore.readSkinMode()
+            ?.let { runCatching { SkinMode.valueOf(it) }.getOrNull() }
+            ?: SkinMode.CLEAN
         val storedProfile = configStore.readUserProfile()
         val safeProfile = avatarStorage.sanitize(storedProfile)
         if (safeProfile != storedProfile) configStore.saveUserProfile(safeProfile)
-        uiState = uiState.copy(themeMode = savedTheme, skinMode = savedSkin)
+        uiState = uiState.copy(themeMode = savedTheme, skinMode = savedSkin,
+            launcherIcon = runCatching { com.qingyu.hermescompanion.appearance.LauncherIconController(application).current() }
+                .getOrDefault(com.qingyu.hermescompanion.appearance.LauncherIcon.PARTNER),
+            reduceMotion = configStore.readReduceMotion(), promptSnippets = configStore.readPromptSnippets())
         uiState = uiState.copy(
             notificationPreferences = configStore.readNotificationPreferences(),
             voicePreferences = configStore.readVoicePreferences(),
@@ -326,6 +391,11 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             latestCompletion = configStore.readRecentCompletions().firstOrNull(),
         )
         val saved = configStore.read()
+        // Existing accounts keep their local identity. New installs choose it
+        // before authenticating; the welcome animation is shown once on upgrade.
+        if (saved != null) configStore.markLocalIdentityConfigured()
+        uiState = uiState.copy(showLaunchIntro = !configStore.hasSeenLaunchIntro(),
+            needsIdentitySetup = !configStore.hasConfiguredLocalIdentity())
         if (saved != null) {
             val client = HermesApiClient(saved, cookieJar, configStore)
             apiClient = client
@@ -342,6 +412,23 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun finishLaunchIntro() {
+        configStore.markLaunchIntroSeen()
+        uiState = uiState.copy(showLaunchIntro = false)
+    }
+
+    fun replayLaunchIntro() { uiState = uiState.copy(showLaunchIntro = true) }
+
+    fun editFirstRunIdentity() { uiState = uiState.copy(needsIdentitySetup = true) }
+
+    fun completeLocalIdentity(value: UserProfilePreferences) {
+        if (uiState.isAvatarUpdating) return
+        val profile = avatarStorage.sanitize(value)
+        configStore.saveUserProfile(profile)
+        configStore.markLocalIdentityConfigured()
+        uiState = uiState.copy(userProfile = profile, needsIdentitySetup = false, errorMessage = null, noticeMessage = null)
+    }
+
     fun dismissCrashReport() {
         CrashDiagnostics.clear(getApplication())
         uiState = uiState.copy(crashReport = null)
@@ -350,19 +437,22 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun connect(baseUrl: String, username: String, password: String, allowInsecureHttp: Boolean) {
         val normalizedUrl = normalizeBaseUrl(baseUrl)
         if (normalizedUrl == null) {
-            showError("请输入有效的远程网关地址，例如 http://服务器IP:9119")
+            showError(uiText(R.string.ui_0198, "请输入有效的远程网关地址，例如 http://服务器IP:9119"))
             return
         }
         if (normalizedUrl.startsWith("http://") && !allowInsecureHttp) {
-            showError("这是未加密的 HTTP 连接，请勾选风险确认后再连接")
+            showError(uiText(R.string.ui_0199, "这是未加密的 HTTP 连接，请勾选风险确认后再连接"))
             return
         }
         if (username.isBlank() || password.isBlank()) {
-            showError("请输入 Hermes 用户名和密码")
+            showError(uiText(R.string.ui_0200, "请输入 Hermes 用户名和密码"))
             return
         }
 
-        uiState = uiState.copy(isBusy = true, errorMessage = null, noticeMessage = null)
+        dailyOpenToken = null
+        dailyOpenJob?.cancel()
+        dailyLiveSessions.clear()
+        uiState = uiState.copy(isBusy = true, isDailyOpening = false, errorMessage = null, noticeMessage = null)
         viewModelScope.launch {
             runCatching {
                 val config = ConnectionConfig(normalizedUrl, username.trim())
@@ -385,7 +475,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     recentArtifacts = configStore.readRecentArtifacts(),
                     connectionDiagnostics = emptyList(),
                     isBusy = false,
-                    noticeMessage = "已登录：$signedInAs",
+                    noticeMessage = uiText(R.string.ui_0201, "已登录：%1\$s", signedInAs),
                 )
                 loadGatewayInfo(client)
                 loadProfilesAndSessions(client)
@@ -443,7 +533,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             sessions = emptyList(),
                             projects = emptyList(),
             selectedProjectId = null,
-                            noticeMessage = "原 Profile 已不存在，已切换到 ${fallback.name}",
+                            noticeMessage = uiText(R.string.ui_0202, "原 Profile 已不存在，已切换到 %1\$s", fallback.name),
                         )
                         refreshSessions()
                     }
@@ -458,10 +548,12 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun selectProfile(profile: HermesProfile) {
         val client = apiClient ?: return
         if (uiState.isStreaming || uiState.stoppingSessionKeys.isNotEmpty()) {
-            showNotice("当前回复仍在生成，请等待完成后再切换 Profile")
+            showNotice(uiText(R.string.ui_0203, "当前回复仍在生成，请等待完成后再切换 Profile"))
             return
         }
         if (profile.name == client.currentProfile()) return
+        dailyOpenToken = null
+        dailyOpenJob?.cancel()
         titleRefreshJobs.values.forEach { it.cancel() }
         titleRefreshJobs.clear()
         slashCommandJob?.cancel()
@@ -475,6 +567,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(
             route = AppRoute.SESSIONS,
             activeProfile = profile.name,
+            isDailyOpening = false,
             selectedProjectId = configStore.readSelectedProject(profile.name),
             isProfileSwitching = true,
             isProfilesLoading = false,
@@ -508,7 +601,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             isRecentArtifactsLoading = false,
             highlightedMessageId = null,
             workspaceSourceArtifact = null,
-            noticeMessage = "已切换到 Profile：${profile.name}",
+            noticeMessage = uiText(R.string.ui_0204, "已切换到 Profile：%1\$s", profile.name),
             errorMessage = null,
         )
         refreshSessions()
@@ -538,7 +631,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         if (uiState.isBusy || uiState.isProfileSwitching) return
         val project = uiState.projects.firstOrNull { it.id == uiState.selectedProjectId }
         if (uiState.selectedProjectId != null && project == null) {
-            showNotice("项目列表正在刷新，请稍后再试")
+            showNotice(uiText(R.string.ui_0205, "项目列表正在刷新，请稍后再试"))
             return
         }
         saveCurrentChatDraft()
@@ -546,7 +639,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         chatReturnRoute = if (uiState.route == AppRoute.HOME) AppRoute.HOME else AppRoute.SESSIONS
         uiState = uiState.copy(isBusy = true, errorMessage = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.createSession(project?.primaryPath) } }
+            runCatching { withContext(Dispatchers.IO) { client.createSessionForProfile(project?.primaryPath, profile) } }
                 .onSuccess { session ->
                     if (uiState.activeProfile != profile || apiClient !== client) return@onSuccess
                     uiState = uiState.copy(
@@ -562,6 +655,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun openSession(session: HermesSession) {
+        if (session.profile == uiState.activeProfile && DailyConversation.isDailyTitle(session.title)) {
+            configStore.saveDailyConversation(uiState.baseUrl, uiState.username, session.profile, session.id)
+        }
         chatReturnRoute = if (uiState.route == AppRoute.HOME) AppRoute.HOME else AppRoute.SESSIONS
         openSessionInternal(session, targetMessageId = null)
     }
@@ -714,11 +810,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun deleteSession(session: HermesSession) {
-        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice(uiText(R.string.ui_0206, "请先等待这段对话停止，再进行此操作"))
         val client = apiClient ?: return
+        val dailyServer = uiState.baseUrl; val dailyAccount = uiState.username
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { client.deleteSession(session.id) } }
                 .onSuccess {
+                    if (configStore.readDailyConversation(dailyServer, dailyAccount, session.profile) == session.id) {
+                        configStore.saveDailyConversation(dailyServer, dailyAccount, session.profile, null)
+                        dailyLiveSessions.remove(dailyScope(dailyServer, dailyAccount, session.profile))
+                    }
                     val unreadSessionIds = uiState.unreadSessionIds - session.scopedId
                     configStore.saveUnreadSessionIds(unreadSessionIds)
                     configStore.clearDraft(session.profile, session.id)
@@ -726,7 +827,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         sessions = uiState.sessions.filterNot { it.id == session.id },
                         sessionTotalCount = (uiState.sessionTotalCount - 1).coerceAtLeast(0),
                         unreadSessionIds = unreadSessionIds,
-                        noticeMessage = "会话已删除",
+                        noticeMessage = uiText(R.string.ui_0207, "会话已删除"),
                     )
                 }
                 .onFailure(::handleFailure)
@@ -758,9 +859,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val cleanName = name.trim()
         val cleanPath = primaryPath.trim()
         when {
-            cleanName.isBlank() -> showError("请输入项目名称")
-            cleanPath.isBlank() -> showError("请输入服务器上的项目目录")
-            !cleanPath.startsWith('/') -> showError("项目目录需要使用绝对路径，例如 /root/workspace/my-project")
+            cleanName.isBlank() -> showError(uiText(R.string.ui_0208, "请输入项目名称"))
+            cleanPath.isBlank() -> showError(uiText(R.string.ui_0209, "请输入服务器上的项目目录"))
+            !isAbsoluteRemotePath(cleanPath) -> showError(uiText(R.string.ui_0210, "请输入完整路径，例如 C:\\Users\\Name\\workspace 或 /root/workspace"))
             uiState.isProjectsLoading -> return
             else -> {
                 uiState = uiState.copy(isProjectsLoading = true, errorMessage = null)
@@ -772,7 +873,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             projects = (uiState.projects + project).distinctBy(HermesProject::id),
                             selectedProjectId = project.id,
                             isProjectsLoading = false,
-                            noticeMessage = "项目“${project.name}”已创建",
+                            noticeMessage = uiText(R.string.ui_0211, "项目“%1\$s”已创建", project.name),
                         )
                     }.onFailure(::handleFailure)
                 }
@@ -805,20 +906,21 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun aiRenameSession(session: HermesSession) {
         val client = apiClient ?: return
+        if (isDailyConversation(session)) return showNotice(uiText(R.string.ui_0212, "日常助理保留固定名称，方便重新连接后找回"))
         if (uiState.sessionActionId != null || uiState.isBatchRenaming) return
         uiState = uiState.copy(sessionActionId = session.id, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val generated = client.generateSessionTitles(listOf(session))[session.id]
-                        ?: throw ApiException(500, "Hermes 没有生成新的会话标题")
+                        ?: throw ApiException(500, uiText(R.string.ui_0213, "Hermes 没有生成新的会话标题"))
                     client.renameSession(session.id, generated)
                 }
             }.onSuccess { title ->
                 updateSession(session.id) { it.copy(title = title) }
                 uiState = uiState.copy(
                     sessionActionId = null,
-                    noticeMessage = "已重命名为“$title”",
+                    noticeMessage = uiText(R.string.ui_0214, "已重命名为“%1\$s”", title),
                 )
             }.onFailure(::handleFailure)
         }
@@ -827,9 +929,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun batchAiRenameSessions() {
         val client = apiClient ?: return
         if (uiState.isBatchRenaming || uiState.sessionActionId != null) return
-        val targets = uiState.sessions.filter { !it.source.equals("cron", true) && it.messageCount > 0 }
+        val targets = uiState.sessions.filter { !it.source.equals("cron", true) && it.messageCount > 0 && !isDailyConversation(it) }
         if (targets.isEmpty()) {
-            showNotice("当前没有可重命名的对话")
+            showNotice(uiText(R.string.ui_0215, "当前没有可重命名的对话"))
             return
         }
         uiState = uiState.copy(isBatchRenaming = true, errorMessage = null)
@@ -850,7 +952,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         titles[session.id]?.let { session.copy(title = it) } ?: session
                     },
                     isBatchRenaming = false,
-                    noticeMessage = "已完成 ${titles.size} 个对话改名",
+                    noticeMessage = uiText(R.string.ui_0216, "已完成 %1\$s 个对话改名", titles.size),
                 )
             }.onFailure(::handleFailure)
         }
@@ -867,7 +969,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     updateSession(session.id) { it.copy(isPinned = pinned) }
                     uiState = uiState.copy(
                         sessionActionId = null,
-                        noticeMessage = if (pinned) "会话已置顶" else "已取消置顶",
+                        noticeMessage = if (pinned) uiText(R.string.ui_0217, "会话已置顶") else uiText(R.string.ui_0218, "已取消置顶"),
                     )
                 }
                 .onFailure(::handleFailure)
@@ -875,13 +977,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun archiveSession(session: HermesSession) {
-        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice(uiText(R.string.ui_0206, "请先等待这段对话停止，再进行此操作"))
         val client = apiClient ?: return
         if (uiState.sessionActionId != null) return
         uiState = uiState.copy(sessionActionId = session.id, errorMessage = null)
+        val dailyServer = uiState.baseUrl; val dailyAccount = uiState.username
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { client.archiveSession(session.id) } }
                 .onSuccess {
+                    if (configStore.readDailyConversation(dailyServer, dailyAccount, session.profile) == session.id) {
+                        configStore.saveDailyConversation(dailyServer, dailyAccount, session.profile, null)
+                        dailyLiveSessions.remove(dailyScope(dailyServer, dailyAccount, session.profile))
+                    }
                     val unreadSessionIds = uiState.unreadSessionIds - session.scopedId
                     configStore.saveUnreadSessionIds(unreadSessionIds)
                     uiState = uiState.copy(
@@ -889,7 +996,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         sessionTotalCount = (uiState.sessionTotalCount - 1).coerceAtLeast(0),
                         unreadSessionIds = unreadSessionIds,
                         sessionActionId = null,
-                        noticeMessage = "会话已归档，可在 Hermes 电脑端恢复",
+                        noticeMessage = uiText(R.string.ui_0219, "会话已归档，可在 Hermes 电脑端恢复"),
                     )
                 }
                 .onFailure(::handleFailure)
@@ -897,7 +1004,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun moveSessionToProject(session: HermesSession, project: HermesProject) {
-        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice("请先等待这段对话停止，再进行此操作")
+        if (activeRuns.containsKey(session.scopedId) || session.scopedId in uiState.stoppingSessionKeys) return showNotice(uiText(R.string.ui_0206, "请先等待这段对话停止，再进行此操作"))
         val client = apiClient ?: return
         if (uiState.sessionActionId != null) return
         uiState = uiState.copy(sessionActionId = session.id, errorMessage = null)
@@ -910,7 +1017,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 uiState = uiState.copy(
                     sessionActionId = null,
-                    noticeMessage = "已移至项目“${project.name}”",
+                    noticeMessage = uiText(R.string.ui_0220, "已移至项目“%1\$s”", project.name),
                 )
                 refreshProjects()
             }.onFailure(::handleFailure)
@@ -999,7 +1106,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     val merged = (existing + attachments).take(MAX_ATTACHMENTS)
                     attachmentDrafts[session.scopedId] = merged
                     if (visible) uiState = uiState.copy(attachments = merged,
-                        noticeMessage = if (existing.size + attachments.size > MAX_ATTACHMENTS) "单次最多添加 $MAX_ATTACHMENTS 个附件" else null)
+                        noticeMessage = if (existing.size + attachments.size > MAX_ATTACHMENTS) uiText(R.string.ui_0221, "单次最多添加 %1\$s 个附件", MAX_ATTACHMENTS) else null)
                 }.onFailure(::handleFailure)
         }
     }
@@ -1033,7 +1140,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             uiState = uiState.copy(
                 incomingShare = IncomingShare(sharedText = sharedText, attachments = attachments),
                 isSharePreparing = false,
-                noticeMessage = if (skipped > 0) "$skipped 个暂不支持的文件未加入分享" else null,
+                noticeMessage = if (skipped > 0) uiText(R.string.ui_0222, "%1\$s 个暂不支持的文件未加入分享", skipped) else null,
             )
         }
     }
@@ -1048,25 +1155,34 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun sendIncomingShare(sessionId: String?) {
-        val client = apiClient ?: return showNotice("请先连接 Hermes，再发送分享内容")
+        val client = apiClient ?: return showNotice(uiText(R.string.ui_0223, "请先连接 Hermes，再发送分享内容"))
         val payload = uiState.incomingShare ?: return
-        val target = sessionId?.let { id -> uiState.sessions.firstOrNull { it.id == id } }
-        if (target != null && activeRuns.containsKey(target.scopedId)) return showNotice("这段对话正在运行，请选择其他对话")
+        val profile = uiState.activeProfile
+        val server = uiState.baseUrl; val account = uiState.username
+        val toDaily = sessionId == DailyConversation.SHARE_TARGET
+        val target = sessionId?.let { id -> uiState.sessions.firstOrNull { it.id == id && it.profile == profile } }
+        if (sessionId != null && !toDaily && target == null) return showNotice(uiText(R.string.ui_0224, "这段对话暂时找不到，请重新选择"))
+        if (target != null && activeRuns.containsKey(target.scopedId)) return showNotice(uiText(R.string.ui_0225, "这段对话正在运行，请选择其他对话"))
         saveCurrentChatDraft()
         val project = uiState.projects.firstOrNull { it.id == uiState.selectedProjectId }
-        if (uiState.isShareSending) return
+        if (uiState.isShareSending || uiState.isDailyOpening || uiState.isProfileSwitching) return
         uiState = uiState.copy(isShareSending = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val session = target ?: client.createSession(project?.primaryPath)
+                    val session = if (toDaily) resolveDailyConversation(client, server, account, profile)
+                        else target ?: client.createSessionForProfile(project?.primaryPath, profile)
                     val history = if (session.messageCount > 0) client.loadMessages(session) else emptyList()
                     session to history
                 }
             }.onSuccess { (session, history) ->
+                if (apiClient !== client || uiState.activeProfile != profile) {
+                    uiState = uiState.copy(isShareSending = false, noticeMessage = uiText(R.string.ui_0226, "档案已切换，分享内容仍保留，请确认后再发送"))
+                    return@onSuccess
+                }
                 if (activeRuns.containsKey(session.scopedId)) {
                     uiState = uiState.copy(isShareSending = false)
-                    showNotice("这段对话已开始运行，请选择其他对话")
+                    showNotice(uiText(R.string.ui_0227, "这段对话已开始运行，请选择其他对话"))
                     return@onSuccess
                 }
                 messageCache[session.scopedId] = history
@@ -1075,12 +1191,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     payload.instruction.trim().takeIf(String::isNotBlank)?.let(::append)
                     payload.sharedText.trim().takeIf(String::isNotBlank)?.let { text ->
                         if (isNotEmpty()) append("\n\n")
-                        append("分享内容：\n").append(text)
+                        append(uiText(R.string.ui_0228, "分享内容：\n")).append(text)
                     }
                 }
                 uiState = uiState.copy(
                     route = AppRoute.CHAT,
                     selectedSession = session,
+                    sessions = (listOf(session) + uiState.sessions).distinctBy(HermesSession::scopedId),
                     messages = history.visibleConversationMessages(),
                     toolActivities = emptyList(),
                     chatArtifacts = insights.artifacts,
@@ -1129,14 +1246,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 uiState = uiState.copy(
                     selectedSession = if (uiState.selectedSession?.scopedId == updated.scopedId) updated else uiState.selectedSession,
                     isModelSwitching = false,
-                    noticeMessage = "当前会话已切换到 ${model.substringAfterLast('/')}",
+                    noticeMessage = uiText(R.string.ui_0229, "当前会话已切换到 %1\$s", model.substringAfterLast('/')),
                 )
             }.onFailure(::handleFailure)
         }
     }
 
     fun setCouncilMode(mode: CouncilMode) {
-        if (currentRun() != null) return showNotice("请在当前任务完成后开启专家会审")
+        if (currentRun() != null) return showNotice(uiText(R.string.ui_0230, "请在当前任务完成后开启专家会审"))
         if (mode == CouncilMode.OFF || mode == CouncilMode.DEEP) {
             uiState = uiState.copy(councilMode = mode)
             return
@@ -1151,13 +1268,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val moaModel = moaProvider?.models?.firstOrNull()
         if (moaProvider == null || moaModel == null) {
             if (uiState.modelCatalog.providers.isEmpty()) loadModelCatalog()
-            return showNotice("服务器尚未提供 MoA 预设；可先使用深度会审，或在 Hermes 中配置 MoA")
+            return showNotice(uiText(R.string.ui_0231, "服务器尚未提供 MoA 预设；可先使用深度会审，或在 Hermes 中配置 MoA"))
         }
         if (uiState.isModelSwitching) return
         uiState = uiState.copy(
             isModelSwitching = true,
             errorMessage = null,
-            noticeMessage = "正在切换到 MoA 会审模型…",
+            noticeMessage = uiText(R.string.ui_0232, "正在切换到 MoA 会审模型…"),
         )
         viewModelScope.launch {
             runCatching {
@@ -1167,7 +1284,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     selectedSession = if (uiState.selectedSession?.scopedId == updated.scopedId) updated else uiState.selectedSession,
                     councilMode = if (uiState.selectedSession?.scopedId == updated.scopedId) CouncilMode.QUICK else uiState.councilMode,
                     isModelSwitching = false,
-                    noticeMessage = "已切换到 MoA：${moaModel.substringAfterLast('/')}",
+                    noticeMessage = uiText(R.string.ui_0233, "已切换到 MoA：%1\$s", moaModel.substringAfterLast('/')),
                 )
             }.onFailure { error ->
                 uiState = uiState.copy(isModelSwitching = false)
@@ -1180,7 +1297,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val client = apiClient ?: return
         val session = uiState.selectedSession
         val resolvedPath = resolveArtifactPath(artifact.path, session?.workspacePath.orEmpty())
-            ?: return showNotice("无法确定 ${artifact.name} 的绝对路径，请回到来源会话后再试")
+            ?: return showNotice(uiText(R.string.ui_0234, "无法确定 %1\$s 的绝对路径，请回到来源会话后再试", artifact.name))
         val resolvedArtifact = artifact.copy(path = resolvedPath)
         val source = session?.let { recentArtifactSource(it, resolvedArtifact) }
         if (source != null) {
@@ -1195,7 +1312,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
         if (!resolvedPath.isPreviewableArtifact()) {
-            showNotice("${artifact.name} 已列入聊天产物；当前版本支持图片、Markdown、PDF、HTML 和常见文本预览")
+            showNotice(uiText(R.string.ui_0235, "%1\$s 已列入聊天产物；当前版本支持图片、Markdown、PDF、HTML 和常见文本预览", artifact.name))
             return
         }
         uiState = uiState.copy(isWorkspaceLoading = true, errorMessage = null)
@@ -1219,20 +1336,20 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun openChatLink(rawTarget: String) {
         val target = normalizeChatLinkTarget(rawTarget)
         if (target.isBlank()) {
-            showNotice("文件链接为空，无法打开")
+            showNotice(uiText(R.string.ui_0236, "文件链接为空，无法打开"))
             return
         }
         if (target.startsWith("http://", ignoreCase = true) || target.startsWith("https://", ignoreCase = true)) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             runCatching { getApplication<Application>().startActivity(intent) }
-                .onFailure { showNotice("没有找到可以打开这个链接的应用") }
+                .onFailure { showNotice(uiText(R.string.ui_0237, "没有找到可以打开这个链接的应用")) }
             return
         }
         openChatArtifact(
             ChatArtifact(
                 path = target,
-                name = target.substringAfterLast('/').ifBlank { "聊天文件" },
-                kind = "文件",
+                name = target.substringAfterLast('/').ifBlank { uiText(R.string.ui_0238, "聊天文件") },
+                kind = uiText(R.string.ui_0064, "文件"),
             ),
         )
     }
@@ -1247,7 +1364,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun openRecentArtifact(item: RecentArtifact) {
-        if (item.profile != uiState.activeProfile) return showNotice("请先切换到档案：${item.profile}")
+        if (item.profile != uiState.activeProfile) return showNotice(uiText(R.string.ui_0239, "请先切换到档案：%1\$s", item.profile))
         if (uiState.workspaceAttachmentTarget != null) { attachRecentArtifact(item); return }
         val load = artifactLoader(item) ?: return
         val version = ++workspaceRequestVersion
@@ -1270,7 +1387,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             route = AppRoute.WORKSPACE, workspaceDocument = document, workspaceDocumentOrigin = null,
                             workspaceSourceArtifact = resolved, workspaceDraft = document.content, isWorkspaceEditing = false,
                         )
-                        else -> showNotice("${document.name} 暂不支持预览，可从对话的“+ → 空间”添加为附件")
+                        else -> showNotice(uiText(R.string.ui_0240, "%1\$s 暂不支持预览，可从对话的“+ → 空间”添加为附件", document.name))
                     }
                 }.onFailure { if (workspaceRequestIsCurrent(version, item.profile) && uiState.route == origin) handleFileFailure(it) }
         }
@@ -1278,13 +1395,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun openArtifactSource(item: RecentArtifact) {
         if (item.profile != uiState.activeProfile) {
-            showNotice("请先切换到 Profile：${item.profile}")
+            showNotice(uiText(R.string.ui_0241, "请先切换到 Profile：%1\$s", item.profile))
             return
         }
         val session = uiState.sessions.firstOrNull { it.id == item.sessionId }
             ?: HermesSession(
                 id = item.sessionId,
-                title = item.sessionTitle.ifBlank { "Hermes 对话" },
+                title = item.sessionTitle.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
                 profile = item.profile,
             )
         uiState = uiState.copy(
@@ -1301,12 +1418,12 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val attachments = uiState.attachments
         if (prompt.isBlank() && attachments.isEmpty()) return
         if (currentRun() != null) return
-        if (uiState.isModelSwitching) return showNotice("模型正在切换，请稍后发送")
+        if (uiState.isModelSwitching) return showNotice(uiText(R.string.ui_0243, "模型正在切换，请稍后发送"))
 
         val requestedMode = uiState.councilMode
         val effectiveMode = requestedMode.takeUnless { prompt.trimStart().startsWith('/') } ?: CouncilMode.OFF
         val submittedPrompt = buildCouncilPrompt(
-            prompt = prompt.ifBlank { "请查看我发送的附件。" },
+            prompt = prompt.ifBlank { uiText(R.string.ui_0244, "请查看我发送的附件。") },
             mode = effectiveMode,
         )
         startMessage(session, prompt, attachments, submittedPrompt, effectiveMode)
@@ -1322,12 +1439,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     ) {
         val client = apiClient ?: return
         if (activeRuns.containsKey(session.scopedId)) return
-        if (session.scopedId in uiState.stoppingSessionKeys) return showNotice("正在停止这段对话的上一轮，请稍后发送")
+        if (session.scopedId in uiState.stoppingSessionKeys) return showNotice(uiText(R.string.ui_0245, "正在停止这段对话的上一轮，请稍后发送"))
         if (uiState.sessionActionId == session.id || uiState.isProfileSwitching) {
-            showNotice("会话正在更新，请稍后发送")
+            showNotice(uiText(R.string.ui_0246, "会话正在更新，请稍后发送"))
             return
         }
-        val submittedPrompt = submittedPromptOverride ?: prompt.ifBlank { "请查看我发送的附件。" }
+        val basePrompt = prompt.ifBlank { uiText(R.string.ui_0244, "请查看我发送的附件。") }
+        val daily = isDailyConversation(session)
+        val submitted = submittedPromptOverride ?: basePrompt
+        val submittedPrompt = if (daily && !prompt.trimStart().startsWith('/')) DailyConversation.prompt(submitted) else submitted
+        if (daily) dailyLiveSessions.remove(dailyScope(uiState.baseUrl, uiState.username, session.profile))
         val baseMessages = if (uiState.selectedSession?.scopedId == session.scopedId) uiState.messages
             else messageCache[session.scopedId].visibleConversationMessages()
         val userMessage = ChatMessage(
@@ -1354,7 +1475,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         )
         run.messages = baseMessages + userMessage + ChatMessage(role = MessageRole.ASSISTANT, content = "", isStreaming = true)
         activeRuns[session.scopedId] = run
-        if (session.messageCount == 0 || session.title == "新会话") pendingTitleSessionIds += session.id
+        if (session.messageCount == 0 || session.title == uiText(R.string.ui_0079, "新会话")) pendingTitleSessionIds += session.id
         configStore.saveActiveRunSnapshot(run.snapshot())
         val consumeDraft = !voiceTurn && configStore.readDraft(session.profile, session.id).trim() == prompt.trim()
         if (consumeDraft) configStore.clearDraft(session.profile, session.id)
@@ -1374,13 +1495,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         )
         setRunMessages(run, run.messages)
         publishRuns()
+        val fastReply = voiceTurn && uiState.voicePreferences.fastReply
         val controller = StreamController()
         run.controller = controller
         run.streamJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 val receive: (StreamEvent) -> Unit = { event -> viewModelScope.launch { handleStreamEvent(run, event) } }
-                if (voiceTurn) client.streamVoiceMessage(controller, session, submittedPrompt, uiState.voicePreferences.fastReply,
-                    onNotice = { message -> viewModelScope.launch { if (isVisible(run)) showNotice(message) } }, onEvent = receive)
+                if (voiceTurn || fastReply) client.streamVoiceMessage(controller, session, submittedPrompt, fastReply,
+                    onNotice = { message -> viewModelScope.launch { if (isVisible(run)) showNotice(message) } }, onEvent = receive, attachments = attachments)
                 else client.streamMessage(controller, session, submittedPrompt, attachments, receive)
             }.onFailure { throwable ->
                 if (!controller.isStopped() && !controller.wasDisconnected()) {
@@ -1396,10 +1518,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun steerCurrentRun() {
         val client = apiClient ?: return
         val run = currentRun() ?: return
-        val runtimeId = run.controller?.runtimeSessionId ?: return showNotice("Hermes 运行尚未就绪，请稍后再试")
+        val runtimeId = run.controller?.runtimeSessionId ?: return showNotice(uiText(R.string.ui_0247, "Hermes 运行尚未就绪，请稍后再试"))
         val text = uiState.draft.trim()
         if (text.isBlank() || run.isSteering) return
-        if (uiState.attachments.isNotEmpty()) return showNotice("追加要求暂不支持附件；可改用排队发送")
+        if (uiState.attachments.isNotEmpty()) return showNotice(uiText(R.string.ui_0248, "追加要求暂不支持附件；可改用排队发送"))
         run.isSteering = true
         publishRuns()
         viewModelScope.launch {
@@ -1410,8 +1532,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         configStore.clearDraft(run.session.profile, run.session.id)
                     }
                     if (isVisible(run) && uiState.draft.trim() == text) uiState = uiState.copy(draft = "")
-                    run.touch("已收到追加要求")
-                    uiState = uiState.copy(noticeMessage = "追加要求已送达 Hermes")
+                    run.touch(uiText(R.string.ui_0249, "已收到追加要求"))
+                    uiState = uiState.copy(noticeMessage = uiText(R.string.ui_0250, "追加要求已送达 Hermes"))
                 }.onFailure(::handleFailure)
             run.isSteering = false
             publishRuns()
@@ -1424,11 +1546,11 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val attachments = uiState.attachments
         if (prompt.isBlank() && attachments.isEmpty()) return
         val replacing = run.queued != null
-        run.queued = QueuedRunMessage(run.session, prompt.ifBlank { "请查看我发送的附件。" }, attachments)
+        run.queued = QueuedRunMessage(run.session, prompt.ifBlank { uiText(R.string.ui_0244, "请查看我发送的附件。") }, attachments)
         configStore.clearDraft(run.session.profile, run.session.id)
         attachmentDrafts.remove(run.session.scopedId)
         uiState = uiState.copy(draft = "", attachments = emptyList(),
-            noticeMessage = if (replacing) "已替换这段对话的排队消息" else "消息已排队，将在这段对话本轮完成后发送")
+            noticeMessage = if (replacing) uiText(R.string.ui_0251, "已替换这段对话的排队消息") else uiText(R.string.ui_0252, "消息已排队，将在这段对话本轮完成后发送"))
         publishRuns()
     }
 
@@ -1436,7 +1558,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val run = currentRun() ?: return
         run.queued = null
         publishRuns()
-        uiState = uiState.copy(noticeMessage = "已取消这段对话的排队消息")
+        uiState = uiState.copy(noticeMessage = uiText(R.string.ui_0253, "已取消这段对话的排队消息"))
     }
 
     fun respondToAgentRequest(request: AgentRequest, answer: String) {
@@ -1454,7 +1576,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 .onSuccess {
                     uiState = uiState.copy(
                         pendingAgentRequests = uiState.pendingAgentRequests.filterNot { it.requestId == request.requestId && it.runtimeSessionId == request.runtimeSessionId },
-                        noticeMessage = "已提交给 Hermes",
+                        noticeMessage = uiText(R.string.ui_0254, "已提交给 Hermes"),
                     )
                     configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
                     resumeRecoveryAfterAgentResponse(request)
@@ -1504,7 +1626,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         removeRunRequests(run)
         uiState = uiState.copy(stoppingSessionKeys = uiState.stoppingSessionKeys + run.session.scopedId)
         removeRun(run)
-        uiState = uiState.copy(noticeMessage = "已请求停止这段对话")
+        uiState = uiState.copy(noticeMessage = uiText(R.string.ui_0255, "已请求停止这段对话"))
         if (voiceIsCurrent() && isVisible(run)) interruptVoicePlayback()
         val client = apiClient
         viewModelScope.launch {
@@ -1573,10 +1695,20 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val session = uiState.sessions.firstOrNull { it.id == completion.sessionId }
             ?: HermesSession(
                 id = completion.sessionId,
-                title = completion.title.ifBlank { "Hermes 对话" },
+                title = completion.title.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
                 profile = uiState.activeProfile,
             )
         openTaskSession(session)
+    }
+
+    private var initialIntentHandled = false
+
+    fun handleInitialIntent(intent: Intent?) {
+        // A retained ViewModel must not replay a notification/share on locale recreation.
+        if (initialIntentHandled) return
+        initialIntentHandled = true
+        handleDeepLink(intent)
+        handleShareIntent(intent)
     }
 
     fun handleDeepLink(intent: Intent?) {
@@ -1598,7 +1730,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val targetProfile = target.profile?.takeIf(String::isNotBlank)
         if (targetProfile != null && targetProfile != client.currentProfile()) {
             if (uiState.isStreaming) {
-                showNotice("当前任务仍在执行，完成后可打开通知对应的 Profile")
+                showNotice(uiText(R.string.ui_0256, "当前任务仍在执行，完成后可打开通知对应的 Profile"))
                 return
             }
             val profile = uiState.profiles.firstOrNull { it.name == targetProfile } ?: return
@@ -1616,7 +1748,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 val session = uiState.sessions.firstOrNull { it.id == sessionId }
                     ?: HermesSession(
                         id = sessionId,
-                        title = "Hermes 对话",
+                        title = uiText(R.string.ui_0242, "Hermes 对话"),
                         profile = targetProfile ?: uiState.activeProfile,
                     )
                 pendingDeepLink = null
@@ -1767,7 +1899,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun attachRecentArtifact(item: RecentArtifact) {
         val target = uiState.workspaceAttachmentTarget ?: return
-        if (item.profile != target.profile) return showNotice("请选择当前档案内的文件")
+        if (item.profile != target.profile) return showNotice(uiText(R.string.ui_0257, "请选择当前档案内的文件"))
         val load = artifactLoader(item) ?: return
         prepareWorkspaceAttachment(load)
     }
@@ -1775,7 +1907,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     private fun prepareWorkspaceAttachment(load: () -> WorkspaceDocument) {
         val target = uiState.workspaceAttachmentTarget ?: return
         if (uiState.isWorkspaceAttaching) return
-        if (uiState.attachments.size >= MAX_ATTACHMENTS) return showNotice("单次最多添加 $MAX_ATTACHMENTS 个附件")
+        if (uiState.attachments.size >= MAX_ATTACHMENTS) return showNotice(uiText(R.string.ui_0221, "单次最多添加 %1\$s 个附件", MAX_ATTACHMENTS))
         val version = ++workspaceAttachmentRequest
         uiState = uiState.copy(isWorkspaceAttaching = true, errorMessage = null, noticeMessage = null)
         fun isCurrent() = version == workspaceAttachmentRequest && uiState.route == AppRoute.WORKSPACE &&
@@ -1787,7 +1919,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     if (!isCurrent()) return@onSuccess
                     if (uiState.attachments.size >= MAX_ATTACHMENTS) {
                         uiState = uiState.copy(isWorkspaceAttaching = false)
-                        showNotice("单次最多添加 $MAX_ATTACHMENTS 个附件")
+                        showNotice(uiText(R.string.ui_0221, "单次最多添加 %1\$s 个附件", MAX_ATTACHMENTS))
                         return@onSuccess
                     }
                     val merged = uiState.attachments + attachment
@@ -1795,7 +1927,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     workspaceRequestVersion++
                     invalidateWorkspaceAttachmentPicker()
                     uiState = uiState.copy(route = AppRoute.CHAT, attachments = merged, isWorkspaceLoading = false,
-                        workspaceDocument = null, noticeMessage = "已添加 ${attachment.name}")
+                        workspaceDocument = null, noticeMessage = uiText(R.string.ui_0258, "已添加 %1\$s", attachment.name))
                 }.onFailure {
                     if (isCurrent()) {
                         uiState = uiState.copy(isWorkspaceAttaching = false)
@@ -1881,7 +2013,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val existing = uiState.workspaceListing
         val desiredRoot = selectedWorkspaceRoot()
         if (uiState.selectedProjectId != null && desiredRoot == null) {
-            showError("所选项目已不可用，请重新选择项目")
+            showError(uiText(R.string.ui_0259, "所选项目已不可用，请重新选择项目"))
             return
         }
         val profile=uiState.activeProfile
@@ -1897,9 +2029,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             } }.onSuccess { listing ->
                 if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
                 val expected = if(resetToRoot || existing==null) desiredRoot else existing.path
-                if(expected!=null && listing.path.trimEnd('/')!=expected.trimEnd('/')) {
+                if(expected!=null && !remotePathsEqual(listing.path, expected)) {
                     uiState=uiState.copy(isWorkspaceLoading=false)
-                    showError("服务器返回了其他目录，请检查当前 Profile 的工作目录设置")
+                    showError(uiText(R.string.ui_0260, "服务器返回了其他目录，请检查当前 Profile 的工作目录设置"))
                     return@onSuccess
                 }
                 uiState=uiState.copy(workspaceListing=listing,
@@ -1914,7 +2046,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val client=apiClient ?: return
         val current=uiState.workspaceListing ?: return
         val root=uiState.workspaceRootPath ?: current.path
-        if(!pathIsWithin(root,path)) { showError("不能离开当前 Hermes 项目目录"); return }
+        if(!pathIsWithin(root,path)) { showError(uiText(R.string.ui_0261, "不能离开当前 Hermes 项目目录")); return }
         val profile=uiState.activeProfile
         val version=++workspaceRequestVersion
         uiState=uiState.copy(isWorkspaceLoading=true,errorMessage=null)
@@ -1922,9 +2054,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { withContext(Dispatchers.IO) { client.listWorkspaceForProfile(path,profile) } }
                 .onSuccess { listing ->
                     if(!workspaceRequestIsCurrent(version,profile)) return@onSuccess
-                    if(listing.path.trimEnd('/')!=path.trimEnd('/') || !pathIsWithin(root,listing.path)) {
+                    if(!remotePathsEqual(listing.path, path) || !pathIsWithin(root,listing.path)) {
                         uiState=uiState.copy(isWorkspaceLoading=false)
-                        showError("服务器返回了其他目录，已保留当前项目位置")
+                        showError(uiText(R.string.ui_0262, "服务器返回了其他目录，已保留当前项目位置"))
                     } else uiState=uiState.copy(workspaceListing=listing.copy(projectName=current.projectName),isWorkspaceLoading=false)
                 }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFileFailure(it) }
         }
@@ -1945,14 +2077,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun openImage(source: String, name: String = "图片") {
+    fun openImage(source: String, name: String = uiText(R.string.ui_0057, "图片")) {
         val client = apiClient ?: return
         uiState = uiState.copy(isImageLoading = true, errorMessage = null)
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { client.readImage(source) } }
                 .onSuccess { image ->
                     uiState = uiState.copy(
-                        imagePreview = image.copy(name = image.name.takeUnless { it == "图片" }.orEmpty().ifBlank { name }),
+                        imagePreview = image.copy(name = image.name.takeUnless { it == uiText(R.string.ui_0057, "图片") }.orEmpty().ifBlank { name }),
                         isImageLoading = false,
                     )
                 }
@@ -2086,7 +2218,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     workspaceDraft = saved.content,
                     isWorkspaceEditing = false,
                     isWorkspaceSaving = false,
-                    noticeMessage = "文档已保存到 Hermes 工作区",
+                    noticeMessage = uiText(R.string.ui_0263, "文档已保存到 Hermes 工作区"),
                 )
             }.onFailure { if(workspaceRequestIsCurrent(version,profile)) handleFailure(it) }
         }
@@ -2099,12 +2231,12 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             runCatching {
                 withContext(Dispatchers.IO) {
                     resolver.openOutputStream(destination, "w").use { output ->
-                        requireNotNull(output) { "无法写入所选位置" }
+                        requireNotNull(output) { uiText(R.string.ui_0264, "无法写入所选位置") }
                         output.write(document.bytesForTransfer())
                     }
                 }
             }.onSuccess {
-                uiState = uiState.copy(noticeMessage = "${document.name} 已保存到手机")
+                uiState = uiState.copy(noticeMessage = uiText(R.string.ui_0265, "%1\$s 已保存到手机", document.name))
             }.onFailure(::handleFailure)
         }
     }
@@ -2128,7 +2260,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     .setType(document.mimeType.ifBlank { "application/octet-stream" })
                     .putExtra(Intent.EXTRA_STREAM, uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(Intent.createChooser(intent, "分享 ${document.name}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(Intent.createChooser(intent, uiText(R.string.ui_0266, "分享 %1\$s", document.name)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }.onFailure(::handleFailure)
         }
     }
@@ -2160,21 +2292,24 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshCronJobs() {
         val client = apiClient ?: return
         if (uiState.isCronLoading) return
+        val server = uiState.baseUrl; val account = uiState.username; val profile = uiState.activeProfile
         uiState = uiState.copy(isCronLoading = true, errorMessage = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client.listCronJobs() } }
+            runCatching { withContext(Dispatchers.IO) { client.listCronJobs(profile) } }
                 .onSuccess { jobs ->
+                    if (apiClient !== client || uiState.activeProfile != profile) return@onSuccess
                     uiState = uiState.copy(cronJobs = jobs, isCronLoading = false)
                     configStore.saveCronSnapshot(jobs.associate { it.id to "${it.lastRunAt}|${it.lastStatus}" })
+                    com.qingyu.hermescompanion.assistant.ReminderAlarms.reconcileExisting(getApplication(), server, account, profile, jobs)
                 }
-                .onFailure(::handleFailure)
+                .onFailure { if (apiClient === client && uiState.activeProfile == profile) handleFailure(it) }
         }
     }
 
     fun createCronJob(name: String, prompt: String, schedule: String) {
         val client = apiClient ?: return
         if (name.isBlank() || prompt.isBlank() || schedule.isBlank()) {
-            showError("请填写任务名称、执行内容和时间计划")
+            showError(uiText(R.string.ui_0267, "请填写任务名称、执行内容和时间计划"))
             return
         }
         uiState = uiState.copy(isCronLoading = true, errorMessage = null)
@@ -2184,7 +2319,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     uiState = uiState.copy(
                         cronJobs = (uiState.cronJobs + job).distinctBy(CronJob::id),
                         isCronLoading = false,
-                        noticeMessage = "定时任务已创建",
+                        noticeMessage = uiText(R.string.ui_0268, "定时任务已创建"),
                     )
                     HermesNotifications.scheduleCronPolling(
                         getApplication(),
@@ -2198,7 +2333,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun updateCronJob(job: CronJob, name: String, prompt: String, schedule: String) {
         val client = apiClient ?: return
         if (name.isBlank() || prompt.isBlank() || schedule.isBlank()) {
-            showError("请填写任务名称、执行内容和时间计划")
+            showError(uiText(R.string.ui_0267, "请填写任务名称、执行内容和时间计划"))
             return
         }
         if (uiState.cronActionId != null) return
@@ -2213,7 +2348,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     cronJobs = uiState.cronJobs.map { if (it.id == job.id) updated else it },
                     selectedCronJob = uiState.selectedCronJob?.let { if (it.id == job.id) updated else it },
                     cronActionId = null,
-                    noticeMessage = "定时任务已更新",
+                    noticeMessage = uiText(R.string.ui_0269, "定时任务已更新"),
                 )
             }.onFailure(::handleFailure)
         }
@@ -2235,7 +2370,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         if (it.id == job.id) it.copy(enabled = !job.enabled) else it
                     },
                     cronActionId = null,
-                    noticeMessage = if (job.enabled) "定时任务已暂停" else "定时任务已恢复",
+                    noticeMessage = if (job.enabled) uiText(R.string.ui_0270, "定时任务已暂停") else uiText(R.string.ui_0271, "定时任务已恢复"),
                 )
             }.onFailure(::handleFailure)
         }
@@ -2248,7 +2383,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { client.triggerCronJob(job.id) } }
                 .onSuccess {
-                    uiState = uiState.copy(cronActionId = null, noticeMessage = "已开始执行“${job.name}”")
+                    uiState = uiState.copy(cronActionId = null, noticeMessage = uiText(R.string.ui_0272, "已开始执行“%1\$s”", job.name))
                     delay(1_000)
                     refreshCronJobs()
                 }
@@ -2268,7 +2403,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         route = if (uiState.route == AppRoute.CRON_DETAIL) AppRoute.TASKS else uiState.route,
                         selectedCronJob = null,
                         cronActionId = null,
-                        noticeMessage = "定时任务已删除",
+                        noticeMessage = uiText(R.string.ui_0273, "定时任务已删除"),
                     )
                 }
                 .onFailure(::handleFailure)
@@ -2287,7 +2422,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun updateUserProfile(value: UserProfilePreferences) {
         val safeProfile = avatarStorage.sanitize(value)
         configStore.saveUserProfile(safeProfile)
-        uiState = uiState.copy(userProfile = safeProfile, noticeMessage = "个人资料已保存")
+        uiState = uiState.copy(userProfile = safeProfile, noticeMessage = uiText(R.string.ui_0274, "个人资料已保存"))
     }
 
     fun updateUserAvatar(source: Uri, crop: AvatarCropSpec) {
@@ -2321,14 +2456,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     uiState = uiState.copy(
                         userProfile = profile,
                         isAvatarUpdating = false,
-                        noticeMessage = if (target == AvatarTarget.USER) "我的头像已更新" else "Hermes 头像已更新",
+                        noticeMessage = if (target == AvatarTarget.USER) uiText(R.string.ui_0275, "我的头像已更新") else uiText(R.string.ui_0276, "Hermes 头像已更新"),
                     )
                 }
                 .onFailure { throwable ->
                     val message = when (unwrapFailure(throwable)) {
-                        is SecurityException -> "照片读取授权已失效，请重新选择图片"
-                        is OutOfMemoryError -> "图片尺寸过大，请选择较小的图片"
-                        else -> throwable.message?.takeIf(String::isNotBlank) ?: "头像保存失败，请重新选择"
+                        is SecurityException -> uiText(R.string.ui_0277, "照片读取授权已失效，请重新选择图片")
+                        is OutOfMemoryError -> uiText(R.string.ui_0278, "图片尺寸过大，请选择较小的图片")
+                        else -> throwable.message?.takeIf(String::isNotBlank) ?: uiText(R.string.ui_0279, "头像保存失败，请重新选择")
                     }
                     uiState = uiState.copy(isAvatarUpdating = false, errorMessage = message)
                 }
@@ -2345,7 +2480,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             uiState = uiState.copy(
                 userProfile = profile,
                 isAvatarUpdating = false,
-                noticeMessage = if (target == AvatarTarget.USER) "已恢复默认用户头像" else "已恢复默认 Hermes 头像",
+                noticeMessage = if (target == AvatarTarget.USER) uiText(R.string.ui_0280, "已恢复默认用户头像") else uiText(R.string.ui_0281, "已恢复默认 Hermes 头像"),
             )
         }
     }
@@ -2389,7 +2524,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             if (it.name == skill.name) it.copy(enabled = !skill.enabled) else it
                         },
                         settingsActionKey = null,
-                        noticeMessage = "技能设置已保存，下次会话生效",
+                        noticeMessage = uiText(R.string.ui_0282, "技能设置已保存，下次会话生效"),
                     )
                 }.onFailure(::handleFailure)
         }
@@ -2423,7 +2558,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                         },
                         serverSettings = withContext(Dispatchers.IO) { client.serverSettings() },
                         settingsActionKey = null,
-                        noticeMessage = "工具集设置已保存，下次会话生效",
+                        noticeMessage = uiText(R.string.ui_0283, "工具集设置已保存，下次会话生效"),
                     )
                 }.onFailure(::handleFailure)
         }
@@ -2441,7 +2576,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             if (it.name == server.name) it.copy(enabled = !server.enabled) else it
                         },
                         settingsActionKey = null,
-                        noticeMessage = "MCP 设置已保存",
+                        noticeMessage = uiText(R.string.ui_0284, "MCP 设置已保存"),
                     )
                 }.onFailure(::handleFailure)
         }
@@ -2450,13 +2585,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun showModelSettings() = loadServerSettings(AppRoute.MODEL_SETTINGS, loadModels = true)
 
     fun saveModelSettings(value: ServerModelSettings) {
-        saveServerSettings("模型设置已保存，新会话将使用新的模型配置") { it.saveModelSettings(value) }
+        saveServerSettings(uiText(R.string.ui_0285, "模型设置已保存，新会话将使用新的模型配置")) { it.saveModelSettings(value) }
     }
 
     fun addCustomProvider(id: String, name: String, baseUrl: String, model: String, apiKey: String) {
         val client = apiClient ?: return
         if (id.isBlank() || baseUrl.isBlank() || model.isBlank()) {
-            showError("请填写提供商标识、接口地址和默认模型")
+            showError(uiText(R.string.ui_0286, "请填写提供商标识、接口地址和默认模型"))
             return
         }
         uiState = uiState.copy(isAdvancedSettingsLoading = true, errorMessage = null)
@@ -2471,7 +2606,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     serverSettings = settings,
                     modelCatalog = catalog,
                     isAdvancedSettingsLoading = false,
-                    noticeMessage = "模型提供商已添加",
+                    noticeMessage = uiText(R.string.ui_0287, "模型提供商已添加"),
                 )
             }.onFailure(::handleFailure)
         }
@@ -2480,19 +2615,19 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     fun showConversationStyleSettings() = loadServerSettings(AppRoute.CONVERSATION_STYLE)
 
     fun saveConversationStyle(value: ConversationStyleSettings) {
-        saveServerSettings("对话风格已保存") { it.saveConversationStyle(value) }
+        saveServerSettings(uiText(R.string.ui_0288, "对话风格已保存")) { it.saveConversationStyle(value) }
     }
 
     fun showApprovalSettings() = loadServerSettings(AppRoute.APPROVAL_SETTINGS)
 
     fun saveApprovalSettings(value: ApprovalSettings) {
-        saveServerSettings("审批模式已保存") { it.saveApprovalSettings(value) }
+        saveServerSettings(uiText(R.string.ui_0289, "审批模式已保存")) { it.saveApprovalSettings(value) }
     }
 
     fun showMemoryContextSettings() = loadServerSettings(AppRoute.MEMORY_CONTEXT)
 
     fun saveMemorySettings(value: MemoryContextSettings) {
-        saveServerSettings("记忆与上下文设置已保存") { it.saveMemorySettings(value) }
+        saveServerSettings(uiText(R.string.ui_0290, "记忆与上下文设置已保存")) { it.saveMemorySettings(value) }
     }
 
     fun showArchivedSessions() {
@@ -2521,7 +2656,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     uiState = uiState.copy(
                         archivedSessions = uiState.archivedSessions.filterNot { it.id == session.id },
                         settingsActionKey = null,
-                        noticeMessage = "会话已恢复",
+                        noticeMessage = uiText(R.string.ui_0291, "会话已恢复"),
                     )
                     refreshSessions()
                 }.onFailure(::handleFailure)
@@ -2538,7 +2673,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     uiState = uiState.copy(
                         archivedSessions = uiState.archivedSessions.filterNot { it.id == session.id },
                         settingsActionKey = null,
-                        noticeMessage = "归档会话已删除",
+                        noticeMessage = uiText(R.string.ui_0292, "归档会话已删除"),
                     )
                 }.onFailure(::handleFailure)
         }
@@ -2598,8 +2733,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun sendTestNotification() {
-        HermesNotifications.showMessage(getApplication(), "Hermes 通知测试", "系统通知、提示音与角标已经可以正常工作。")
-        showNotice("测试通知已发送；如果没有出现，请检查系统通知权限")
+        HermesNotifications.showMessage(getApplication(), uiText(R.string.ui_0293, "Hermes 通知测试"), uiText(R.string.ui_0294, "系统通知、提示音与角标已经可以正常工作。"))
+        showNotice(uiText(R.string.ui_0295, "测试通知已发送；如果没有出现，请检查系统通知权限"))
     }
 
     fun showVoiceSettings() = loadServerSettings(AppRoute.VOICE_SETTINGS)
@@ -2610,7 +2745,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun saveVoiceSettings(value: ServerVoiceSettings) {
-        saveServerSettings("语音模型设置已保存") { it.saveVoiceSettings(value) }
+        saveServerSettings(uiText(R.string.ui_0296, "语音模型设置已保存")) { it.saveVoiceSettings(value) }
     }
 
     fun acceptVoiceResult(text: String) {
@@ -2621,108 +2756,166 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 phase = VoicePhase.IDLE,
                 target = VoiceCaptureTarget.CHAT_INPUT,
                 transcript = transcript,
-                message = "已识别到输入框",
+                message = uiText(R.string.ui_0297, "已识别到输入框"),
                 requiresAgentUpdate = false,
             ),
         )
         updateDraft(listOf(uiState.draft, transcript).filter(String::isNotBlank).joinToString(" "))
-        if (uiState.voicePreferences.autoSend) sendMessage()
+        // Single-shot input is always editable before sending; continuous voice owns its explicit auto-send flow.
     }
 
     fun startSingleVoiceInput() = startVoiceCapture(VoiceCaptureTarget.CHAT_INPUT)
 
     fun startVoiceSettingsTest() = startVoiceCapture(VoiceCaptureTarget.SETTINGS_TEST)
 
-    private fun startVoiceCapture(target: VoiceCaptureTarget) {
-        if (!uiState.voicePreferences.enabled) return showNotice("请先启用语音功能")
-        if (target == VoiceCaptureTarget.CHAT_INPUT && currentRun() != null) {
-            return showNotice("请等待 Hermes 完成当前回复后再录音")
-        }
-        voicePlaybackJob?.cancel()
-        voiceCaptureJob?.cancel()
-        voicePlayback.stop()
-        runCatching { voiceRecorder.start() }
-            .onSuccess {
-                uiState = uiState.copy(
-                    voiceCapture = uiState.voiceCapture.copy(
-                        phase = VoicePhase.LISTENING,
-                        target = target,
-                        transcript = "",
-                        provider = "",
-                        message = if (target == VoiceCaptureTarget.CHAT_INPUT) "正在录音，再点麦克风结束" else "请说一句中文测试语音",
-                        requiresAgentUpdate = false,
-                    ),
-                    errorMessage = null,
-                )
-            }
-            .onFailure { throwable ->
-                uiState = uiState.copy(
-                    voiceCapture = uiState.voiceCapture.copy(
-                        phase = VoicePhase.ERROR,
-                        target = target,
-                        message = throwable.message ?: "无法启动麦克风",
-                    ),
-                )
-            }
+    private fun currentVoiceDraft(): com.qingyu.hermescompanion.data.VoiceDraft? {
+        val settings = uiState.route == AppRoute.VOICE_SETTINGS
+        return voiceDrafts.all().firstOrNull { it.matches(uiState.baseUrl, uiState.username, uiState.activeProfile,
+            if (settings) "" else uiState.selectedSession?.id.orEmpty(), settings) }
     }
 
+    fun restoreVoiceDraft() {
+        val active = singleVoiceDraft
+        if (uiState.voiceCapture.phase in setOf(VoicePhase.LISTENING, VoicePhase.TRANSCRIBING) && active != null &&
+            !active.matches(uiState.baseUrl, uiState.username, uiState.activeProfile,
+                if (active.settingsTest) "" else uiState.selectedSession?.id.orEmpty(), uiState.route == AppRoute.VOICE_SETTINGS)) {
+            cancelSingleVoiceInput()
+        }
+        if (uiState.voiceCapture.phase in setOf(VoicePhase.LISTENING, VoicePhase.TRANSCRIBING)) return
+        val pending = currentVoiceDraft()
+        if (pending != null && pending.transcript.isNotBlank()) {
+            singleVoiceDraft = pending
+            applyVoiceDraftTranscript(pending)
+        } else uiState = uiState.copy(voiceCapture = uiState.voiceCapture.copy(canRetry = pending != null && voiceDrafts.file(pending).length() >= 128))
+    }
+
+    private fun startVoiceCapture(target: VoiceCaptureTarget) {
+        if (!uiState.voicePreferences.enabled) return showNotice(uiText(R.string.ui_0298, "请先启用语音功能"))
+        if (target == VoiceCaptureTarget.CHAT_INPUT && currentRun() != null) return showNotice(uiText(R.string.ui_0299, "请等待 Hermes 完成当前回复后再录音"))
+        if (uiState.voiceCapture.phase == VoicePhase.TRANSCRIBING) return
+        val pending = currentVoiceDraft()
+        if (pending != null && voiceDrafts.file(pending).length() >= 128) {
+            uiState = uiState.copy(voiceCapture = uiState.voiceCapture.copy(canRetry = true, phase = VoicePhase.ERROR,
+                message = uiText(R.string.ui_0300, "上次录音仍在，请重新识别或删除后再录")))
+            return
+        }
+        pending?.let { voiceDrafts.delete(it) }
+        voicePlaybackJob?.cancel(); voiceCaptureJob?.cancel(); voicePlayback.stop()
+        val draft = com.qingyu.hermescompanion.data.VoiceDraft(server = uiState.baseUrl, account = uiState.username,
+            profile = uiState.activeProfile, session = if (target == VoiceCaptureTarget.SETTINGS_TEST) "" else uiState.selectedSession?.id.orEmpty(),
+            settingsTest = target == VoiceCaptureTarget.SETTINGS_TEST)
+        runCatching {
+            voiceDrafts.save(draft)
+            voiceRecorder.start(voiceDrafts.file(draft))
+        }.onSuccess {
+            singleVoiceDraft = draft
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.LISTENING, target = target,
+                message = uiText(R.string.ui_0301, "正在录音，再点麦克风结束；最长 5 分钟")), errorMessage = null)
+            voiceLimitJob?.cancel()
+            voiceLimitJob = viewModelScope.launch { delay(5 * 60_000L); voiceLimitJob = null; stopSingleVoiceInput() }
+        }.onFailure {
+            voiceDrafts.delete(draft)
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.ERROR, target = target, message = it.message ?: uiText(R.string.ui_0302, "无法启动麦克风")))
+        }
+    }
+
+    /** Pause is recoverable. Deletion is a separate explicit action. */
     fun cancelSingleVoiceInput() {
-        voiceCaptureJob?.cancel()
-        voiceCaptureJob = null
-        voiceRecorder.cancel()
+        voiceLimitJob?.cancel(); voiceLimitJob = null
+        voiceHttpCall?.cancel(); voiceHttpCall = null
+        voiceCaptureJob?.cancel(); voiceCaptureJob = null
+        if (uiState.voiceCapture.phase == VoicePhase.LISTENING) runCatching { voiceRecorder.stopToFile() }
+            .onFailure { singleVoiceDraft?.let { voiceDrafts.delete(it) } }
+        val draft = currentVoiceDraft()
+        uiState = uiState.copy(voiceCapture = VoiceCaptureState(canRetry = draft != null && voiceDrafts.file(draft).length() >= 128,
+            message = if (draft != null) uiText(R.string.ui_0303, "录音已保留，可稍后重新识别") else uiText(R.string.ui_0304, "已停止录音")))
+    }
+
+    fun discardSingleVoiceInput() {
+        cancelSingleVoiceInput()
+        currentVoiceDraft()?.let { voiceDrafts.delete(it) }
+        singleVoiceDraft = null
         uiState = uiState.copy(voiceCapture = VoiceCaptureState())
     }
 
+    fun onAppBackgrounded() {
+        if (uiState.voiceCapture.phase == VoicePhase.LISTENING) cancelSingleVoiceInput()
+        if (uiState.voiceConversation.phase == VoicePhase.LISTENING) cancelVoiceListening()
+    }
+
     fun stopSingleVoiceInput() {
+        if (uiState.voiceCapture.phase != VoicePhase.LISTENING) return
+        voiceLimitJob?.cancel(); voiceLimitJob = null
+        runCatching { voiceRecorder.stopToFile() }.onSuccess { retrySingleVoiceInput() }.onFailure {
+            singleVoiceDraft?.let { draft -> voiceDrafts.delete(draft) }
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.ERROR, message = it.message ?: uiText(R.string.ui_0305, "无法读取录音")))
+        }
+    }
+
+    fun retrySingleVoiceInput() {
         val client = apiClient ?: return
-        val capture = uiState.voiceCapture
-        if (capture.phase != VoicePhase.LISTENING) return
-        uiState = uiState.copy(
-            voiceCapture = capture.copy(phase = VoicePhase.TRANSCRIBING, message = "正在识别语音"),
-        )
-        voiceCaptureJob?.cancel()
+        if (uiState.voiceCapture.phase == VoicePhase.TRANSCRIBING) return
+        val draft = currentVoiceDraft() ?: return showNotice(uiText(R.string.ui_0306, "没有可恢复的录音"))
+        if (draft.transcript.isNotBlank()) { applyVoiceDraftTranscript(draft); return }
+        singleVoiceDraft = draft
+        val script = uiState.voicePreferences.transcriptScript
+        uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.TRANSCRIBING,
+            target = if (draft.settingsTest) VoiceCaptureTarget.SETTINGS_TEST else VoiceCaptureTarget.CHAT_INPUT,
+            canRetry = true, message = uiText(R.string.ui_0307, "正在上传并识别，录音已保留在手机")))
         voiceCaptureJob = viewModelScope.launch {
-            runCatching {
-                val (bytes, mimeType) = withContext(Dispatchers.IO) { voiceRecorder.stop() }
-                if (capture.target == VoiceCaptureTarget.CHAT_INPUT && uiState.voicePreferences.engine == "system") {
-                    throw IllegalStateException("当前已选择手机系统语音识别")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val job = kotlinx.coroutines.currentCoroutineContext()[Job]
+                    client.transcribeAudioFile(voiceDrafts.file(draft), draft.profile) { call ->
+                        voiceHttpCall = call
+                        if (job?.isActive == false) call.cancel()
+                    }
                 }
-                withContext(Dispatchers.IO) { client.transcribeAudio(bytes, mimeType) }
-            }.onSuccess { result ->
-                voiceCaptureJob = null
-                val target = capture.target
-                val transcript = normalizeVoiceTranscript(result.transcript, uiState.voicePreferences.transcriptScript).trim()
-                uiState = uiState.copy(
-                    voiceCapture = uiState.voiceCapture.copy(
-                        phase = VoicePhase.IDLE,
-                        target = target,
-                        transcript = transcript,
-                        provider = result.provider,
-                        message = if (target == VoiceCaptureTarget.SETTINGS_TEST) "识别成功" else "已识别到输入框",
-                        agentSttAvailable = true,
-                        requiresAgentUpdate = false,
-                    ),
-                )
-                if (target == VoiceCaptureTarget.CHAT_INPUT) acceptVoiceResult(transcript)
-            }.onFailure { throwable ->
-                if (throwable is CancellationException) return@onFailure
-                voiceCaptureJob = null
-                val root = unwrapFailure(throwable)
-                val unavailable = root is ApiException && root.statusCode in setOf(404, 405, 501)
-                val incompatible = isAgentSttCompatibilityFailure(root)
-                uiState = uiState.copy(
-                    voiceCapture = uiState.voiceCapture.copy(
-                        phase = VoicePhase.ERROR,
-                        message = when {
-                            incompatible -> agentSttCompatibilityMessage()
-                            unavailable -> "Agent 语音识别不可用，可改用手机系统识别"
-                            else -> diagnosticFailure(root)
-                        },
-                        agentSttAvailable = if (unavailable || incompatible) false else uiState.voiceCapture.agentSttAvailable,
-                        requiresAgentUpdate = incompatible,
-                    ),
-                )
+                val completed = draft.copy(transcript = normalizeVoiceTranscript(result.transcript, script).trim())
+                withContext(Dispatchers.IO) { voiceDrafts.save(completed) }
+                voiceHttpCall = null; voiceCaptureJob = null
+                applyVoiceDraftTranscript(completed)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                voiceHttpCall = null; voiceCaptureJob = null
+                if (draft.matches(uiState.baseUrl, uiState.username, uiState.activeProfile,
+                    if (draft.settingsTest) "" else uiState.selectedSession?.id.orEmpty(), uiState.route == AppRoute.VOICE_SETTINGS)) {
+                    val error = unwrapFailure(e)
+                    val hint = when ((error as? ApiException)?.statusCode) {
+                        401, 403 -> uiText(R.string.ui_0308, "服务器登录已失效，请重新连接后重试")
+                        404, 405, 501 -> uiText(R.string.ui_0309, "当前服务器未提供语音识别接口，可在语音设置中测试或改用手机系统识别")
+                        413 -> uiText(R.string.ui_0310, "服务器限制了上传大小，请调整反向代理的上传限制后重试")
+                        400 -> error.message ?: uiText(R.string.ui_0311, "服务器未能识别这段录音")
+                        else -> uiText(R.string.ui_0312, "识别未完成：%1\$s", error.message?.take(180) ?: uiText(R.string.ui_0313, "连接中断"))
+                    }
+                    uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.ERROR, canRetry = true,
+                        target = if (draft.settingsTest) VoiceCaptureTarget.SETTINGS_TEST else VoiceCaptureTarget.CHAT_INPUT,
+                        message = uiText(R.string.ui_0314, "%1\$s。录音已保留。", hint)))
+                } else uiState = uiState.copy(voiceCapture = VoiceCaptureState())
             }
+        }
+    }
+
+    private fun applyVoiceDraftTranscript(draft: com.qingyu.hermescompanion.data.VoiceDraft) {
+        try {
+        // Never inject a late transcription into another account, profile, or conversation.
+        if (draft.server.trimEnd('/') != uiState.baseUrl.trimEnd('/') || draft.account != uiState.username || draft.profile != uiState.activeProfile) {
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState()); return
+        }
+        if (draft.settingsTest) {
+            if (uiState.route != AppRoute.VOICE_SETTINGS) return
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState(transcript = draft.transcript,
+                target = VoiceCaptureTarget.SETTINGS_TEST, message = uiText(R.string.ui_0315, "识别成功"), agentSttAvailable = true))
+        } else {
+            val text = configStore.applyVoiceTranscript(draft.profile, draft.session, draft.id, draft.transcript)
+            if (uiState.selectedSession?.id == draft.session) uiState = uiState.copy(draft = text,
+                voiceCapture = VoiceCaptureState(transcript = draft.transcript, message = uiText(R.string.ui_0316, "文字已放入输入框，请检查后发送"), agentSttAvailable = true))
+            else uiState = uiState.copy(voiceCapture = VoiceCaptureState(), noticeMessage = uiText(R.string.ui_0317, "语音文字已保留到原对话的输入框"))
+        }
+        voiceDrafts.delete(draft); singleVoiceDraft = null
+        } catch (e: Exception) {
+            uiState = uiState.copy(voiceCapture = VoiceCaptureState(phase = VoicePhase.ERROR, canRetry = true,
+                message = e.message ?: uiText(R.string.ui_0318, "文字未能写入输入框，录音已保留")))
         }
     }
 
@@ -2734,9 +2927,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(settingsActionKey = "voice-tts-test", errorMessage = null)
         voicePlaybackJob = viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { client.synthesizeSpeech("你好，我是 Hermes。语音合成测试成功。") }
+                withContext(Dispatchers.IO) { client.synthesizeSpeech(uiText(R.string.ui_0319, "你好，我是 Hermes。语音合成测试成功。")) }
             }.onSuccess { audio ->
-                uiState = uiState.copy(settingsActionKey = null, noticeMessage = "正在播放 Agent 语音测试")
+                uiState = uiState.copy(settingsActionKey = null, noticeMessage = uiText(R.string.ui_0320, "正在播放 Agent 语音测试"))
                 voicePlayback.play(audio)
             }.onFailure { throwable ->
                 uiState = uiState.copy(settingsActionKey = null)
@@ -2750,8 +2943,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState.selectedSession?.scopedId == voiceSessionKey
 
     fun openVoiceConversation() {
-        if (!uiState.voicePreferences.enabled) return showNotice("先在‘我的 → 语音’中启用语音功能")
-        val session = uiState.selectedSession ?: return showNotice("先打开一个对话")
+        if (uiState.voiceCapture.phase in setOf(VoicePhase.LISTENING, VoicePhase.TRANSCRIBING)) cancelSingleVoiceInput()
+        if (!uiState.voicePreferences.enabled) return showNotice(uiText(R.string.ui_0321, "先在‘我的 → 语音’中启用语音功能"))
+        val session = uiState.selectedSession ?: return showNotice(uiText(R.string.ui_0322, "先打开一个对话"))
         voiceEpoch++
         voiceSessionKey = session.scopedId
         voiceRecorder.cancel()
@@ -2763,7 +2957,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(route = AppRoute.VOICE_CHAT, voiceCapture = VoiceCaptureState(),
             voiceConversation = VoiceConversationState(active = true,
                 phase = if (currentRun() != null) VoicePhase.THINKING else VoicePhase.IDLE,
-                message = if (currentRun() != null) "Hermes 正在处理当前问题" else "点按开始，说完停顿后自动发送"), errorMessage = null)
+                message = if (currentRun() != null) uiText(R.string.ui_0323, "Hermes 正在处理当前问题") else uiText(R.string.ui_0324, "点按开始，说完停顿后自动发送")), errorMessage = null)
     }
 
     fun closeVoiceConversation() {
@@ -2784,7 +2978,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         voicePlayback.stop()
         runCatching { voiceRecorder.start() }.onSuccess {
             uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.LISTENING,
-                transcript = "", provider = "", message = "正在适应环境声音，可以直接说话", requiresAgentUpdate = false, inputLevel = 0f))
+                transcript = "", provider = "", message = uiText(R.string.ui_0325, "正在适应环境声音，可以直接说话"), requiresAgentUpdate = false, inputLevel = 0f))
             voiceLevelJob?.cancel()
             val epoch = voiceEpoch
             val endpoint = com.qingyu.hermescompanion.data.VoiceSilenceDetector(sensitivity = uiState.voicePreferences.noiseSensitivity)
@@ -2797,10 +2991,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     val shouldSend = endpoint.sampleDb(sample.dbFs, now)
                     uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(inputLevel = sample.displayLevel,
                         message = when {
-                            endpoint.isCalibrating -> "正在适应环境声音，可以直接说话"
-                            endpoint.isSpeaking -> "正在听你说，说完停顿后自动发送"
-                            endpoint.hasSpeech -> "停顿中，即将自动发送…"
-                            else -> "正在听，靠近手机自然说话即可"
+                            endpoint.isCalibrating -> uiText(R.string.ui_0325, "正在适应环境声音，可以直接说话")
+                            endpoint.isSpeaking -> uiText(R.string.ui_0326, "正在听你说，说完停顿后自动发送")
+                            endpoint.hasSpeech -> uiText(R.string.ui_0327, "停顿中，即将自动发送…")
+                            else -> uiText(R.string.ui_0328, "正在听，靠近手机自然说话即可")
                         }))
                     if (shouldSend) {
                         voiceLevelJob = null // stopVoiceListening must not cancel its own caller.
@@ -2813,7 +3007,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             }
         }.onFailure { error ->
             uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.ERROR,
-                message = error.message ?: "无法启动麦克风"))
+                message = error.message ?: uiText(R.string.ui_0302, "无法启动麦克风")))
         }
     }
 
@@ -2823,7 +3017,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         voiceCaptureJob?.cancel(); voiceCaptureJob = null
         if (!voiceIsCurrent()) return
         uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE,
-            message = "已暂停，点按重新说话", inputLevel = 0f))
+            message = uiText(R.string.ui_0329, "已暂停，点按重新说话"), inputLevel = 0f))
     }
 
     fun stopVoiceListening() {
@@ -2833,7 +3027,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val epoch = voiceEpoch
         val profile = uiState.activeProfile
         uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.TRANSCRIBING,
-            message = "正在识别语音", inputLevel = 0f))
+            message = uiText(R.string.ui_0330, "正在识别语音"), inputLevel = 0f))
         voiceCaptureJob = viewModelScope.launch {
             try {
                 // Release the recorder before suspension so close/reopen cannot stop a newer capture.
@@ -2850,7 +3044,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 val unavailable = root is ApiException && root.statusCode in setOf(404, 405, 501)
                 val incompatible = isAgentSttCompatibilityFailure(root)
                 uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.ERROR,
-                    message = if (incompatible) agentSttCompatibilityMessage() else if (unavailable) "当前 Agent 未启用语音识别，可改用手机系统识别" else diagnosticFailure(root),
+                    message = if (incompatible) agentSttCompatibilityMessage() else if (unavailable) uiText(R.string.ui_0331, "当前 Agent 未启用语音识别，可改用手机系统识别") else diagnosticFailure(root),
                     agentSttAvailable = if (unavailable) false else uiState.voiceConversation.agentSttAvailable,
                     requiresAgentUpdate = incompatible))
             }
@@ -2862,9 +3056,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val session = uiState.selectedSession ?: return
         val transcript = normalizeVoiceTranscript(text, uiState.voicePreferences.transcriptScript).trim()
         if (transcript.isBlank() || currentRun() != null) return
-        if (uiState.isModelSwitching) return showNotice("模型正在切换，稍后再说")
+        if (uiState.isModelSwitching) return showNotice(uiText(R.string.ui_0332, "模型正在切换，稍后再说"))
         uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.THINKING,
-            transcript = transcript, message = "正在生成回答"))
+            transcript = transcript, message = uiText(R.string.ui_0333, "正在生成回答")))
         startMessage(session, transcript, emptyList(), voiceTurn = true)
     }
 
@@ -2872,14 +3066,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         voicePlaybackJob?.cancel(); voicePlaybackJob = null
         voicePlayback.stop()
         if (voiceIsCurrent()) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
-            phase = VoicePhase.IDLE, message = "已停止播放，点按继续说话"))
+            phase = VoicePhase.IDLE, message = uiText(R.string.ui_0334, "已停止播放，点按继续说话")))
     }
 
     private fun requestNextVoiceTurn() {
         if (!voiceIsCurrent()) return
         val continuous = uiState.voicePreferences.continuous
         uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.IDLE,
-            message = if (continuous) "准备聆听" else "回答完毕，点按继续",
+            message = if (continuous) uiText(R.string.ui_0335, "准备聆听") else uiText(R.string.ui_0336, "回答完毕，点按继续"),
             listenRequest = uiState.voiceConversation.listenRequest + if (continuous) 1 else 0))
     }
 
@@ -2895,18 +3089,18 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         voicePlaybackJob = viewModelScope.launch {
             try {
                 uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(phase = VoicePhase.SPEAKING,
-                    message = "Hermes 正在回答"))
+                    message = uiText(R.string.ui_0337, "Hermes 正在回答")))
                 val chinese = com.qingyu.hermescompanion.data.containsChinese(spoken)
                 suspend fun phone() {
                     if (!voiceIsCurrent(epoch)) throw kotlinx.coroutines.CancellationException()
-                    uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(provider = "手机中文语音".takeIf { chinese } ?: "Android TTS"))
+                    uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(provider = uiText(R.string.ui_0338, "手机中文语音").takeIf { chinese } ?: "Android TTS"))
                     voicePlayback.speakSystem(spoken, preferences.language, preferences.speechRate)
                 }
                 suspend fun agent() {
                     if (chinese) {
                         val config = withContext(Dispatchers.IO) { client.voiceSettings(profile).tts }
                         if (!com.qingyu.hermescompanion.data.agentVoiceSupportsChinese(config)) {
-                            throw IllegalStateException("Agent 当前发音人不支持中文，在语音设置中选择中文发音人后重试")
+                            throw IllegalStateException(uiText(R.string.ui_0339, "Agent 当前发音人不支持中文，在语音设置中选择中文发音人后重试"))
                         }
                     }
                     for (chunk in com.qingyu.hermescompanion.data.speechChunks(spoken)) {
@@ -2933,7 +3127,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             } catch (error: kotlinx.coroutines.CancellationException) { throw error }
             catch (error: Exception) {
                 if (voiceIsCurrent(epoch)) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
-                    phase = VoicePhase.ERROR, message = error.message ?: "朗读失败，回答已保留在对话中"))
+                    phase = VoicePhase.ERROR, message = error.message ?: uiText(R.string.ui_0340, "朗读失败，回答已保留在对话中")))
             }
         }
     }
@@ -2951,7 +3145,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             agentVersion = info.currentVersion.ifBlank { uiState.gatewayInfo.agentVersion },
                         ),
                         isAgentUpdateChecking = false,
-                        noticeMessage = if (info.updateAvailable) "发现 Hermes Agent 更新" else "当前已是最新版本",
+                        noticeMessage = if (info.updateAvailable) uiText(R.string.ui_0341, "发现 Hermes Agent 更新") else uiText(R.string.ui_0342, "当前已是最新版本"),
                     )
                 }
                 .onFailure { throwable ->
@@ -2959,8 +3153,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     val root = unwrapFailure(throwable)
                     if (root is ApiException && root.statusCode == 404) {
                         uiState = uiState.copy(
-                            agentUpdateInfo = AgentUpdateInfo(message = "当前 Agent 版本尚未提供远程更新接口，请在服务器运行 hermes update"),
-                            errorMessage = "当前 Agent 不支持应用内更新，请先在服务器手动升级一次",
+                            agentUpdateInfo = AgentUpdateInfo(message = uiText(R.string.ui_0343, "当前 Agent 版本尚未提供远程更新接口，请在服务器运行 hermes update")),
+                            errorMessage = uiText(R.string.ui_0344, "当前 Agent 不支持应用内更新，请先在服务器手动升级一次"),
                         )
                     } else handleFailure(throwable)
                 }
@@ -2971,12 +3165,12 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val client = apiClient ?: return
         val info = uiState.agentUpdateInfo
         if (!info.updateAvailable || !info.canApply || uiState.isStreaming || uiState.pendingAgentRequests.isNotEmpty()) {
-            return showNotice("请先完成当前任务和待处理请求，再更新 Hermes Agent")
+            return showNotice(uiText(R.string.ui_0345, "请先完成当前任务和待处理请求，再更新 Hermes Agent"))
         }
         if (agentUpdateJob?.isActive == true) return
         val previousVersion = info.currentVersion
         uiState = uiState.copy(
-            agentUpdateProgress = AgentUpdateProgress(started = true, running = true, lines = "正在启动服务器更新"),
+            agentUpdateProgress = AgentUpdateProgress(started = true, running = true, lines = uiText(R.string.ui_0346, "正在启动服务器更新")),
             errorMessage = null,
         )
         agentUpdateJob = viewModelScope.launch {
@@ -2986,14 +3180,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 handleFailure(started.exceptionOrNull()!!)
                 return@launch
             }
-            uiState = uiState.copy(agentUpdateProgress = started.getOrThrow(), noticeMessage = "更新已启动，Gateway 可能短暂离线")
+            uiState = uiState.copy(agentUpdateProgress = started.getOrThrow(), noticeMessage = uiText(R.string.ui_0347, "更新已启动，Gateway 可能短暂离线"))
             repeat(60) {
                 delay(5_000)
                 val status = runCatching { withContext(Dispatchers.IO) { client.agentUpdateStatus() } }.getOrNull()
                 if (status != null) {
                     uiState = uiState.copy(agentUpdateProgress = status)
                     if (!status.running && status.exitCode != null && status.exitCode != 0) {
-                        uiState = uiState.copy(errorMessage = "Hermes 更新失败（退出码 ${status.exitCode}）")
+                        uiState = uiState.copy(errorMessage = uiText(R.string.ui_0348, "Hermes 更新失败（退出码 %1\$s）", status.exitCode))
                         return@launch
                     }
                 }
@@ -3010,7 +3204,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             agentUpdateInfo = refreshed,
                             agentUpdateProgress = AgentUpdateProgress(started = true, running = false, exitCode = 0, lines = status?.lines.orEmpty()),
                             gatewayInfo = uiState.gatewayInfo.copy(agentVersion = refreshed.currentVersion),
-                            noticeMessage = "Hermes Agent 已更新并重新连接",
+                            noticeMessage = uiText(R.string.ui_0349, "Hermes Agent 已更新并重新连接"),
                         )
                         loadGatewayInfo(client)
                         return@launch
@@ -3019,7 +3213,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             }
             uiState = uiState.copy(
                 agentUpdateProgress = uiState.agentUpdateProgress.copy(running = false),
-                noticeMessage = "服务器仍在更新或重启，请稍后重新检查版本",
+                noticeMessage = uiText(R.string.ui_0350, "服务器仍在更新或重启，请稍后重新检查版本"),
             )
         }
     }
@@ -3034,6 +3228,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     fun closeSettingsPage() {
         if (uiState.route == AppRoute.VOICE_SETTINGS) {
+            cancelSingleVoiceInput()
             voiceRecorder.cancel()
             voiceCaptureJob?.cancel()
             voiceCaptureJob = null
@@ -3069,14 +3264,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun diagnoseConnection() {
-        val client = apiClient ?: return showNotice("请先完成一次登录，再诊断已保存的连接")
+        val client = apiClient ?: return showNotice(uiText(R.string.ui_0351, "请先完成一次登录，再诊断已保存的连接"))
         if (uiState.isConnectionDiagnosing) return
         val items = listOf(
-            ConnectionDiagnosticItem("gateway", "网关接口", "正在访问 ${uiState.baseUrl}", DiagnosticStatus.CHECKING),
-            ConnectionDiagnosticItem("version", "版本与兼容性", "正在读取 Agent 与网关版本", DiagnosticStatus.CHECKING),
-            ConnectionDiagnosticItem("auth", "登录状态", "正在验证加密保存的登录会话", DiagnosticStatus.CHECKING),
-            ConnectionDiagnosticItem("realtime", "实时连接", "正在检查 WebSocket 流式通道", DiagnosticStatus.CHECKING),
-            ConnectionDiagnosticItem("capabilities", "功能接口", "正在检查 Profile 与会话接口", DiagnosticStatus.CHECKING),
+            ConnectionDiagnosticItem("gateway", uiText(R.string.ui_0352, "网关接口"), uiText(R.string.ui_0353, "正在访问 %1\$s", uiState.baseUrl), DiagnosticStatus.CHECKING),
+            ConnectionDiagnosticItem("version", uiText(R.string.ui_0354, "版本与兼容性"), uiText(R.string.ui_0355, "正在读取 Agent 与网关版本"), DiagnosticStatus.CHECKING),
+            ConnectionDiagnosticItem("auth", uiText(R.string.ui_0356, "登录状态"), uiText(R.string.ui_0357, "正在验证加密保存的登录会话"), DiagnosticStatus.CHECKING),
+            ConnectionDiagnosticItem("realtime", uiText(R.string.ui_0358, "实时连接"), uiText(R.string.ui_0359, "正在检查 WebSocket 流式通道"), DiagnosticStatus.CHECKING),
+            ConnectionDiagnosticItem("capabilities", uiText(R.string.ui_0360, "功能接口"), uiText(R.string.ui_0361, "正在检查 Profile 与会话接口"), DiagnosticStatus.CHECKING),
         )
         uiState = uiState.copy(
             connectionDiagnostics = items,
@@ -3088,9 +3283,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             val gatewayStart = System.currentTimeMillis()
             val gateway = runCatching { withContext(Dispatchers.IO) { client.gatewayInfo() } }
             if (gateway.isFailure) {
-                updateDiagnostic("gateway", "无法访问：${diagnosticFailure(gateway.exceptionOrNull())}", DiagnosticStatus.FAILED)
+                updateDiagnostic("gateway", uiText(R.string.ui_0362, "无法访问：%1\$s", diagnosticFailure(gateway.exceptionOrNull())), DiagnosticStatus.FAILED)
                 listOf("version", "auth", "realtime", "capabilities").forEach { key ->
-                    updateDiagnostic(key, "网关不可用，已跳过", DiagnosticStatus.WARNING)
+                    updateDiagnostic(key, uiText(R.string.ui_0363, "网关不可用，已跳过"), DiagnosticStatus.WARNING)
                 }
                 uiState = uiState.copy(isConnectionDiagnosing = false)
                 return@launch
@@ -3101,7 +3296,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             val insecure = uiState.baseUrl.startsWith("http://", ignoreCase = true)
             updateDiagnostic(
                 "gateway",
-                "接口响应 ${latency}ms${if (insecure) "；当前为未加密 HTTP" else "；HTTPS 正常"}",
+                uiText(R.string.ui_0364, "接口响应 %1\$sms%2\$s", latency, if (insecure) uiText(R.string.ui_0365, "；当前为未加密 HTTP") else uiText(R.string.ui_0366, "；HTTPS 正常")),
                 if (insecure) DiagnosticStatus.WARNING else DiagnosticStatus.PASSED,
             )
             val versionText = buildList {
@@ -3110,16 +3305,16 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             }.joinToString(" · ")
             updateDiagnostic(
                 "version",
-                versionText.ifBlank { "网关未公布版本号；已改用接口探测判断兼容性" },
+                versionText.ifBlank { uiText(R.string.ui_0367, "网关未公布版本号；已改用接口探测判断兼容性") },
                 if (versionText.isBlank()) DiagnosticStatus.WARNING else DiagnosticStatus.PASSED,
             )
 
             runCatching { withContext(Dispatchers.IO) { client.checkSavedSession() } }
-                .onSuccess { user -> updateDiagnostic("auth", "登录有效：$user", DiagnosticStatus.PASSED) }
+                .onSuccess { user -> updateDiagnostic("auth", uiText(R.string.ui_0368, "登录有效：%1\$s", user), DiagnosticStatus.PASSED) }
                 .onFailure { updateDiagnostic("auth", diagnosticFailure(it), DiagnosticStatus.FAILED) }
 
             runCatching { withContext(Dispatchers.IO) { client.reconnectGateway() } }
-                .onSuccess { updateDiagnostic("realtime", "WebSocket 已连接，可接收流式回复", DiagnosticStatus.PASSED) }
+                .onSuccess { updateDiagnostic("realtime", uiText(R.string.ui_0369, "WebSocket 已连接，可接收流式回复"), DiagnosticStatus.PASSED) }
                 .onFailure { updateDiagnostic("realtime", diagnosticFailure(it), DiagnosticStatus.FAILED) }
 
             runCatching {
@@ -3130,11 +3325,11 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }.onSuccess { (profileCount, sessionCount) ->
                 val advertised = info.capabilities.takeIf(List<String>::isNotEmpty)
-                    ?.let { " · 服务端公布 ${it.size} 项能力" }
+                    ?.let { uiText(R.string.ui_0370, " · 服务端公布 %1\$s 项能力", it.size) }
                     .orEmpty()
                 updateDiagnostic(
                     "capabilities",
-                    "$profileCount 个 Profile · $sessionCount 个会话，核心接口正常$advertised",
+                    uiText(R.string.ui_0371, "%1\$s 个 Profile · %2\$s 个会话，核心接口正常%3\$s", profileCount, sessionCount, advertised),
                     DiagnosticStatus.PASSED,
                 )
             }.onFailure { updateDiagnostic("capabilities", diagnosticFailure(it), DiagnosticStatus.FAILED) }
@@ -3143,6 +3338,10 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun disconnect() {
+        dailyOpenToken = null
+        dailyOpenJob?.cancel()
+        dailyLiveSessions.clear()
+        if (uiState.voiceCapture.phase in setOf(VoicePhase.LISTENING, VoicePhase.TRANSCRIBING)) cancelSingleVoiceInput()
         if (uiState.isStreaming) stopAllRuns()
         agentUpdateJob?.cancel()
         voicePlaybackJob?.cancel()
@@ -3163,8 +3362,26 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         recoveredProfiles.clear()
         uiState = AppUiState(
             route = AppRoute.SETUP,
+            userProfile = uiState.userProfile,
+            languageMode = uiState.languageMode,
             themeMode = uiState.themeMode,
             skinMode = uiState.skinMode,
+            launcherIcon = uiState.launcherIcon,
+            reduceMotion = uiState.reduceMotion,
+            promptSnippets = uiState.promptSnippets,
+        )
+    }
+
+    fun setLanguageMode(mode: com.qingyu.hermescompanion.i18n.AppLanguageMode) {
+        com.qingyu.hermescompanion.i18n.AppLanguage.setMode(getApplication(), mode)
+        refreshUiLanguage()
+    }
+
+    fun refreshUiLanguage() {
+        // Keep sessions, message streams, attachments and every draft intact across recreation.
+        uiState = uiState.copy(
+            languageMode = com.qingyu.hermescompanion.i18n.AppLanguage.mode,
+            promptSnippets = configStore.readPromptSnippets(),
         )
     }
 
@@ -3178,12 +3395,39 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         uiState = uiState.copy(skinMode = mode)
     }
 
+    fun setLauncherIcon(icon: com.qingyu.hermescompanion.appearance.LauncherIcon) {
+        if (uiState.isIconChanging || uiState.launcherIcon == icon) return
+        uiState = uiState.copy(isIconChanging = true)
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { com.qingyu.hermescompanion.appearance.LauncherIconController(getApplication()).select(icon).getOrThrow() }
+            }
+            uiState = uiState.copy(isIconChanging = false, launcherIcon = result.getOrDefault(uiState.launcherIcon))
+            if (result.isSuccess) showNotice(uiText(R.string.icon_changed, "图标已切换，桌面可能需要几秒刷新"))
+            else showError(uiText(R.string.icon_change_failed, "图标未能切换，请稍后重试"))
+        }
+    }
+
+    fun setReduceMotion(value: Boolean) {
+        configStore.saveReduceMotion(value)
+        uiState = uiState.copy(reduceMotion = value)
+    }
+
+    fun markHomeWelcomed() { uiState = uiState.copy(homeWelcomed = true) }
+
+    fun updatePromptSnippets(items: List<com.qingyu.hermescompanion.model.PromptSnippet>) {
+        val valid = items.map { it.copy(title = it.title.trim(), text = it.text.trim()) }
+            .filter { it.id.isNotBlank() && it.title.isNotBlank() && it.text.isNotBlank() }.distinctBy { it.id }
+        configStore.savePromptSnippets(valid)
+        uiState = uiState.copy(promptSnippets = valid)
+    }
+
     fun clearTransientMessage() {
         uiState = uiState.copy(errorMessage = null, noticeMessage = null)
     }
 
     fun showVoiceRecognitionUnavailable() {
-        showError("此手机没有系统语音识别服务；请在语音设置选择 Agent 自动识别，或安装并启用系统语音助手")
+        showError(uiText(R.string.ui_0372, "此手机没有系统语音识别服务；请在语音设置选择 Agent 自动识别，或安装并启用系统语音助手"))
     }
 
     fun showNotice(message: String) {
@@ -3197,11 +3441,11 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             is StreamEvent.RunStarted -> {
                 run.session = run.session.copy(runtimeId = event.runId)
                 updateSession(run.session.id) { it.copy(runtimeId = event.runId) }
-                run.touch("Hermes 正在执行")
+                run.touch(uiText(R.string.ui_0373, "Hermes 正在执行"))
             }
             is StreamEvent.ReasoningDelta -> {
                 updateStreamingReasoning(run) { it + event.text }
-                run.touch("Hermes 正在思考")
+                run.touch(uiText(R.string.ui_0374, "Hermes 正在思考"))
             }
             is StreamEvent.ReasoningAvailable -> {
                 updateStreamingReasoning(run) { it.ifBlank { event.text } }
@@ -3211,7 +3455,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             is StreamEvent.AssistantInterim -> {
                 flushStreamingDelta(run)
                 updateStreamingMessage(run) { mergeInterimAssistantText(it, event.content) }
-                run.touch("Hermes 正在处理")
+                run.touch(uiText(R.string.ui_0375, "Hermes 正在处理"))
             }
             is StreamEvent.AssistantCompleted -> {
                 flushStreamingDelta(run)
@@ -3223,23 +3467,23 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             is StreamEvent.ToolStarted -> {
                 flushStreamingDelta(run)
                 val name = councilToolName(event.name)
-                run.touch("正在使用 $name")
+                run.touch(uiText(R.string.ui_0376, "正在使用 %1\$s", name))
                 updateTool(run, name, event.preview, ToolStatus.RUNNING, event.todos)
             }
             is StreamEvent.ToolProgress -> {
                 val name = councilToolName(event.name)
-                run.touch(event.preview.ifBlank { "正在使用 $name" }.take(80))
+                run.touch(event.preview.ifBlank { uiText(R.string.ui_0376, "正在使用 %1\$s", name) }.take(80))
                 updateTool(run, name, event.preview, ToolStatus.RUNNING)
             }
             is StreamEvent.ToolCompleted -> {
                 flushStreamingDelta(run)
                 val name = councilToolName(event.name)
-                run.touch("$name 已完成")
+                run.touch(uiText(R.string.ui_0377, "%1\$s 已完成", name))
                 updateTool(run, name, event.preview, ToolStatus.COMPLETED, event.todos)
             }
             is StreamEvent.ToolFailed -> {
                 val name = councilToolName(event.name)
-                run.touch("$name 执行失败")
+                run.touch(uiText(R.string.ui_0378, "%1\$s 执行失败", name))
                 updateTool(run, name, event.preview, ToolStatus.FAILED)
             }
             is StreamEvent.AgentRequestPending -> {
@@ -3248,8 +3492,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     it.runtimeSessionId == request.runtimeSessionId && it.requestId == request.requestId
                 } + request)
                 configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-                run.touch("等待你的处理")
-                val action = if (request.type == AgentRequestType.APPROVAL) "需要确认一项操作" else "需要你补充信息"
+                run.touch(uiText(R.string.ui_0379, "等待你的处理"))
+                val action = if (request.type == AgentRequestType.APPROVAL) uiText(R.string.ui_0380, "需要确认一项操作") else uiText(R.string.ui_0381, "需要你补充信息")
                 HermesNotifications.showAgentRequest(getApplication(), "Hermes $action", request.title,
                     profile = run.session.profile, sessionId = run.session.id)
             }
@@ -3258,7 +3502,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     it.conversationId == run.session.id && it.requestId == event.requestId
                 })
                 configStore.savePendingAgentRequests(uiState.pendingAgentRequests)
-                run.touch("请求已过期，Hermes 正在继续")
+                run.touch(uiText(R.string.ui_0382, "请求已过期，Hermes 正在继续"))
             }
             is StreamEvent.ConnectionInterrupted -> {
                 flushStreamingDelta(run)
@@ -3275,7 +3519,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun enqueueStreamingDelta(run: SessionRun, text: String) {
         if (text.isEmpty()) return
-        run.touch("正在组织回复")
+        run.touch(uiText(R.string.ui_0383, "正在组织回复"))
         run.deltaBuffer.append(text)
         if (run.deltaFlushJob?.isActive == true) return
         run.deltaFlushJob = viewModelScope.launch {
@@ -3323,8 +3567,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val needsAttention = hasReply && replyNeedsAttention(uiState.route, uiState.selectedSession?.id, session.id, isAppInForeground())
         val unread = if (needsAttention) uiState.unreadSessionIds + session.scopedId else uiState.unreadSessionIds
         configStore.saveUnreadSessionIds(unread)
-        val completion = RunCompletionSummary(sessionId = session.id, title = session.title.ifBlank { "Hermes 已完成" },
-            summary = text.take(240).ifBlank { "本轮执行已完成" }, artifacts = run.artifacts)
+        val completion = RunCompletionSummary(sessionId = session.id, title = session.title.ifBlank { uiText(R.string.ui_0384, "Hermes 已完成") },
+            summary = text.take(240).ifBlank { uiText(R.string.ui_0385, "本轮执行已完成") }, artifacts = run.artifacts)
         val recent = (listOf(completion) + uiState.recentCompletions).take(29)
         val queued = run.queued
         uiState = uiState.copy(
@@ -3333,7 +3577,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             chatArtifacts = if (isVisible(run)) run.artifacts else uiState.chatArtifacts,
             chatTodos = if (isVisible(run)) run.todos else uiState.chatTodos,
             sessions = uiState.sessions.map {
-                if (it.scopedId == session.scopedId) it.copy(preview = text.ifBlank { "Hermes 已发送图片" },
+                if (it.scopedId == session.scopedId) it.copy(preview = text.ifBlank { uiText(R.string.ui_0386, "Hermes 已发送图片") },
                     messageCount = maxOf(it.messageCount + 2, completed.size), runtimeId = session.runtimeId) else it
             },
         )
@@ -3344,8 +3588,8 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         if (hasReply && isVisible(run)) speakVoiceReply(reply?.content.orEmpty())
         if (needsAttention) {
             val name = uiState.userProfile.hermesDisplayName.ifBlank { "Hermes" }
-            HermesNotifications.showMessage(getApplication(), "$name 已回复",
-                "${session.title} · ${text.take(120).ifBlank { "回复中包含图片" }}",
+            HermesNotifications.showMessage(getApplication(), uiText(R.string.ui_0387, "%1\$s 已回复", name),
+                "${session.title} · ${text.take(120).ifBlank { uiText(R.string.ui_0388, "回复中包含图片") }}",
                 profile = session.profile, sessionId = session.id, route = "chat")
         }
         scheduleTitleRefresh(session)
@@ -3372,7 +3616,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     // Preserve 3.0.3a's completion boundary: saved text alone cannot end a live run.
                     if (failure != null && idleFor >= STREAM_CONNECTION_STALE_MILLIS) {
-                        recoverInterruptedStream(run, "实时连接暂时没有响应，正在自动取回结果")
+                        recoverInterruptedStream(run, uiText(R.string.ui_0389, "实时连接暂时没有响应，正在自动取回结果"))
                         return@launch
                     }
                 }
@@ -3385,7 +3629,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val key = "${uiState.activeProfile}::${request.conversationId}"
         var run = activeRuns[key]
         if (run != null) {
-            run.touch("已处理，Hermes 正在继续")
+            run.touch(uiText(R.string.ui_0390, "已处理，Hermes 正在继续"))
             publishRuns()
             if (run.controller != null && run.recoveryJob?.isActive != true) return
             if (run.recoveryJob?.isActive == true) return
@@ -3396,7 +3640,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             run = restoredRun(session, snapshot)
             activeRuns[session.scopedId] = run
         }
-        recoverInterruptedStream(run, "已提交处理结果，正在继续取回回复")
+        recoverInterruptedStream(run, uiText(R.string.ui_0391, "已提交处理结果，正在继续取回回复"))
     }
 
     private fun recoverInterruptedStream(run: SessionRun, message: String) {
@@ -3407,7 +3651,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         run.streamJob?.cancel()
         run.controller = null
         run.recovering = true
-        run.touch("正在取回回复")
+        run.touch(uiText(R.string.ui_0392, "正在取回回复"))
         run.tools = run.tools.map { if (it.status == ToolStatus.RUNNING) it.copy(status = ToolStatus.FAILED) else it }
         publishRuns()
         uiState = uiState.copy(noticeMessage = message)
@@ -3421,7 +3665,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 if (uiState.pendingAgentRequests.any { it.conversationId == run.session.id }) {
                     run.recoveryJob = null
                     run.recovering = false
-                    run.touch("等待你的处理")
+                    run.touch(uiText(R.string.ui_0379, "等待你的处理"))
                     publishRuns()
                     return@launch
                 }
@@ -3438,7 +3682,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     run.artifacts = insights.artifacts
                     run.todos = insights.todos
                     setRunMessages(run, messages.visibleConversationMessages())
-                    uiState = uiState.copy(noticeMessage = "${run.session.title}：回复已同步")
+                    uiState = uiState.copy(noticeMessage = uiText(R.string.ui_0393, "%1\$s：回复已同步", run.session.title))
                     finishStreaming(run)
                     return@launch
                 }
@@ -3452,20 +3696,40 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         if (uiState.pendingAgentRequests.any { it.conversationId == run.session.id }) {
             run.recoveryJob = null
             run.recovering = false
-            run.touch("等待你的处理")
+            run.touch(uiText(R.string.ui_0379, "等待你的处理"))
             publishRuns()
             return
         }
         preserveFailedSend(run)
         restoreQueuedDraft(run)
         removeRun(run)
-        uiState = uiState.copy(errorMessage = "${run.session.title}：未能自动取回完整回复，请稍后重新打开这段对话确认结果。")
+        uiState = uiState.copy(errorMessage = uiText(R.string.ui_0394, "%1\$s：未能自动取回完整回复，请稍后重新打开这段对话确认结果。", run.session.title))
     }
 
     private fun scheduleTitleRefresh(session: HermesSession) {
         val sessionId = session.id
-        if (sessionId !in pendingTitleSessionIds) return
         val client = apiClient ?: return
+        if (isDailyConversation(session)) {
+            pendingTitleSessionIds -= sessionId
+            titleRefreshJobs.remove(session.scopedId)?.cancel()
+            titleRefreshJobs[session.scopedId] = viewModelScope.launch {
+                for (wait in listOf(700L, 1_400L, 2_800L)) {
+                    delay(wait)
+                    if (apiClient !== client || uiState.activeProfile != session.profile) return@launch
+                    try {
+                        withContext(Dispatchers.IO) { client.renameSessionForProfile(session.id, DailyConversation.stableTitle(session), session.profile) }
+                        if (apiClient === client && uiState.activeProfile == session.profile) applySessionTitle(session.id, DailyConversation.stableTitle(session))
+                        return@launch
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        if (error !is ApiException || error.statusCode != 404) break
+                    }
+                }
+                if (apiClient === client && uiState.activeProfile == session.profile) showNotice(uiText(R.string.ui_0395, "对话已保留，固定名称暂未同步，下次打开时会重试"))
+            }
+            return
+        }
+        if (sessionId !in pendingTitleSessionIds) return
         titleRefreshJobs.remove(session.scopedId)?.cancel()
         titleRefreshJobs[session.scopedId] = viewModelScope.launch {
             val waits = listOf(700L, 1_400L, 2_800L)
@@ -3488,7 +3752,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             val fallback = compactSessionTitle(
                 messageCache[cacheKey(sessionId)].orEmpty().firstOrNull { it.role == MessageRole.USER }?.content.orEmpty(),
             )
-            if (fallback != "新会话") {
+            if (fallback != uiText(R.string.ui_0079, "新会话")) {
                 val saved = runCatching { withContext(Dispatchers.IO) { client.renameSession(session.id, fallback) } }
                     .getOrDefault(fallback)
                 applySessionTitle(session.id, saved)
@@ -3608,7 +3872,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 RecentArtifact(
                     profile = session.profile,
                     sessionId = session.id,
-                    sessionTitle = session.title.ifBlank { "Hermes 对话" },
+                    sessionTitle = session.title.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
                     messageId = message.id,
                     path = resolvedPath,
                     name = artifact.name,
@@ -3625,7 +3889,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
             RecentArtifact(
                 profile = session.profile,
                 sessionId = session.id,
-                sessionTitle = session.title.ifBlank { "Hermes 对话" },
+                sessionTitle = session.title.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
                 messageId = fallbackMessageId,
                 path = resolvedPath,
                 name = artifact.name,
@@ -3658,7 +3922,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         return RecentArtifact(
             profile = session.profile,
             sessionId = session.id,
-            sessionTitle = session.title.ifBlank { "Hermes 对话" },
+            sessionTitle = session.title.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
             messageId = sourceMessage?.id.orEmpty(),
             path = artifact.path,
             name = artifact.name,
@@ -3714,13 +3978,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                 return@forEach
             }
             val session = sessions.firstOrNull { it.id == snapshot.sessionId }
-                ?: HermesSession(id = snapshot.sessionId, title = snapshot.title.ifBlank { "Hermes 对话" },
+                ?: HermesSession(id = snapshot.sessionId, title = snapshot.title.ifBlank { uiText(R.string.ui_0242, "Hermes 对话") },
                     profile = profile, workspacePath = snapshot.workspacePath)
             if (activeRuns.containsKey(session.scopedId)) return@forEach
             val run = restoredRun(session, snapshot)
             activeRuns[session.scopedId] = run
             publishRuns()
-            recoverInterruptedStream(run, "正在恢复上次运行的对话")
+            recoverInterruptedStream(run, uiText(R.string.ui_0396, "正在恢复上次运行的对话"))
         }
     }
 
@@ -3742,7 +4006,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         removeRunRequests(run)
         removeRun(run)
         if (voiceIsCurrent() && isVisible(run)) uiState = uiState.copy(voiceConversation = uiState.voiceConversation.copy(
-            phase = VoicePhase.ERROR, message = "回复暂时失败，内容已保留，可回到对话重试"))
+            phase = VoicePhase.ERROR, message = uiText(R.string.ui_0397, "回复暂时失败，内容已保留，可回到对话重试")))
         handleFailure(throwable)
     }
 
@@ -3795,14 +4059,14 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val root = throwable?.let(::unwrapFailure)
         return when (root) {
             is ApiException -> when (root.statusCode) {
-                401, 403 -> "登录会话已失效，请重新输入密码"
-                404 -> "接口不存在，可能需要升级 Hermes Agent"
-                408 -> "连接超时，请检查反向代理或网络"
-                else -> root.message.ifBlank { "服务器请求失败" }
+                401, 403 -> uiText(R.string.ui_0398, "登录会话已失效，请重新输入密码")
+                404 -> uiText(R.string.ui_0399, "接口不存在，可能需要升级 Hermes Agent")
+                408 -> uiText(R.string.ui_0400, "连接超时，请检查反向代理或网络")
+                else -> root.message.ifBlank { uiText(R.string.ui_0401, "服务器请求失败") }
             }
-            is IOException -> "网络不可达或连接被中断"
-            null -> "未知错误"
-            else -> root.message?.takeIf(String::isNotBlank) ?: "连接失败"
+            is IOException -> uiText(R.string.ui_0402, "网络不可达或连接被中断")
+            null -> uiText(R.string.ui_0403, "未知错误")
+            else -> root.message?.takeIf(String::isNotBlank) ?: uiText(R.string.ui_0404, "连接失败")
         }
     }
 
@@ -3811,7 +4075,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         if (root is ApiException && root.statusCode == 403) {
             uiState = uiState.copy(isWorkspaceLoading = false, isWorkspaceSaving = false,
                 isWorkspaceAttaching = false, isImageLoading = false)
-            showError("没有读取或操作该文件的权限，请检查当前档案的文件权限。${root.message.takeIf { it.isNotBlank() }?.let { "\n$it" }.orEmpty()}")
+            showError(uiText(R.string.ui_0405, "没有读取或操作该文件的权限，请检查当前档案的文件权限。%1\$s", root.message.takeIf { it.isNotBlank() }?.let { "\n$it" }.orEmpty()))
         } else {
             if (root is ApiException && root.statusCode == 401) invalidateWorkspaceAttachmentPicker()
             handleFailure(throwable)
@@ -3822,13 +4086,13 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         val root = unwrapFailure(throwable)
         val message = when (root) {
             is ApiException -> when (root.statusCode) {
-                401, 403 -> "登录已失效，或 Hermes 用户名/密码不正确"
-                404 -> root.message.ifBlank { "当前 Hermes 版本不支持所需接口，请先升级 Hermes Agent" }
-                429 -> "Hermes 正在处理过多任务，请稍后再试"
-                else -> root.message.ifBlank { "服务器请求失败" }
+                401, 403 -> uiText(R.string.ui_0406, "登录已失效，或 Hermes 用户名/密码不正确")
+                404 -> root.message.ifBlank { uiText(R.string.ui_0407, "当前 Hermes 版本不支持所需接口，请先升级 Hermes Agent") }
+                429 -> uiText(R.string.ui_0408, "Hermes 正在处理过多任务，请稍后再试")
+                else -> root.message.ifBlank { uiText(R.string.ui_0401, "服务器请求失败") }
             }
-            is IOException -> "网络连接不稳定，请稍后重试"
-            else -> root.message?.takeIf { it.isNotBlank() } ?: "连接失败，请检查远程网关地址和网络"
+            is IOException -> uiText(R.string.ui_0409, "网络连接不稳定，请稍后重试")
+            else -> root.message?.takeIf { it.isNotBlank() } ?: uiText(R.string.ui_0410, "连接失败，请检查远程网关地址和网络")
         }
         uiState = uiState.copy(
             isBusy = false,
@@ -3868,12 +4132,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
         return value
     }
 
-    private fun pathIsWithin(root: String, target: String): Boolean {
-        if (target.replace('\\', '/').split('/').any { it == ".." }) return false
-        val cleanRoot = root.trimEnd('/', '\\')
-        if (target == cleanRoot || target == root) return true
-        return target.startsWith("$cleanRoot/") || target.startsWith("$cleanRoot\\")
-    }
+    private fun pathIsWithin(root: String, target: String): Boolean = isRemotePathWithin(root, target)
 
     private fun isAppInForeground(): Boolean {
         val info = ActivityManager.RunningAppProcessInfo()
@@ -3889,7 +4148,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                     uiState = uiState.copy(
                         route = AppRoute.HOME,
                         isBusy = false,
-                        noticeMessage = "已恢复登录：$signedInAs",
+                        noticeMessage = uiText(R.string.ui_0411, "已恢复登录：%1\$s", signedInAs),
                     )
                     loadGatewayInfo(client)
                     loadProfilesAndSessions(client)
@@ -3902,7 +4161,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             route = AppRoute.SETUP,
                             isBusy = false,
                             hasSavedConnection = false,
-                            noticeMessage = "登录已过期，请重新输入密码",
+                            noticeMessage = uiText(R.string.ui_0412, "登录已过期，请重新输入密码"),
                         )
                     } else {
                         uiState = uiState.copy(
@@ -3910,7 +4169,7 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
                             isBusy = false,
                             hasSavedConnection = true,
                             noticeMessage = null,
-                            errorMessage = "暂时无法连接已保存的远程网关，请确认服务器已启动且手机网络可访问该地址",
+                            errorMessage = uiText(R.string.ui_0413, "暂时无法连接已保存的远程网关，请确认服务器已启动且手机网络可访问该地址"),
                         )
                     }
                 }
@@ -3980,6 +4239,9 @@ class HermesViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        if (uiState.voiceCapture.phase == VoicePhase.LISTENING) cancelSingleVoiceInput()
+        voiceHttpCall?.cancel()
+        voiceLimitJob?.cancel()
         activeRuns.values.forEach { run ->
             run.controller?.stop()
             run.streamJob?.cancel()
@@ -4020,19 +4282,19 @@ private fun String.isPreviewableArtifact(): Boolean =
         "yaml", "yml", "log", "kt", "java", "py", "js", "ts", "css", "sh", "sql",
     )
 
-private val DEFAULT_SLASH_COMMANDS = listOf(
-    SlashCommand("/new", "开始一个新对话", "会话"),
-    SlashCommand("/retry", "重新执行上一条消息", "会话"),
-    SlashCommand("/undo", "移除上一轮用户与助手消息", "会话"),
-    SlashCommand("/title", "设置当前对话标题", "会话", "[标题]"),
-    SlashCommand("/compress", "压缩当前对话上下文", "会话"),
-    SlashCommand("/model", "查看或切换当前模型", "模型", "[provider:model]"),
-    SlashCommand("/reasoning", "调整推理强度或显示方式", "模型", "[级别]"),
-    SlashCommand("/skills", "搜索、查看或管理技能", "技能"),
-    SlashCommand("/status", "查看当前会话状态", "信息"),
-    SlashCommand("/usage", "查看本会话用量", "信息"),
-    SlashCommand("/help", "查看可用命令", "信息"),
-    SlashCommand("/stop", "停止当前正在执行的任务", "会话"),
+private val DEFAULT_SLASH_COMMANDS get() = listOf(
+    SlashCommand("/new", uiText(R.string.ui_0414, "开始一个新对话"), uiText(R.string.ui_0415, "会话")),
+    SlashCommand("/retry", uiText(R.string.ui_0416, "重新执行上一条消息"), uiText(R.string.ui_0415, "会话")),
+    SlashCommand("/undo", uiText(R.string.ui_0417, "移除上一轮用户与助手消息"), uiText(R.string.ui_0415, "会话")),
+    SlashCommand("/title", uiText(R.string.ui_0418, "设置当前对话标题"), uiText(R.string.ui_0415, "会话"), uiText(R.string.ui_0419, "[标题]")),
+    SlashCommand("/compress", uiText(R.string.ui_0420, "压缩当前对话上下文"), uiText(R.string.ui_0415, "会话")),
+    SlashCommand("/model", uiText(R.string.ui_0421, "查看或切换当前模型"), uiText(R.string.ui_0422, "模型"), "[provider:model]"),
+    SlashCommand("/reasoning", uiText(R.string.ui_0423, "调整推理强度或显示方式"), uiText(R.string.ui_0422, "模型"), uiText(R.string.ui_0424, "[级别]")),
+    SlashCommand("/skills", uiText(R.string.ui_0425, "搜索、查看或管理技能"), uiText(R.string.ui_0426, "技能")),
+    SlashCommand("/status", uiText(R.string.ui_0427, "查看当前会话状态"), uiText(R.string.ui_0428, "信息")),
+    SlashCommand("/usage", uiText(R.string.ui_0429, "查看本会话用量"), uiText(R.string.ui_0428, "信息")),
+    SlashCommand("/help", uiText(R.string.ui_0430, "查看可用命令"), uiText(R.string.ui_0428, "信息")),
+    SlashCommand("/stop", uiText(R.string.ui_0431, "停止当前正在执行的任务"), uiText(R.string.ui_0415, "会话")),
 )
 
 private const val CHAT_PAGE_SIZE = 60
@@ -4061,50 +4323,18 @@ private fun String.isMoaProvider(): Boolean =
     equals("moa", ignoreCase = true) || contains("mixture-of-agents", ignoreCase = true)
 
 private fun councilToolName(name: String): String =
-    if (name.contains("delegate", ignoreCase = true)) "专家并行分析" else name
+    if (name.contains("delegate", ignoreCase = true)) uiText(R.string.ui_0432, "专家并行分析") else name
 
 internal fun buildCouncilPrompt(prompt: String, mode: CouncilMode): String = when (mode) {
     CouncilMode.OFF -> prompt
-    CouncilMode.QUICK -> """
-        [Hermes Mobile · 快速会审]
-        当前会话使用 MoA。请利用各参考模型已经独立生成的分析，由聚合模型做真正的比较与裁决；不要虚构角色对话，也不要输出参考模型的原始聊天记录。
-
-        最终答复只保留对用户有用的内容，并使用以下结构：
-        ## 会审结论
-        ## 共识
-        ## 关键分歧与裁决
-        ## 证据与风险
-        ## 相比单模型的增益
-        ## 置信度与未决事项
-
-        [原始问题]
-        $prompt
-    """.trimIndent()
-    CouncilMode.DEEP -> """
-        [Hermes Mobile · 深度专家会审协议]
-        这不是角色扮演。三个子 Agent 必须给出真实、独立的返回结果；移动端会把异步批次中的三份结果分别显示为群聊成员，不得把子 Agent 回包伪装成用户消息。
-
-        先判断该问题是否确实值得多 Agent 会审。若问题很简单，直接给出精炼答案并明确说明“本题无需会审”，避免浪费 Token。若值得会审：
-        1. 使用 delegate_task，以一个并行批次启动 3 个隔离上下文的专家：证据分析员（事实、来源与假设）、反方审查员（反例、盲点与失败条件）、落地评审员（成本、步骤与可执行性）。三者必须独立首轮分析。
-        2. 主 Agent 比较三份结论，识别真正影响决策的共识和冲突。只有存在高影响且未解决的分歧时，才允许追加至多 1 轮定向复核；禁止开放式互聊。
-        3. 若 delegate_task 不可用，不得伪造专家意见；请明确标注“会审降级为单 Agent 审查”。
-        4. 子 Agent 的独立结果由异步批次正常返回；主 Agent 的最终答复不要再次整段复制三份原文，只输出压缩后的决策信息。
-
-        最终答复使用以下结构：
-        ## 会审结论
-        ## 共识
-        ## 关键分歧与裁决
-        ## 证据与风险
-        ## 相比单 Agent 的增益
-        ## 置信度与未决事项
-
-        [原始问题]
-        $prompt
-    """.trimIndent()
+    CouncilMode.QUICK -> uiText(R.string.ui_0433, "\n        [Hermes Mobile · 快速会审]\n        当前会话使用 MoA。请利用各参考模型已经独立生成的分析，由聚合模型做真正的比较与裁决；不要虚构角色对话，也不要输出参考模型的原始聊天记录。\n\n        最终答复只保留对用户有用的内容，并使用以下结构：\n        ## 会审结论\n        ## 共识\n        ## 关键分歧与裁决\n        ## 证据与风险\n        ## 相比单模型的增益\n        ## 置信度与未决事项\n\n        [原始问题]\n        %1\$s\n    ", prompt).trimIndent()
+    CouncilMode.DEEP -> uiText(R.string.ui_0434, "\n        [Hermes Mobile · 深度专家会审协议]\n        这不是角色扮演。三个子 Agent 必须给出真实、独立的返回结果；移动端会把异步批次中的三份结果分别显示为群聊成员，不得把子 Agent 回包伪装成用户消息。\n\n        先判断该问题是否确实值得多 Agent 会审。若问题很简单，直接给出精炼答案并明确说明“本题无需会审”，避免浪费 Token。若值得会审：\n        1. 使用 delegate_task，以一个并行批次启动 3 个隔离上下文的专家：证据分析员（事实、来源与假设）、反方审查员（反例、盲点与失败条件）、落地评审员（成本、步骤与可执行性）。三者必须独立首轮分析。\n        2. 主 Agent 比较三份结论，识别真正影响决策的共识和冲突。只有存在高影响且未解决的分歧时，才允许追加至多 1 轮定向复核；禁止开放式互聊。\n        3. 若 delegate_task 不可用，不得伪造专家意见；请明确标注“会审降级为单 Agent 审查”。\n        4. 子 Agent 的独立结果由异步批次正常返回；主 Agent 的最终答复不要再次整段复制三份原文，只输出压缩后的决策信息。\n\n        最终答复使用以下结构：\n        ## 会审结论\n        ## 共识\n        ## 关键分歧与裁决\n        ## 证据与风险\n        ## 相比单 Agent 的增益\n        ## 置信度与未决事项\n\n        [原始问题]\n        %1\$s\n    ", prompt).trimIndent()
 }
 
 private fun List<ChatMessage>?.visibleConversationMessages(): List<ChatMessage> =
-    this.orEmpty().filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }
+    this.orEmpty().filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }.map {
+        if (it.role == MessageRole.USER) it.copy(content = com.qingyu.hermescompanion.assistant.AssistantPrompts.visibleText(it.content)) else it
+    }
 
 internal fun replyNeedsAttention(
     route: AppRoute,

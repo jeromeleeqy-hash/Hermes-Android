@@ -1,5 +1,9 @@
 package com.qingyu.hermescompanion.ui.component
 
+import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.R
+
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -153,7 +157,7 @@ fun MarkdownContent(
                 is MarkdownBlock.DocumentLink -> DocumentLinkCard(block, onOpenLink)
                 is MarkdownBlock.Image -> PreviewableImage(
                     source = block.source,
-                    name = block.alt.ifBlank { "图片" },
+                    name = block.alt.ifBlank { uiText(R.string.ui_0057, "图片") },
                     onOpen = onOpenImage,
                     preview = inlineImagePreviews[block.source],
                     modifier = Modifier.fillMaxWidth().heightIn(min = 92.dp, max = 220.dp),
@@ -205,7 +209,7 @@ private fun DocumentLinkCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "点击打开 Markdown 预览",
+                    uiText(R.string.ui_0452, "点击打开 Markdown 预览"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
@@ -213,7 +217,7 @@ private fun DocumentLinkCard(
             }
             HermesMulticolorIcon(
                 HermesIconKind.CHEVRON_RIGHT,
-                contentDescription = "打开文档",
+                contentDescription = uiText(R.string.ui_0453, "打开文档"),
                 iconSize = 16.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -240,7 +244,7 @@ private fun CodeBlock(block: MarkdownBlock.Code) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = block.language.ifBlank { "代码" },
+                    text = block.language.ifBlank { uiText(R.string.ui_0454, "代码") },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(top = 7.dp),
@@ -251,7 +255,7 @@ private fun CodeBlock(block: MarkdownBlock.Code) {
                     },
                     modifier = Modifier.size(32.dp),
                 ) {
-                    HermesMulticolorIcon(HermesIconKind.COPY, contentDescription = "复制代码", iconSize = 15.dp)
+                    HermesMulticolorIcon(HermesIconKind.COPY, contentDescription = uiText(R.string.ui_0455, "复制代码"), iconSize = 15.dp)
                 }
             }
             Text(

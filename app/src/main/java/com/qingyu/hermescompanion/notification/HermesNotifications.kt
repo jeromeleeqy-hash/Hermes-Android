@@ -1,5 +1,8 @@
 package com.qingyu.hermescompanion.notification
 
+import com.qingyu.hermescompanion.i18n.uiText
+
+
 import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationChannel
@@ -16,7 +19,7 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.qingyu.hermescompanion.MainActivity
+import com.qingyu.hermescompanion.HermesHostActivity
 import com.qingyu.hermescompanion.R
 import com.qingyu.hermescompanion.data.HermesApiClient
 import com.qingyu.hermescompanion.model.NotificationPreferences
@@ -39,8 +42,8 @@ object HermesNotifications {
         manager.deleteNotificationChannel(MESSAGE_CHANNEL)
         manager.deleteNotificationChannel(TASK_CHANNEL)
         if (!preferences.enabled) return
-        manager.createNotificationChannel(channel(MESSAGE_CHANNEL, "Hermes 消息", "AI 回复与对话结果", preferences))
-        manager.createNotificationChannel(channel(TASK_CHANNEL, "Hermes 任务", "定时任务完成、失败与异常", preferences))
+        manager.createNotificationChannel(channel(MESSAGE_CHANNEL, uiText(R.string.ui_0157, "Hermes 消息"), uiText(R.string.ui_0158, "AI 回复与对话结果"), preferences))
+        manager.createNotificationChannel(channel(TASK_CHANNEL, uiText(R.string.ui_0159, "Hermes 任务"), uiText(R.string.ui_0160, "定时任务完成、失败与异常"), preferences))
     }
 
     fun showMessage(
@@ -159,7 +162,7 @@ object HermesNotifications {
         val openApp = PendingIntent.getActivity(
             context,
             notificationId,
-            Intent(context, MainActivity::class.java)
+            Intent(context, HermesHostActivity::class.java)
                 .setData(deepLink)
                 .putExtra(EXTRA_PROFILE, profile)
                 .putExtra(EXTRA_SESSION_ID, sessionId)
@@ -178,13 +181,13 @@ object HermesNotifications {
             .setNumber(if (preferences.badge) 1 else 0)
             .setVibrate(if (preferences.vibration) longArrayOf(0, 180, 90, 180) else longArrayOf(0))
         if (includeRequestActions) {
-            builder.addAction(R.drawable.ic_stat_hermes, "去处理", openApp)
+            builder.addAction(R.drawable.ic_stat_hermes, uiText(R.string.ui_0161, "去处理"), openApp)
             if (!sessionId.isNullOrBlank()) {
                 val chatLink = deepLink.buildUpon().path("chat").build()
                 val openChat = PendingIntent.getActivity(
                     context,
                     notificationId + 100_000,
-                    Intent(context, MainActivity::class.java)
+                    Intent(context, HermesHostActivity::class.java)
                         .setData(chatLink)
                         .putExtra(EXTRA_PROFILE, profile)
                         .putExtra(EXTRA_SESSION_ID, sessionId)
@@ -192,7 +195,7 @@ object HermesNotifications {
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
-                builder.addAction(R.drawable.ic_stat_hermes, "打开会话", openChat)
+                builder.addAction(R.drawable.ic_stat_hermes, uiText(R.string.ui_0162, "打开会话"), openChat)
             }
         }
         val notification = builder.build()
@@ -246,8 +249,8 @@ class CronNotificationReceiver : BroadcastReceiver() {
                                 val status = job.lastStatus.ifBlank { job.state }
                                 HermesNotifications.showTask(
                                     appContext,
-                                    if (status.contains("fail", true) || status.contains("error", true)) "定时任务执行失败" else "定时任务已完成",
-                                    "${job.name} · ${status.ifBlank { "已更新" }}",
+                                    if (status.contains("fail", true) || status.contains("error", true)) uiText(R.string.ui_0163, "定时任务执行失败") else uiText(R.string.ui_0164, "定时任务已完成"),
+                                    "${job.name} · ${status.ifBlank { uiText(R.string.ui_0165, "已更新") }}",
                                     profile = profile,
                                 )
                             }

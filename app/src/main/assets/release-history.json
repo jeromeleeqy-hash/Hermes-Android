@@ -1,0 +1,1034 @@
+[
+  {
+    "version": "3.6.5",
+    "date": "2026-09-10",
+    "zh": [
+      "温暖灵动首页放大并上移人物，头部对齐问候语、脚底对齐主按钮；按实际文字与按钮位置计算，并保留动作空间。",
+      "三套首页左上角改为小字号日期与星期，随本地日期、时区和前台恢复刷新，适配中英文。",
+      "首页加入 48 组中英文随机短句，中文每句不超过 15 字；重新进入首页或跨天更换，阅读、切换皮肤及语言时保持同一句。",
+      "温暖首页为短句保留两行空间，避免内容长短变化造成按钮和人物跳动；任务与待确认状态继续优先展示。",
+      "同版本修订：缩小三套主题的对话右上角菜单，按文字长度确定宽度，收紧圆角；保持居中排版与完整点击区域。"
+    ],
+    "en": [
+      "Enlarge and raise the Warm home character, aligning its head with the greeting and feet with the main action. The layout follows measured text and button positions.",
+      "Replace the home identity heading with a smaller date and weekday in all three skins, localized for Chinese and English.",
+      "Add 48 bilingual short home quotes. Refresh on a new home visit or day, while keeping the current line stable during reading, theme changes and language changes.",
+      "Reserve two caption lines in the Warm layout so changing quotes does not move the action or character. Running and pending task messages remain prioritized.",
+      "Same-version refinement: compact the chat overflow menu in all three skins, sizing its width to the labels with smaller corners while retaining centered text and comfortable touch targets."
+    ]
+  },
+  {
+    "version": "3.6.4",
+    "date": "2026-09-10",
+    "zh": [
+      "外观设置新增“白发伙伴”和“耳机精灵”两款桌面图标，可随时切换；记住选择并支持升级恢复。",
+      "助理首页增加点击人物互动：抱臂挑眉、伸懒腰交替播放，动作结束回到待机；离开页面或切到后台停止互动。",
+      "两段新动作已转换为透明、无声动画，适配三套首页及减少动态效果设置。",
+      "玻璃底栏按实测圆角轮廓裁剪下方列表，保留栏内半透，同时让两个下圆角及手势区露出原页面渐变。",
+      "首页问候语随每分钟、系统时间/时区变化以及应用回到前台即时刷新。"
+    ],
+    "en": [
+      "Appearance now offers Partner and Sprite launcher icons. The selected icon is retained across restarts and upgrades.",
+      "Tap the assistant on Home to alternate between a confident folded-arms gesture and a stretch. Each gesture finishes before returning to idle; leaving the screen or backgrounding stops it.",
+      "The two supplied clips are shipped as silent transparent animations, with support for all three home layouts and Reduce Motion.",
+      "The glass dock clips list content to its measured lower corner contour, preserving translucency inside the dock while revealing the original scene around the corners and gesture area.",
+      "Home greetings refresh on minute ticks, clock or time-zone changes, and foreground resume."
+    ]
+  },
+  {
+    "version": "3.6.3",
+    "date": "2026-09-09",
+    "zh": [
+      "玻璃底栏下方改为露出同一张页面渐变，裁去手势区的滚动内容，去除异色遮挡条；底栏内部继续半透。",
+      "对话右上角菜单文字居中，减少玻璃弹窗阴影并改为采样背景，避免脏污状文字重影。",
+      "连续语音页面在前台保持屏幕常亮，离开或切到后台恢复原有息屏行为。",
+      "温暖、安静首页缩小顶部与区域间距，按可用高度分配人物空间；常用手机尺寸下完整显示主操作和两条近期事项。",
+      "玻璃回看列表增加分组内部左右留白，同步调整首尾和分隔线的缩进。",
+      "加入确认的首开欢迎视频，支持跳过、后台暂停、减少动态效果及播放失败兜底；网关首开和设置页面按三套皮肤重构。",
+      "重新设计编辑信息页面，助理资料和用户资料分组展示，各皮肤保持一致的字段、按钮与容器。",
+      "首次使用先设置手机端助理昵称和头像，再连接网关；升级用户保留已有资料，网关账号及 Agent Profile 不受昵称修改影响。",
+      "使用说明改为六类十九篇操作指引，提供目录、步骤详情、关键词搜索及开场动画重看入口，支持中英文。",
+      "助理页左上角改为“我是 + 昵称”，英文为“I’m + name”，字号缩小并保留长昵称省略处理。"
+    ],
+    "en": [
+      "Remove the mismatched footer strip: clip route content at the gesture area to reveal the original page gradient while keeping the dock translucent.",
+      "Center conversation menu labels and soften Glass popup shadows, sampling the background without blurring underlying text into the menu.",
+      "Keep the screen awake during foreground continuous voice and restore normal behavior when leaving or backgrounding it.",
+      "Tighten Warm and Quiet home spacing and budget the portrait against the viewport so common phone sizes show the main action and two recent items.",
+      "Add inner spacing to rounded Glass history groups and align row edges and dividers.",
+      "Add the approved welcome video with skip, background pause, reduced motion and failure fallback, and redesign both initial and saved gateway setup for all skins.",
+      "Redesign Edit profile with separate assistant and user sections and fields, buttons and containers appropriate to each skin.",
+      "Let new users choose local assistant identity before connecting; preserve existing identities on upgrade and keep names separate from gateway accounts and Agent Profiles.",
+      "Replace the long feature overview with six categories and nineteen task guides, nested step pages, search and welcome replay in Chinese and English.",
+      "Use a smaller “I’m + name” home identity header, localized in Chinese and with overflow handling for long names."
+    ],
+    "source": "docs/RELEASE-3.6.3.md"
+  },
+  {
+    "version": "3.6.2",
+    "date": "2026-09-09",
+    "zh": [
+      "采用选定的白发耳机女孩软件图标，并适配桌面圆形与圆角蒙版。",
+      "Hermes 默认头像更新为选定的人像；默认用户头像换为通用卡通人物，自定义头像继续保留。",
+      "玻璃模式输入框增加独立底色、清晰边线与焦点状态；主按钮和次按钮明确区分。",
+      "统一详细设置、语音自定义值、项目目录、定时任务和提示词编辑的输入控件。",
+      "补齐可核对的历史版本记录，修正 3.0.3 与 3.0.3a 的内容归属，支持中英文查看。",
+      "发布正式 Release 构建；保留三套首页、底栏遮挡、Windows 路径及中英文切换。"
+    ],
+    "en": [
+      "Adopt the selected silver-haired character app icon, adapted for circular and rounded launcher masks.",
+      "Use the selected Hermes portrait and a generic illustrated user avatar; keep custom avatars intact.",
+      "Give Glass inputs a distinct fill, visible border and focus state, with clear primary and secondary actions.",
+      "Apply consistent fields to detailed settings, custom voice values, workspace paths, scheduled tasks and prompt editing.",
+      "Restore all documented release entries, correct the 3.0.3 / 3.0.3a mix-up, and provide Chinese and English history.",
+      "Ship a non-debuggable Release build while retaining the three home layouts, dock masking, Windows paths and language switching."
+    ],
+    "source": "docs/RELEASE-3.6.2.md"
+  },
+  {
+    "version": "3.6.1-preview",
+    "date": "2026-09-09",
+    "zh": [
+      "玻璃首页紧凑展示两条近期事项，人物视觉居中，导航栏下方不再露出滚动内容",
+      "统一分组圆角、下拉菜单和设置控件，改善三套皮肤的一致性",
+      "工作目录支持 Windows 盘符、UNC 共享路径及 Linux 绝对路径",
+      "新增跟随系统、简体中文和 English 语言切换，保留会话与草稿"
+    ],
+    "en": [
+      "A compact glass home with two recent items, centered artwork, and no content leaking below navigation",
+      "Consistent group corners, dropdowns, and settings controls across all three skins",
+      "Workspaces support Windows drive paths, UNC shares, and Linux absolute paths",
+      "Added System, Simplified Chinese, and English language options while preserving conversations and drafts"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.6.0-preview",
+    "date": "2026-09-09",
+    "zh": [
+      "三套助理首页独立布局：左右分栏、居中玻璃、简洁阅读",
+      "接入银发人物动画，欢迎只播一次，录音与处理动作跟随真实状态",
+      "添加到对话支持自定义提示词，可编辑、排序、删除和恢复默认",
+      "弹层材质延伸至屏幕底端，内容避让手势区和键盘",
+      "统一图标底托与选择控件，设置说明采用完整宽度",
+      "移除首页头像菜单，精简对话菜单，增加减少动态效果选项"
+    ],
+    "en": [
+      "Three distinct assistant home layouts: split view, centered glass, and focused reading",
+      "Silver-haired character animations: one-time welcome and state-aware recording and processing actions",
+      "Custom prompt snippets with editing, sorting, deletion, and reset to defaults",
+      "Sheets extend to the bottom of the screen while their content avoids gestures and the keyboard",
+      "Consistent icon surfaces and selection controls, with full-width settings descriptions",
+      "Removed the home avatar menu, simplified the conversation menu, and added reduced motion"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.5.1-preview",
+    "date": "2026-09-09",
+    "zh": [
+      "重做三套皮肤的页面、导航和弹层，玻璃取样真实页面图层并为旧系统提供兼容材质。",
+      "回看增加时间分组，语音和模型设置重新分类，长模型名称完整显示。",
+      "统一菜单与弹窗，选择后确认；清理摘要内部标记并修复定时记录的科学计数法时间。"
+    ],
+    "en": [
+      "Redesign the three skins across pages, navigation and overlays; Glass samples the page with a fallback for older Android versions.",
+      "Group history by time and reorganize voice and model settings, allowing long model names to wrap.",
+      "Unify menus and dialogs with explicit confirmation; clean internal preview markers and format numeric scheduled-run timestamps."
+    ],
+    "source": "docs/RELEASE-3.5.1.md"
+  },
+  {
+    "version": "3.5.0-preview",
+    "date": "2026-09-09",
+    "zh": [
+      "增加温暖灵动、液态玻璃、安静耐看三套可切换皮肤，以及独立的浅色、深色和跟随系统设置。"
+    ],
+    "en": [
+      "Introduce Warm, Glass and Quiet skins, with separate Light, Dark and System appearance choices."
+    ],
+    "source": "3.5.0 delivered APK / docs/RELEASE-3.5.1.md"
+  },
+  {
+    "version": "3.4.1-preview",
+    "date": "2026-09-08",
+    "zh": [
+      "首页新增固定的日常助理入口，跟我说直接继续同一段对话",
+      "日常对话独立于项目选择，重连时查找已有会话",
+      "分享内容默认发送到日常助理，也可选择其他对话",
+      "移除收下、安排、采用等额外流程及独立助理资料同步",
+      "记忆、文件和定时事项沿用 Hermes 原有能力",
+      "保留录音失败重试、草稿恢复、五栏导航和原首页插画"
+    ],
+    "en": [
+      "Added a fixed daily assistant entry; Talk to me continues the same conversation",
+      "The daily conversation is independent of project selection and is recovered on reconnect",
+      "Shared content goes to the daily assistant by default, with other conversations available",
+      "Removed extra acceptance and scheduling steps and separate assistant profile syncing",
+      "Memory, files, and scheduled items use existing Hermes capabilities",
+      "Retained recording retries, draft recovery, five-tab navigation, and the original home illustration"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.4.0-preview",
+    "date": "2026-09-08",
+    "zh": [
+      "基于 3.2 重做助理体验，支持快问、近况记录、规划草案及原生定时跟进。",
+      "完善资料同步、离线恢复、跨 Profile 隔离与录音失败重试。",
+      "本版的独立助理操作及自动资料同步在 3.4.1 中移除。"
+    ],
+    "en": [
+      "Rework the assistant from the 3.2 baseline with quick questions, notes, planning drafts and native scheduled follow-ups.",
+      "Improve note synchronization, offline recovery, Profile isolation and retries after recording failures.",
+      "The separate assistant workflow and automatic note synchronization from this release were removed in 3.4.1."
+    ],
+    "source": "docs/VALIDATION-3.4.md"
+  },
+  {
+    "version": "3.3.0-preview",
+    "date": "2026-09-08",
+    "zh": [
+      "试行 B 助理首页、协同待办、语音备忘与聊天拆词选择。",
+      "协同能力依赖当时的独立服务；该实验分支未沿用到 3.4，当前版本不需要该服务。"
+    ],
+    "en": [
+      "Trial the B assistant home, collaborative to-dos, voice memos and word-based text selection.",
+      "Collaboration used a separate service. This experimental branch was not carried into 3.4, and the current app does not require that service."
+    ],
+    "source": "Hermes-3.3.0-preview-交付说明.md (archived delivery)"
+  },
+  {
+    "version": "3.2.0-preview",
+    "date": "2026-09-08",
+    "zh": [
+      "首页人物平底衔接卡片，增加任务底栏入口，遮挡导航下方滚动内容。",
+      "连续语音按实际录音音量、环境底噪和持续发声判断，减少噪声误触发。",
+      "新增日常、嘈杂、轻声收音模式，录音中可调整。"
+    ],
+    "en": [
+      "Align the home artwork with its card, add the Tasks tab and mask content below navigation.",
+      "Use actual recording levels, ambient noise and sustained speech to reduce false voice triggers.",
+      "Add Everyday, Noisy and Quiet capture modes, adjustable while recording."
+    ],
+    "source": "Hermes-v3.2.0-preview-notes.md"
+  },
+  {
+    "version": "3.1.6-release",
+    "date": "2026-09-08",
+    "zh": [
+      "精简助理首页，调整悬浮导航和深色人物显示。",
+      "连续语音停顿自动发送，增加中文发音校验、完整分段朗读和会话级快速回答。",
+      "修复退出语音后的迟到结果，以及未发送草稿和附件被消费的问题。"
+    ],
+    "en": [
+      "Simplify the assistant home and refine floating navigation and dark-mode artwork.",
+      "Send after a speaking pause, validate Chinese voices, read complete segmented replies and offer per-session quick answers.",
+      "Prevent late voice results after leaving voice mode and preserve unsent drafts and attachments."
+    ],
+    "source": "Hermes-v3.1.6-release-notes.md"
+  },
+  {
+    "version": "3.1.5-release",
+    "date": "2026-09-07",
+    "zh": [
+      "精简对话菜单，命令进入加号面板，空间文件可作为附件返回原对话。",
+      "修复文件路径、编码与来源 Profile 读取问题；微调底栏、创建按钮和软件图标。"
+    ],
+    "en": [
+      "Simplify chat menus, move commands into the add panel and attach workspace files to the original conversation.",
+      "Fix file paths, encoding and source Profile reads; refine navigation, create buttons and the app icon."
+    ],
+    "source": "Hermes-v3.1.5-release-notes.md"
+  },
+  {
+    "version": "3.1.4-release",
+    "date": "2026-09-07",
+    "zh": [
+      "精简首页菜单和执行中心入口，统一导航选中态与审批图标。",
+      "扩大桌面图标背景以改善自适应裁切。"
+    ],
+    "en": [
+      "Simplify home menus and execution-center entry points, and unify navigation selection and approval icons.",
+      "Extend the launcher artwork background to improve adaptive cropping."
+    ],
+    "source": "Hermes-v3.1.4-release-notes.md"
+  },
+  {
+    "version": "3.1.3-release",
+    "date": "2026-09-07",
+    "zh": [
+      "统一开关、导航、创建按钮与页面过渡，完善文件页目录与项目入口。",
+      "文件默认目录读取当前 Profile 配置，记住各服务器与 Profile 的项目选择。",
+      "修复项目切换残留、父子路径匹配及旧目录请求覆盖新目录。"
+    ],
+    "en": [
+      "Unify switches, navigation, create buttons and page transitions; improve file-directory and project controls.",
+      "Read the default directory from the active Profile and remember project selection per server and Profile.",
+      "Fix stale selections, parent/child path matching and late directory responses overwriting newer ones."
+    ],
+    "source": "Hermes-v3.1.3-release-notes.md"
+  },
+  {
+    "version": "3.1.2-release",
+    "date": "2026-09-07",
+    "zh": [
+      "引入晴空蓝浅色主题、白色卡片、统一首页图标与底栏反馈。",
+      "接入确认的人物桌面图标，适配系统蒙版及单色主题图标。"
+    ],
+    "en": [
+      "Introduce a sky-blue light theme, white cards and consistent home icons and navigation feedback.",
+      "Integrate the approved character launcher icon, including system masks and a themed monochrome icon."
+    ],
+    "source": "Hermes-v3.1.2-release-notes.md"
+  },
+  {
+    "version": "3.1.1-release",
+    "date": "2026-09-07",
+    "zh": [
+      "首页按参考图重新排版，使用原画中的托腮女孩",
+      "近期事项合并为一张卡片，输入条和导航恢复紧凑样式",
+      "修复键盘弹出时导航占位导致的大块空白",
+      "工作详情使用进度时间线、资料分组和调整/停止操作",
+      "首页附件和语音按钮接入实际会话功能"
+    ],
+    "en": [
+      "Updated the home layout to match the reference, using the original resting-chin illustration",
+      "Combined recent items into one card and restored compact input and navigation controls",
+      "Fixed excess blank space caused by navigation padding when the keyboard opens",
+      "Work details now use a progress timeline, grouped resources, and adjust/stop actions",
+      "Home attachment and voice buttons now connect to conversation actions"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.1.0-release",
+    "date": "2026-09-07",
+    "zh": [
+      "新增助理首页：待确认、进行中和近期对话",
+      "三栏导航：助理、回看、我的；保留任务与文件入口",
+      "最新答复与完整对话切换，结果集中阅读",
+      "独立决策面板，长选项滚动、确认按钮固定",
+      "统一配色、留白、圆角与可读性"
+    ],
+    "en": [
+      "Added assistant home sections for pending decisions, active work, and recent conversations",
+      "Three-tab navigation: Assistant, History, and Me, with task and file shortcuts",
+      "Switch between the latest reply and full conversation for focused reading",
+      "Separate decision panel with scrollable options and a fixed confirmation button",
+      "Consistent colors, spacing, corners, and readability"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.0.4a-release",
+    "date": "2026-09-07",
+    "zh": [
+      "修复新建空对话时弹出 Session not found",
+      "删除等普通操作提示缩短为约 1.5 秒",
+      "运行状态栏不再遮挡会话列表的新建按钮"
+    ],
+    "en": [
+      "Fixed Session not found when creating an empty conversation",
+      "Shortened routine action notices, such as deletion, to about 1.5 seconds",
+      "The running status bar no longer covers the new conversation button"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.0.4-release",
+    "date": "2026-09-07",
+    "zh": [
+      "新对话继承所选项目目录，历史会话继续使用原目录",
+      "支持多会话同时运行，回复、停止、排队与恢复记录各自独立",
+      "任务页展示全部运行会话，可分别查看和停止",
+      "修复后台失败影响前台草稿，以及附件、项目切换的相关问题"
+    ],
+    "en": [
+      "New conversations inherit the selected project folder; existing conversations keep their original folder",
+      "Multiple conversations can run independently, with separate replies, stopping, queues, and recovery",
+      "The task screen shows all active conversations, each with its own view and stop actions",
+      "Fixed background failures affecting foreground drafts, plus attachment and project-switching issues"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.0.3a-release",
+    "date": "2026-08-23",
+    "zh": [
+      "修复流式思考与最终回复重复显示。",
+      "修复多选澄清被降级为普通文本框，兼容新旧 Gateway 澄清事件。"
+    ],
+    "en": [
+      "Prevent streamed reasoning and final replies from appearing twice.",
+      "Restore multiple-choice clarification controls and support old and new Gateway clarification events."
+    ],
+    "source": "Hermes-v3.0.3a-release-notes.md / CHANGELOG.md"
+  },
+  {
+    "version": "3.0.3-release",
+    "date": "2026-08-22",
+    "zh": [
+      "用户头像与 Hermes 头像支持分别替换，互不覆盖。",
+      "Hermes 头像同步显示在会话列表、回复和助理面板。"
+    ],
+    "en": [
+      "Allow the user avatar and Hermes avatar to be changed independently.",
+      "Show the Hermes avatar consistently in history, replies and the assistant panel."
+    ],
+    "source": "Hermes-v3.0.3-release-notes.md"
+  },
+  {
+    "version": "3.0.2-release",
+    "date": "2026-08-22",
+    "zh": [
+      "实时展示 Agent 思考内容，并继续在聊天中处理审批、澄清问题和可选答案",
+      "修复长任务与后台子 Agent 仍在运行时提前显示本轮完成的问题",
+      "附件栏支持横向滑动，图片和文件单次选择上限统一提升到 10 个",
+      "修复后台 Cron 检查在服务器离线时被误记为应用闪退，并改善已保存网关的断线提示",
+      "修复相对路径产物无法打开、Memory / Soul 缺失误报版本不兼容和推理强度兼容问题"
+    ],
+    "en": [
+      "Live Agent reasoning, with approvals, clarifications, and answer choices handled in the conversation",
+      "Fixed premature completion status while long tasks or background subagents are still running",
+      "Horizontally scrolling attachments; up to 10 images or files per selection",
+      "Fixed offline background Cron checks being recorded as app crashes and improved gateway disconnect notices",
+      "Fixed relative-path output previews, missing Memory/Soul compatibility errors, and reasoning-effort support"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "3.0.0-release",
+    "date": "2026-08-18",
+    "zh": [
+      "统一 Telegram 式设计、全套 Hermes 图标、个人主页、沉浸式头像与关键空白页形象动画",
+      "完善会话、全文搜索、命令面板、任务执行中心、专家会审、审批澄清和后台运行闭环",
+      "升级空间与产物预览、单次及连续语音、Agent STT/TTS、中文转写和长对话性能"
+    ],
+    "en": [
+      "Unified Telegram-inspired design, Hermes icons, profiles, immersive avatars, and animated empty states",
+      "Improved conversations, full-text search, commands, task management, expert review, approvals, and background work",
+      "Upgraded workspace and output previews, single and continuous voice, Agent STT/TTS, Chinese transcription, and long-conversation performance"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.8.1-release",
+    "date": "2026-08-18",
+    "zh": [
+      "重绘修长版置顶图钉，任务新建入口改为小型圆形；移除资料签名和网关主按钮中的绿色对号",
+      "对话列表不再展示 Cron 会话，运行内容集中到任务页执行记录；将长忆录 / 心智章程改名为我的记忆 / 我的心智",
+      "头像大图取消局部模糊并支持照片区域上滑返回；使用说明移至我的页面并取消数字编号",
+      "新会话、空对话列表和使用说明加入耳机女孩循环动画，并为旧版 Android 提供静态兜底",
+      "专家会审结果按独立专家成员分组展示，避免子 Agent 内容被误认为用户消息",
+      "统一正在处理与正在思考的排版，后台执行改为底部悬浮状态；连续语音升级为动态科技感控制球",
+      "移除聊天中的正在整理结果面板，新增静默流自检、延长断线取回并完善审批 / 澄清续接",
+      "来源解析支持引用式链接和带括号 URL，忽略代码块、行内代码与图片地址"
+    ],
+    "en": [
+      "Refined pinned icons and the circular new-task control; removed green checks from profile bios and the gateway primary action",
+      "Moved Cron conversations from history to task execution records; renamed memory and identity entries",
+      "Removed partial avatar blur and added swipe-up dismissal; moved unnumbered help topics to Me",
+      "Added looping headphone-character animations to new conversations, empty history, and help, with static fallback on older Android",
+      "Grouped expert review results by expert so subagent output cannot be mistaken for user messages",
+      "Unified processing and thinking layouts, moved background work to a floating status control, and added an animated voice orb",
+      "Removed the organizing-results panel; added silent-stream checks, longer recovery windows, and improved approval/clarification resumption",
+      "Source parsing supports reference links and parentheses in URLs, while ignoring code and image addresses"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.8.0-release",
+    "date": "2026-08-17",
+    "zh": [
+      "修复搜索页系统侧滑返回、设置子页面返回栈和专家会审返回助理面板的导航逻辑",
+      "助理与附件面板改用横向拖动条并默认完整展开；聊天完成状态重新对齐，长回复行距提升约 10%",
+      "重构我的主页信息层级，加入我的记忆与我的心智文件入口，并完善沉浸式头像与资料操作区",
+      "连续语音界面上移视觉中心，加入由真实麦克风音量驱动的声波纹；无声音时保持安静",
+      "缩减 Markdown 编辑器工具栏、任务新增入口，优化会话列表首屏与后台刷新速度",
+      "重绘 Hermes 助理图标并统一细节尺寸，完善分层使用说明与配置、故障排查建议"
+    ],
+    "en": [
+      "Fixed system-back behavior in search, settings navigation, and returning from expert review to the assistant panel",
+      "Assistant and attachment sheets now open fully with a drag handle; aligned completion status and increased long-reply line spacing",
+      "Reorganized Me with direct memory and identity file entries, immersive avatars, and profile actions",
+      "Raised the visual center of continuous voice and added microphone-driven waves that remain still in silence",
+      "Compacted Markdown tools and new-task controls and improved initial history loading and background refresh",
+      "Redrew the Hermes assistant icon, aligned detail sizes, and improved help, setup, and troubleshooting guidance"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.7.0",
+    "date": "2026-08-17",
+    "zh": [
+      "完整接入八轮精细图标：236 个 SVG 转为 Android 原生 VectorDrawable，统一覆盖导航、会话、聊天、空间、任务、设置和状态图标",
+      "移除业务代码中的旧位图与旧矢量引用，所有页面统一通过语义图标目录调用，浅色与深色模式自动着色",
+      "底栏采用 22dp 线性/实体双态图标；列表、输入器、文档操作与设置入口按 17–20dp 分级，保留 40–48dp 易点击区域",
+      "补齐 Markdown、网页、文件夹、来源会话、保存、分享与下载等专用图标，减少含义模糊的通用图形",
+      "语义色收敛为蓝、青、紫、绿、琥珀和红，仅用于操作、状态与文件类型提示"
+    ],
+    "en": [
+      "Integrated 236 refined SVG icons as native Android vectors across navigation, conversations, files, tasks, settings, and statuses",
+      "Replaced legacy bitmap and vector references with a semantic icon catalog that adapts to light and dark modes",
+      "Added 22dp outlined/filled navigation icons and 17–20dp content icons, retaining 40–48dp touch targets",
+      "Added dedicated Markdown, web, folder, source conversation, save, share, and download icons",
+      "Limited semantic colors to blue, teal, purple, green, amber, and red for actions, statuses, and file types"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.6.0",
+    "date": "2026-08-17",
+    "zh": [
+      "启动 Telegram 风格图标系统第一轮，统一底栏、首页、聊天、助理面板、个人主页和设置入口的矢量语言",
+      "底栏使用未选中线性、选中实体的双态图标，并与滑动底板同步淡入、缩放和换色",
+      "首页搜索与新建对话、聊天输入器、助理面板、Memory / Soul 和个人主页操作改用圆润轻量图标",
+      "设置入口使用白色图形配高辨识度语义色圆角底板，同时适配浅色与深色模式"
+    ],
+    "en": [
+      "Introduced a Telegram-inspired vector icon system across navigation, home, conversations, profiles, and settings",
+      "Outlined inactive and filled active navigation icons animate with the selection surface",
+      "Added lighter rounded icons for search, new conversations, the composer, assistant panels, Memory/Soul, and profile actions",
+      "Settings use white symbols on distinct semantic surfaces, adapted to light and dark modes"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.5.1",
+    "date": "2026-08-16",
+    "zh": [
+      "修正我的主页 Memory / Soul 入口：不再跳到配置页，而是打开当前 Hermes Profile 的真实文件",
+      "Memory 读取当前 Profile 的 memories/MEMORY.md，Soul 读取当前 Profile 根目录的 SOUL.md",
+      "新增独立只读 Markdown 预览，支持复制路径、系统分享和保存到手机，返回后仍停留在我的主页",
+      "兼容普通主机目录与 HERMES_HOME 直接作为文件根目录的服务器部署方式"
+    ],
+    "en": [
+      "Memory/Soul entries now open the current profile's actual files instead of configuration pages",
+      "Memory reads memories/MEMORY.md; Soul reads SOUL.md at the current profile root",
+      "Added read-only Markdown previews with path copying, sharing, and saving, returning to Me on dismissal",
+      "Supports servers using a host folder or HERMES_HOME directly as the file root"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.5.0",
+    "date": "2026-08-16",
+    "zh": [
+      "移除全局多余的灰色半透明按压遮罩，保留底栏、分段控件和开关自身的滑动与弹性动画",
+      "首页下拉菜单与筛选选框之间增加轻微间距，避免菜单紧贴触发器",
+      "会话列表支持左滑露出归档和删除按钮，并保留二次确认防误触",
+      "我的主页新增 Memory 和 Soul 两个 Agent 核心入口",
+      "头像由圆形连续铺展为顶部大图，返回时反向收回，替代整页缩放淡入"
+    ],
+    "en": [
+      "Removed unnecessary gray press overlays while retaining navigation, segmented-control, and switch animations",
+      "Added a small gap between dropdown menus and their filter controls",
+      "Swipe conversations left to reveal archive and delete actions, with confirmation",
+      "Added Memory and Soul shortcuts to Me",
+      "Avatars expand smoothly into a header image and collapse in reverse"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.4.0",
+    "date": "2026-08-16",
+    "zh": [
+      "聊天执行结束改为与正文左对齐的轻量状态行，不再重复显示完整 AI 回复和绿色结果框",
+      "首页下拉选单字号与筛选框统一，保留文字左对齐、对勾右对齐的清晰选择结构",
+      "我的页面重建为个人主页，只保留头像、设置照片、编辑信息和设置三个核心操作",
+      "设置迁移到独立纯列表页面，不再重复展示头像与个人资料；新增版本、网关和使用说明入口",
+      "恢复照片选择、裁剪和应用私有存储，点击头像可平滑放大为顶部沉浸式照片视图"
+    ],
+    "en": [
+      "Conversation completion now uses a light status row aligned with the text, without duplicating the reply",
+      "Matched dropdown and filter typography, with left-aligned labels and right-aligned checks",
+      "Rebuilt Me around the avatar, photo selection, profile editing, and settings",
+      "Moved settings to a separate list and added version, gateway, and help entries",
+      "Restored photo selection, cropping, private storage, and smooth expansion into an immersive avatar view"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.3.0",
+    "date": "2026-08-16",
+    "zh": [
+      "专家会审移入右上角助理面板，聊天输入区只保留附件、命令及语音/发送状态切换",
+      "首页菜单改为文字左对齐、对勾右对齐，新建对话按钮缩小为圆形",
+      "点击我的页面头像进入沉浸式个人资料页，增加圆形大头像与顺滑放大过渡",
+      "底栏与空间、任务页分段加入滑动选中动画，图标颜色和尺度同步过渡",
+      "通知、任务及高级设置开关统一弹性动效与主题色状态"
+    ],
+    "en": [
+      "Moved expert review into the assistant panel and simplified composer attachment, command, and voice/send controls",
+      "Aligned menu labels and checks and reduced the new-conversation button to a circle",
+      "Added an immersive profile view with an enlarged avatar and smooth transitions",
+      "Added sliding selection animations to navigation and file/task segments",
+      "Unified switch spring animations and theme colors across notifications, tasks, and advanced settings"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.2.0",
+    "date": "2026-08-16",
+    "zh": [
+      "首页移除重复标题并压缩头部、筛选栏、会话行和底部导航",
+      "下拉菜单缩小字号与行高，修复按压态越过圆角形成灰色方块",
+      "搜索页改为单行返回与搜索工具栏，聊天输入器减少色块和高度",
+      "连续助手消息合并头像与名称，最近产物以小图标进入来源会话",
+      "修复新对话与新建任务图标，压缩执行中心、我的和设置页密度"
+    ],
+    "en": [
+      "Removed repeated home titles and compacted the header, filters, rows, and navigation",
+      "Compacted dropdowns and fixed pressed backgrounds extending beyond rounded corners",
+      "Simplified search to a single toolbar and reduced composer surfaces and height",
+      "Grouped consecutive assistant messages under one avatar and name; added compact source-conversation links to outputs",
+      "Fixed new-conversation and task icons and compacted Tasks, Me, and Settings"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.1.0",
+    "date": "2026-08-16",
+    "zh": [
+      "统一为 Telegram 式清爽办公界面，取消清爽办公与液态玻璃双皮肤分叉",
+      "首页搜索固定到右上角，新对话改为右下角悬浮按钮，并移除批量改名菜单",
+      "我的页面所有功能入口移除说明副标题，改为更紧凑的白色分组列表",
+      "会话列表使用低饱和字母头像，页面、弹层与底部导航统一表面和交互蓝",
+      "任务页补充执行中心标题和 Agent 状态，保留浅色、深色与跟随系统"
+    ],
+    "en": [
+      "Unified the office interface around a Telegram-inspired design, replacing the previous office/glass split",
+      "Moved search to the top right and new conversations to a floating action; removed batch renaming",
+      "Removed subtitles from Me entries in favor of compact grouped lists",
+      "Added muted initial avatars and consistent surfaces and action blue across lists, sheets, and navigation",
+      "Added the execution-center heading and Agent status, retaining light, dark, and system modes"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "2.0.0",
+    "date": "2026-08-16",
+    "zh": [
+      "全量套用 UI 2.0，统一会话、聊天、空间、任务、我的、网关、语音与全部设置页",
+      "升级浅色与深色配色，中性色承载内容，蓝、青、紫、绿、琥珀与红只表达明确语义",
+      "清爽办公使用纯净表面与轻边界；液态玻璃使用可读的半透明面板、细描边和受控光晕",
+      "聊天输入器收敛为中性工具键与唯一高亮发送键，助手正文改为内容优先文档流",
+      "统一悬浮底部导航、紧凑菜单、弹层字号、设置分隔线、图标尺寸和低饱和底板"
+    ],
+    "en": [
+      "Applied UI 2.0 across conversations, files, tasks, profiles, gateway, voice, and all settings",
+      "Updated light and dark palettes with neutral content surfaces and semantic accent colors",
+      "Office mode uses clean surfaces and light borders; glass mode uses readable translucency, thin edges, and restrained light",
+      "Simplified the composer to neutral tools and one emphasized send action, with document-style assistant replies",
+      "Unified floating navigation, compact menus, sheet typography, dividers, icon sizes, and muted surfaces"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.7.0",
+    "date": "2026-08-15",
+    "zh": [
+      "启动 UI 2.0：统一字体、字号、间距、圆角、菜单与表面层级",
+      "清爽办公减少色块、胶囊、阴影和图标底板，提升信息密度与内容主次",
+      "圆润卡片升级为液态玻璃，以柔和透光、细描边和轻阴影构建层次",
+      "重做首页筛选器、下拉菜单、会话图标、底部导航与我的页面设置列表",
+      "优化深色模式语义颜色，确保两套皮肤下标题、正文和辅助文字清晰可读"
+    ],
+    "en": [
+      "Introduced UI 2.0 typography, spacing, corners, menus, and surface hierarchy",
+      "Reduced colored blocks, pills, shadows, and icon surfaces in office mode to clarify content priority",
+      "Updated rounded cards to glass with soft translucency, thin borders, and light shadows",
+      "Redesigned filters, dropdowns, conversation icons, bottom navigation, and settings lists",
+      "Refined dark-mode semantic colors for readable headings, body text, and supporting text"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.6.1",
+    "date": "2026-08-15",
+    "zh": [
+      "语音设置新增中文转写文字，可选择简体、繁体或保持识别原文",
+      "默认统一输出简体中文，旧用户升级后无需重新设置",
+      "单条语音、连续语音、Agent STT 与手机系统识别共用繁简设置"
+    ],
+    "en": [
+      "Added Chinese transcription script options: simplified, traditional, or original",
+      "Simplified Chinese is the default without requiring existing users to reconfigure",
+      "Single voice, continuous voice, Agent STT, and phone recognition share script preferences"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.6.0",
+    "date": "2026-08-15",
+    "zh": [
+      "聊天输入框麦克风恢复为单次语音输入，识别后写入输入框或按设置自动发送",
+      "顶部波形按钮独立进入连续语音，连续语音页不再重复显示文字对话卡",
+      "语音设置新增当前 Profile 的 STT/TTS 服务商、模型、中文优先和声音管理",
+      "新增 Agent STT 录音测试、TTS 试听与明确的手机系统兜底测试"
+    ],
+    "en": [
+      "Restored single voice input in the composer, inserting recognized text or sending according to preferences",
+      "Added a separate continuous-voice entry and removed the repeated text-conversation card",
+      "Added per-profile STT/TTS providers, models, Chinese preference, and voice selection",
+      "Added Agent STT recording tests, TTS previews, and a separate phone-service test"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.5.1",
+    "date": "2026-08-15",
+    "zh": [
+      "输入框麦克风统一进入 Hermes Agent 语音对话，不再依赖手机预装语音助手",
+      "识别 Agent STT 版本不匹配，隐藏底层英文异常并给出明确修复说明",
+      "语音错误页可直达远程网关检查并更新 Hermes Agent，返回后直接重试",
+      "优化无系统语音服务时的回退提示"
+    ],
+    "en": [
+      "Connected composer voice input to Hermes Agent voice conversations without requiring a preinstalled phone assistant",
+      "Detects incompatible Agent STT versions and provides clear repair guidance",
+      "Voice error screens link directly to Agent checks and updates, then return to retry",
+      "Improved fallback guidance when no phone speech service is available"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.5.0",
+    "date": "2026-08-15",
+    "zh": [
+      "长对话首屏改为最近 60 条，支持向上按页加载更早消息",
+      "流式回复按帧合并刷新，生成结束后再渲染完整 Markdown，减少长回复卡顿",
+      "最近产物使用会话指纹增量索引，只扫描发生变化的会话",
+      "输入区新增斜杠按钮和可搜索、按类别展示的 Hermes 命令面板",
+      "新增专家会审：深度模式调用真实子 Agent，快速模式使用服务器 MoA 预设",
+      "会审只展示进度、共识、关键分歧、证据风险与最终裁决，不展示原始 AI 互聊"
+    ],
+    "en": [
+      "Long conversations initially load the latest 60 messages, with earlier pages available on scroll",
+      "Coalesced streaming updates and delayed full Markdown rendering until completion to reduce stutter",
+      "Incremental output indexing scans only changed conversations",
+      "Added a searchable, categorized Hermes command panel to the composer",
+      "Added expert review using real subagents in deep mode and server MoA presets in quick mode",
+      "Expert review shows progress, agreement, disagreements, evidence risks, and conclusions without raw inter-agent discussion"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.4.0",
+    "date": "2026-08-15",
+    "zh": [
+      "任务页升级为 Agent 执行中心，集中处理审批、澄清、运行进度与最近结果",
+      "审批与澄清通知可快速进入处理页或来源会话",
+      "新增 Agent STT/TTS、安卓回退、自动朗读、打断与连续模式的语音对话",
+      "网关页可检查 Agent 版本、安装方式和待更新提交",
+      "支持通过官方 Gateway 安全更新 Agent，并在服务重启后自动重连验证"
+    ],
+    "en": [
+      "Upgraded Tasks to an execution center for approvals, clarifications, progress, and recent results",
+      "Approval and clarification notifications link to the request or source conversation",
+      "Added voice conversations with Agent STT/TTS, Android fallback, read-aloud, interruption, and continuous mode",
+      "The gateway screen checks Agent version, installation method, and pending commits",
+      "Supports safe Agent updates through the official gateway, with automatic reconnection and verification"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.3.0",
+    "date": "2026-08-15",
+    "zh": [
+      "支持从安卓系统分享网页、文字、图片和常见文本到 Hermes",
+      "产物中心支持 Markdown、PDF、隔离 HTML 与常见文本预览",
+      "产物可复制路径、保存到手机、系统分享或返回来源消息",
+      "自动检测 Agent / Gateway 版本及服务端公布的能力",
+      "助手回复中的网页链接自动整理为参考来源卡片",
+      "修复暗色模式下聊天标题等文字显示为黑色的问题"
+    ],
+    "en": [
+      "Android sharing sends web pages, text, images, and common text files to Hermes",
+      "Output previews support Markdown, PDF, isolated HTML, and common text formats",
+      "Copy output paths, save files, share, or return to the source message",
+      "Automatically detects Agent/Gateway versions and advertised server capabilities",
+      "Collects reply links into reference cards",
+      "Fixed black conversation headings and other text in dark mode"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.2.0",
+    "date": "2026-08-15",
+    "zh": [
+      "空间新增最近产物，汇总当前 Profile 对话中生成的文件",
+      "文件与来源会话可互相跳转，并定位到对应消息",
+      "对话搜索升级为消息正文搜索，展示命中上下文",
+      "搜索结果可直接进入会话并高亮命中的消息",
+      "远程网关新增接口、登录、实时通道与能力诊断"
+    ],
+    "en": [
+      "Added recent outputs, collecting files generated in the current profile's conversations",
+      "Files and source conversations link to each other and locate the relevant message",
+      "Conversation search now searches message bodies and displays matching context",
+      "Search results open the conversation and highlight the matching message",
+      "Added gateway API, login, live-channel, and capability diagnostics"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-08-14",
+    "zh": [
+      "新增全局运行状态条，离开对话后也能查看进度并快速返回",
+      "支持执行中追加要求，以及把下一条消息排队发送",
+      "支持在对话内处理 Hermes 的操作审批与澄清问题",
+      "新增完成结果卡，集中展示本轮摘要与生成产物",
+      "系统通知可直达对应 Profile、对话或任务页面",
+      "修复附件选择器显示暂不支持的 PDF 类型，并恢复固定头像体验"
+    ],
+    "en": [
+      "Added a global running-status bar for progress and quick return outside the conversation",
+      "Supports follow-up instructions during execution and queuing the next message",
+      "Handle Hermes approvals and clarifications directly in the conversation",
+      "Added completion cards with a summary and generated outputs",
+      "System notifications open the relevant profile, conversation, or task",
+      "Fixed unsupported PDF types in attachment selection and restored consistent avatars"
+    ],
+    "source": "SettingsScreens.kt (pre-3.6.2 archive)"
+  },
+  {
+    "version": "1.0.0",
+    "date": "",
+    "zh": [
+      "远程连接自部署 Hermes Agent，管理多 Profile 与会话",
+      "支持项目空间、Markdown 编辑、图片预览与聊天产物",
+      "支持 Cron 定时任务、系统通知、语音输入和深色模式",
+      "提供模型、技能工具、审批、记忆与上下文设置"
+    ],
+    "en": [
+      "Connect remotely to self-hosted Hermes Agent and manage profiles and conversations",
+      "Project workspaces, Markdown editing, image previews, and conversation outputs",
+      "Scheduled tasks, system notifications, voice input, and dark mode",
+      "Model, skill, tool, approval, memory, and context settings"
+    ],
+    "source": "Hermes-v1.0-release-notes.md"
+  },
+  {
+    "version": "0.8.1",
+    "date": "",
+    "zh": [
+      "修复长回复跳到底部定位，合并会话筛选栏；头像裁剪实时预览与最终结果一致，修正 Profile 说明。"
+    ],
+    "en": [
+      "Fix jumping to the end of long replies, consolidate filters, synchronize avatar crop previews and correct Profile descriptions."
+    ],
+    "source": "Hermes-v0.8.1-release-notes.md"
+  },
+  {
+    "version": "0.8",
+    "date": "",
+    "zh": [
+      "保存并恢复会话草稿和发送失败附件；支持会话筛选、头像裁剪及 Profile 故障恢复。"
+    ],
+    "en": [
+      "Preserve drafts and failed-send attachments; add session filtering, avatar cropping and recovery from Profile failures."
+    ],
+    "source": "Hermes-v0.8-release-notes.md"
+  },
+  {
+    "version": "0.6.5.11",
+    "date": "",
+    "zh": [
+      "新增服务器 Profile 切换与最近选择恢复，会话、项目、设置和缓存按 Profile 隔离。"
+    ],
+    "en": [
+      "Add server Profile switching and restore the last selection; isolate sessions, projects, settings and caches by Profile."
+    ],
+    "source": "Hermes-v0.6.5.11-release-notes.md"
+  },
+  {
+    "version": "0.6.5.10",
+    "date": "",
+    "zh": [
+      "聊天图片可内联显示和全屏预览；从聊天打开文件后统一返回原对话。"
+    ],
+    "en": [
+      "Show inline chat images with fullscreen previews and return opened files to the originating conversation."
+    ],
+    "source": "Hermes-v0.6.5.10-release-notes.md"
+  },
+  {
+    "version": "0.6.5.9",
+    "date": "",
+    "zh": [
+      "Hermes 文件引用升级为可点击文档卡片，修复 Markdown 表格高度与边框对齐。"
+    ],
+    "en": [
+      "Turn Hermes file references into document cards and fix Markdown table row heights and borders."
+    ],
+    "source": "Hermes-v0.6.5.9-release-notes.md"
+  },
+  {
+    "version": "0.6.5.8",
+    "date": "",
+    "zh": [
+      "当时改用固定用户和 Hermes 头像，简化个人资料设置；后续版本恢复自定义头像。"
+    ],
+    "en": [
+      "Temporarily use fixed user and Hermes avatars and simplify profile settings; later releases restore custom avatars."
+    ],
+    "source": "Hermes-v0.6.5.8-release-notes.md"
+  },
+  {
+    "version": "0.6.5.7",
+    "date": "",
+    "zh": [
+      "修复头像导入成功但显示不更新，私有头像直接读取并验证解码结果。"
+    ],
+    "en": [
+      "Fix imported avatars not updating by reading private image files directly and validating decoding."
+    ],
+    "source": "Hermes-v0.6.5.7-release-notes.md"
+  },
+  {
+    "version": "0.6.5.6",
+    "date": "",
+    "zh": [
+      "更新系统照片选择与头像私有存储；统一返回图标并支持点击聊天文件链接。"
+    ],
+    "en": [
+      "Update system photo selection and private avatar storage; unify back icons and support chat file links."
+    ],
+    "source": "Hermes-v0.6.5.6-release-notes.md"
+  },
+  {
+    "version": "0.6.5.5",
+    "date": "",
+    "zh": [
+      "隔离头像 URI 与解码异常，避免相册权限导致闪退；增加桌面图标裁切安全边距。"
+    ],
+    "en": [
+      "Isolate avatar URI and decoding failures to prevent permission-related crashes, and increase launcher crop margins."
+    ],
+    "source": "Hermes-v0.6.5.5-release-notes.md"
+  },
+  {
+    "version": "0.6.5.4",
+    "date": "",
+    "zh": [
+      "修复 Android 16 头像授权闪退，新头像复制到应用私有目录，失效时安全回退。"
+    ],
+    "en": [
+      "Fix Android 16 avatar permission crashes, copy new avatars into private storage and fall back safely when unavailable."
+    ],
+    "source": "Hermes-v0.6.5.4-release-notes.md"
+  },
+  {
+    "version": "0.6.5.3",
+    "date": "",
+    "zh": [
+      "接入确认的浅色人物图标，适配圆形、圆角矩形及其他桌面蒙版。"
+    ],
+    "en": [
+      "Adopt the approved light character icon for circular, rounded and other launcher masks."
+    ],
+    "source": "Hermes-v0.6.5.3-release-notes.md"
+  },
+  {
+    "version": "0.6.5.2",
+    "date": "",
+    "zh": [
+      "更新棕发耳机女孩应用图标和单色轮廓，会话页使用设置中的 Hermes 头像。"
+    ],
+    "en": [
+      "Update the brown-haired headphone character icon and monochrome outline; use the configured Hermes avatar in history."
+    ],
+    "source": "Hermes-v0.6.5.2-release-notes.md"
+  },
+  {
+    "version": "0.6.5.1",
+    "date": "",
+    "zh": [
+      "调整底栏图标与未读点，优化 Hermes 名称、头像及启动窗口过渡。"
+    ],
+    "en": [
+      "Refine navigation icons and unread dots, and improve avatar, name and launch-window transitions."
+    ],
+    "source": "Hermes-v0.6.5.1-release-notes.md"
+  },
+  {
+    "version": "0.6.5",
+    "date": "",
+    "zh": [
+      "离开对话后继续生成回复，并提供完成通知和未读标记；完善独立身份资料。"
+    ],
+    "en": [
+      "Continue replies after leaving chat, add completion notifications and unread indicators, and improve independent identity profiles."
+    ],
+    "source": "Hermes-v0.6.5-release-notes.md"
+  },
+  {
+    "version": "0.6.4",
+    "date": "",
+    "zh": [
+      "接入 Hermes Light 全套图标与深色配色，更新全幅自适应人物启动图标。"
+    ],
+    "en": [
+      "Integrate the Hermes Light icon set and dark palette, and update adaptive character launcher artwork."
+    ],
+    "source": "Hermes-v0.6.4-release-notes.md"
+  },
+  {
+    "version": "0.6.3",
+    "date": "",
+    "zh": [
+      "重绘全应用语义图标，统一操作、状态、启动和通知图标。"
+    ],
+    "en": [
+      "Redraw semantic icons and unify actions, status, launcher and notification artwork."
+    ],
+    "source": "Hermes-v0.6.3-release-notes.md"
+  },
+  {
+    "version": "0.6.2",
+    "date": "",
+    "zh": [
+      "固定个人资料主卡，调整会话筛选与列表间距，集中任务页刷新和新建操作。"
+    ],
+    "en": [
+      "Keep the profile card fixed, refine history filters and spacing, and group task refresh and create actions."
+    ],
+    "source": "Hermes-v0.6.2-release-notes.md"
+  },
+  {
+    "version": "0.6.1",
+    "date": "",
+    "zh": [
+      "拉开深色页面层级，采用实体圆润卡片；完善设置开关、用户身份和 Markdown 表格。"
+    ],
+    "en": [
+      "Improve dark-mode hierarchy with solid rounded cards; refine settings switches, user identity and Markdown tables."
+    ],
+    "source": "Hermes-v0.6.1-release-notes.md"
+  },
+  {
+    "version": "0.6.0",
+    "date": "",
+    "zh": [
+      "统一办公与玻璃两套界面的层级、间距及输入体验，整理主要页面和底部导航。"
+    ],
+    "en": [
+      "Unify Office and Glass hierarchy, spacing and inputs, and reorganize core pages and bottom navigation."
+    ],
+    "source": "Hermes-v0.6.0-release-notes.md"
+  },
+  {
+    "version": "0.5.1",
+    "date": "",
+    "zh": [
+      "改善实时连接保活和断线恢复，不重复提交消息，并保留已接收回复与恢复状态。"
+    ],
+    "en": [
+      "Improve connection keepalives and recovery without resending messages; preserve partial replies and show recovery status."
+    ],
+    "source": "Hermes-v0.5.1-release-notes.md"
+  }
+]

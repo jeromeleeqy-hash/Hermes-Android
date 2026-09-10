@@ -1,0 +1,19 @@
+{
+  "selection": {
+    "launcher": "launcher-selected.png",
+    "hermes_avatar": "hermes-avatar-selected.png",
+    "default_user_avatar": "user-avatar-default.png"
+  },
+  "original_sha256": {
+    "user-avatar-default.png": "e02c0f938972cc6018438cbdb3440d7bbf76a6389206a4b2dc77ca4d29a5d6a6",
+    "launcher-selected.png": "dc725eb65a662abeab207571d6f73a5075687fa2df51ae7a2cda3a285edcddae",
+    "hermes-avatar-selected.png": "960c0d1f9c91aeca58c2607d4cc689e37b22ddc2a81f199bb1db826a1475d28c"
+  },
+  "export": "tools/export_brand_assets.py",
+  "notes": [
+    "Selected source artwork is preserved without redesign.",
+    "Custom user and Hermes avatar paths are not changed.",
+    "Android adaptive foreground uses a 13% inset; the system supplies its mask.",
+    "Home and conversation animations are unchanged."
+  ]
+}

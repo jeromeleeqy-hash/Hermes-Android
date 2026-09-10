@@ -6,8 +6,15 @@ import com.qingyu.hermescompanion.notification.HermesNotifications
 import com.qingyu.hermescompanion.storage.SecureConfigStore
 
 class HermesCompanionApplication : Application() {
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        com.qingyu.hermescompanion.i18n.AppLanguage.refresh(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        runCatching { com.qingyu.hermescompanion.appearance.LauncherIconController(this).reconcile() }
+        com.qingyu.hermescompanion.i18n.AppLanguage.refresh(this)
         CrashDiagnostics.install(this)
         val preferences = SecureConfigStore(this).readNotificationPreferences()
         // Notification setup should never keep the core client from opening on an OEM device.
