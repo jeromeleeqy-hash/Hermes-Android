@@ -1,0 +1,86 @@
+name: Publish Hermes v3.6.5 source
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v3.6.5-source.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-hermes-v3.6.5
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out publication commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish verified source snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_commit=90751f6517cbef3929b086c9acdb05616c5cca99
+          workflow=.github/workflows/publish-v3.6.5-source.yml
+          git merge-base --is-ancestor "$base_commit" HEAD
+          test "$(git diff --name-only "$base_commit" HEAD)" = "$workflow"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$(git rev-parse HEAD)"
+          test -z "$(git ls-remote origin refs/tags/v3.6.5)"
+
+          release_id="$(gh api "repos/$GH_REPO/releases" --paginate --jq '[.[] | select(.draft == true and .tag_name == "v3.6.5")] | if length == 1 then .[0].id else error("Expected exactly one matching release draft") end')"
+          source_id="$(gh api "repos/$GH_REPO/releases/$release_id/assets" --jq '[.[] | select(.name == "Hermes-3.6.5-source.zip")] | if length == 1 then .[0].id else error("Expected exactly one source asset") end')"
+          apk_id="$(gh api "repos/$GH_REPO/releases/$release_id/assets" --jq '[.[] | select(.name == "Hermes-3.6.5.apk")] | if length == 1 then .[0].id else error("Expected exactly one APK asset") end')"
+          archive="$RUNNER_TEMP/hermes-3.6.5-source.zip"
+          apk="$RUNNER_TEMP/Hermes-3.6.5.apk"
+          gh api --method GET -H 'Accept: application/octet-stream' "repos/$GH_REPO/releases/assets/$source_id" > "$archive"
+          gh api --method GET -H 'Accept: application/octet-stream' "repos/$GH_REPO/releases/assets/$apk_id" > "$apk"
+          echo "6f97c99c35ffd24987880c86b310b8c1fc7b7404c7ca1deaed3b5d7d7ad54bc6  $archive" | sha256sum --check
+          echo "05be0dee3862c1e6a390aac0688189a1dfa8d45dd447a7db5d2b870c6d14bcbb  $apk" | sha256sum --check
+
+          python3 - <<'PY'
+          import os, pathlib, stat, subprocess, zipfile
+          archive = pathlib.Path(os.environ['RUNNER_TEMP']) / 'hermes-3.6.5-source.zip'
+          prefix = 'hermes-assistant/'
+          with zipfile.ZipFile(archive) as z:
+              members = [i for i in z.infolist() if not i.is_dir()]
+              assert len(members) == 1366 and z.testzip() is None
+              paths = []
+              for member in members:
+                  assert member.filename.startswith(prefix)
+                  p = pathlib.PurePosixPath(member.filename[len(prefix):])
+                  assert p.parts and not p.is_absolute() and '..' not in p.parts
+                  assert not set(p.parts) & {'.git', '.github', 'signing', '.gradle', 'build'}
+                  assert p.name != 'local.properties' and p.suffix not in {'.jks', '.keystore', '.apk'}
+                  assert not stat.S_ISLNK(member.external_attr >> 16)
+                  paths.append(p.as_posix())
+              assert len(set(paths)) == len(paths)
+              original = set(subprocess.check_output(['git','ls-tree','-r','--name-only','90751f6517cbef3929b086c9acdb05616c5cca99'], text=True).splitlines())
+              assert original <= set(paths), 'Source snapshot must preserve existing repository files: ' + repr(sorted(original - set(paths)))
+              gradle = z.read(prefix + 'app/build.gradle.kts').decode()
+              assert 'versionCode = 365' in gradle and 'versionName = "3.6.5"' in gradle
+              chat = z.read(prefix + 'app/src/main/java/com/qingyu/hermescompanion/ui/screen/ChatScreen.kt').decode()
+              assert 'ChatOverflowMenu' in chat
+              for member, name in zip(members, paths):
+                  target = pathlib.Path(name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(z.read(member))
+              pathlib.Path('gradlew').chmod(0o755)
+              pathlib.Path('.github/workflows/publish-v3.6.5-source.yml').unlink()
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release Hermes Android v3.6.5 with compact conversation menus'
+          git tag v3.6.5
+          git push --atomic origin HEAD:main refs/tags/v3.6.5
+          echo 'Published verified 3.6.5 source and matching release tag. APK and source SHA-256 checks passed.' >> "$GITHUB_STEP_SUMMARY"
