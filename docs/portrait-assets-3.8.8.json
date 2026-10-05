@@ -1,0 +1,56 @@
+[
+  {
+    "source": "1.mp4",
+    "sourceSha256": "6060f1e4c38e2af4aceb968cb6411a443a71257e5e0c1b6eac46d66776a15cff",
+    "asset": "home_portrait_breathe.webp",
+    "bytes": 2344606,
+    "durationMs": 4800,
+    "frames": 90,
+    "timelineFrames": 96
+  },
+  {
+    "source": "2.mp4",
+    "sourceSha256": "6beac0fefd700a0443cdcd05cdf11f71911ad25cc54d7fb97529744125250cbe",
+    "asset": "home_portrait_greet.webp",
+    "bytes": 2889924,
+    "durationMs": 5550,
+    "frames": 110,
+    "timelineFrames": 111
+  },
+  {
+    "source": "3.mp4",
+    "sourceSha256": "e05c155902db13883880c77393956f9ef4bb511b3f8fafe5bc025fb957d2018c",
+    "asset": "home_portrait_listen.webp",
+    "bytes": 2814546,
+    "durationMs": 5500,
+    "frames": 109,
+    "timelineFrames": 110
+  },
+  {
+    "source": "5.mp4",
+    "sourceSha256": "a83f50bbc70d516d72ff7fef05c2c18c439d0b9c1a74360e04a2ebc00076267d",
+    "asset": "home_portrait_think.webp",
+    "bytes": 2849472,
+    "durationMs": 5550,
+    "frames": 110,
+    "timelineFrames": 111
+  },
+  {
+    "source": "6.mp4",
+    "sourceSha256": "639412bdb245e2c47a6bb3304dcddbbbefc7beaa0e9524be4ec763d1be9d8650",
+    "asset": "home_portrait_nod.webp",
+    "bytes": 2651048,
+    "durationMs": 5050,
+    "frames": 100,
+    "timelineFrames": 101
+  },
+  {
+    "source": "7.mp4",
+    "sourceSha256": "eebcaceb927269f2100437b69f21e6172d5f7d0e6735c017d8e2fbe7103abebd",
+    "asset": "home_portrait_wink.webp",
+    "bytes": 2869278,
+    "durationMs": 5450,
+    "frames": 108,
+    "timelineFrames": 109
+  }
+]

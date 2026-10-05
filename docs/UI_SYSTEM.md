@@ -1,4 +1,4 @@
-> 历史规范：当前 UI 以 `UI-3.6.0.md` 和 `RELEASE-3.6.0.md` 为准。
+> 历史规范：当前 UI 以 `UI-3.6.0.md` 和 `archive/release-notes/RELEASE-3.6.0.md` 为准。
 
 # Hermes Android 界面视觉系统
 

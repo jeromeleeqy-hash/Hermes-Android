@@ -6,24 +6,27 @@ Hermes Android 是连接个人自部署 Hermes Gateway 的原生 Android 客户�
 
 当前交付基线：
 
-- 版本：`3.0.0-release`（Debug 构建会追加 `-debug`）
-- `versionCode`：`300`
+- 版本：`3.8.8`（默认 Debug 构建追加 `-debug`）
+- `versionCode`：`388`
+- 交付 APK applicationId：`com.qingyu.hermescompanion.preview`（`hermesPreview=true`）
+- 默认 Release applicationId：`com.qingyu.hermescompanion`
 - Debug applicationId：`com.qingyu.hermescompanion.debug`
 - namespace：`com.qingyu.hermescompanion`
 - minSdk：26
 - targetSdk / compileSdk：36
-- Java / JVM：17
+- 构建与 JVM 测试：JDK 21；编译目标：Java 17
 - UI：Jetpack Compose + Material 3
 - 网络：OkHttp 4.12，HTTP JSON + WebSocket
 
 ## 2. 构建环境
 
-推荐使用 Android Studio 与 JDK 17，安装 Android SDK 36。工程使用 Gradle Wrapper，首次构建需要访问 Google Maven 与 Maven Central。
+使用 Android Studio 与 JDK 21，安装 Android SDK 36 和 Build Tools 36.0.0。工程固定使用 Gradle 8.13、AGP 8.13.2、Kotlin 2.3.20；Wrapper 和依赖首次下载需要可访问相应官方仓库。玻璃外观依赖的 JVM 测试需要 JDK 21。
 
 命令行验证：
 
 ```bash
-./gradlew clean testDebugUnitTest assembleDebug
+./gradlew testDebugUnitTest lintRelease assembleDebug
+python3 -m unittest discover -s tests -v
 ```
 
 生成 APK：
@@ -32,9 +35,19 @@ Hermes Android 是连接个人自部署 Hermes Gateway 的原生 Android 客户�
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Debug 包启用 R8、关闭资源裁剪，并使用工程内固定开发签名，目的是维持单 DEX 与历史 Debug 版本的覆盖安装兼容性。不要随意更换 `signing/hermes-debug.keystore`，否则已安装设备无法直接覆盖升级。
+Debug 和 Release 均启用 R8、关闭资源裁剪。源码不包含签名密钥；没有指定密钥时，Debug 使用 Android 默认 Debug 签名，Release 产出未签名包。
 
-Release 构建当前没有配置正式发布签名。准备公开分发前必须另行创建并离线保存正式密钥，不应把正式密钥和密码提交到源码。
+维护者构建与已交付 APK 兼容的升级包：
+
+```bash
+./gradlew testDebugUnitTest lintRelease assembleRelease \
+  -PhermesPreview=true \
+  -PhermesSigningFile=/absolute/path/hermes-preview.keystore
+```
+
+Release 输出为 `app/build/outputs/apk/release/app-release.apk`。`hermesPreview=true` 在 Release 中仅沿用已安装应用的包名，不添加 Preview 名称或版本后缀。必须使用原密钥才能覆盖已有安装。
+
+当前 Gradle 签名配置沿用原开发密钥的别名和口令约定；`hermesSigningFile` 只指定文件路径。自行发布时用自己的签名配置或 Android Studio 签名流程，不要假定任意密钥只换路径就能使用。密钥和口令不得提交到仓库。
 
 ## 3. 工程目录
 
@@ -54,7 +67,7 @@ app/src/main/java/com/qingyu/hermescompanion/
     ├── component/                    图标、头像、Markdown、编辑器等组件
     ├── screen/                       各业务页面
     ├── format/                       时间与标题格式化
-    └── theme/                        明暗主题、两套皮肤和字体
+    └── theme/                        明暗主题、三套皮肤和字体
 ```
 
 资源与文档：
@@ -62,7 +75,9 @@ app/src/main/java/com/qingyu/hermescompanion/
 - `app/src/main/res/`：图标、默认头像、启动主题、颜色与系统资源。
 - `tools/`：图标生成和 APK 辅助脚本。
 - `docs/`：产品、界面、图标、网关和交接文档。
-- `signing/`：仅用于开发覆盖安装的固定 Debug 签名。
+- `signing/`：本机可选的签名输入目录，密钥被 Git 忽略，不随源码分发。
+- `today/` 与 `assistant/`：首页数据、操作回执、同步策略与提示词。
+- `app/src/main/assets/`：操作指南、更新历史、首页协议、writer 和 Cron 模板。
 
 ## 4. 应用架构
 
@@ -119,6 +134,14 @@ Screen 用户操作
 - Cron 使用系统 Receiver 在开机、应用升级和计划触发时恢复补偿检查。
 - 当前没有接入厂商云推送；应用进程被系统完全终止时，实时对话完成通知能力受 Android 后台限制。
 
+### 4.7 首页与自动任务
+
+- `HomeMode.kt` 管理简洁首页与深度助理模式，选择保存在本机。简洁模式不被动轮询概览，已发起任务的结果核对仍继续。
+- `today/` 从当前 Profile 工作区读取概览，支持加密缓存、旧路径兼容、操作编号和写回回执。当前收纳目录为 `.hermes-app/today/`。
+- 卡片关联对话完成或恢复后，按事项、Profile 和工作区合并同步请求；由实际写入结果驱动首页变化，不把普通讨论视为事项完成。派发前的队列只在内存中，进程被终止后可手动刷新核对。
+- `AppTaskConversations.kt` 区分主动聊天与 App 自动任务。手机列表过滤不等于删除服务器或 PC 对话。
+- `HomePortraitPlayback.kt` 和 `HomePortraitCarousel.kt` 管理紧凑首页人物的轮播、点按回应与生命周期。减少动态效果、Android 8 和解码失败使用静态后备图；不调用 Agent。
+
 ## 5. 关键网关接口
 
 实际字段兼容逻辑集中在 `HermesApiClient.kt`，页面不得自行拼接接口。当前主要接口族包括：
@@ -138,15 +161,15 @@ Screen 用户操作
 
 ## 6. UI 与资源约束
 
-- 两套皮肤共享同一信息结构：清爽办公、液态玻璃。
-- 液态玻璃使用可降级的半透明表面；所有文字必须达到与清爽办公相同的可读性，长列表和正文仍保持平铺。
+- 三套皮肤：温暖灵动、液态玻璃、安静耐看；每套保留对应材质、控件和首页布局。首页模式与皮肤选择相互独立。
+- 液态玻璃支持材质降级；三套外观均需验证文字可读性、长列表和大字号布局。
 - 所有业务图标通过 `HermesIconKind` 和 `HermesMulticolorIcon` 使用 Hermes Light 资源。
 - 返回箭头使用中性灰单色；不要重新引入灰蓝拼色或 Material 默认图标。
 - 深色模式必须使用语义色和 `values-night` 资源，禁止硬编码浅色文字/分割线颜色。
 - 用户与 Hermes 可分别选择头像；选择后由 `AvatarStorage` 缩放并复制到 `filesDir/avatars`，UI 只读取该私有目录中的文件。系统相册 URI 不进入长期配置。
 - Compose 的 `painterResource` 只加载位图或 VectorDrawable，不可直接加载 `layer-list` 等 LayerDrawable。
 
-完整规范见 `UI_SYSTEM.md` 和 `ICON_SYSTEM.md`。
+历史视觉规范见 `UI_SYSTEM.md` 和 `ICON_SYSTEM.md`；当前行为及渲染示例以本版发布说明、`docs/design-3.8.8/` 和测试为准。
 
 ## 7. 稳定性保护项
 
@@ -169,6 +192,10 @@ Screen 用户操作
 - 流式恢复和中止后的状态整理
 - Markdown 文档与图片链接解析
 - 会话标题和时间格式化
+- 卡片对话自动同步、审批核对、Profile 与工作区隔离
+- 简洁/深度首页、三套外观、大字号与动画生命周期
+
+3.8.8 已通过 505 项 Android/JVM/Robolectric 测试和 17 项 Python 测试，以及 `lintRelease`、`assembleRelease`。详见 [本版验证记录](VALIDATION-3.8.8.md)；这些检查不等同于真实网关和手机验收。
 
 执行：
 
@@ -198,10 +225,14 @@ Screen 用户操作
 ## 9. 版本与交付流程
 
 1. 修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`。
-2. 更新根目录 `CHANGELOG.md`、`README.md` 和对应 release notes。
+2. 更新 `app/src/main/assets/release-history.json`，运行 `python3 tools/export_release_history.py` 生成中英文日志；更新 `README.md`、文档索引和本版 release notes。
 3. 执行完整构建和测试。
 4. 检查 APK applicationId、版本号、签名、zipalign 和 DEX 数量。
 5. 生成不包含 `.gradle/`、`.kotlin/`、`build/`、`local.properties` 的源码包。
 6. 将 APK、源码、开发文档与完整交接包保存为同一版本号。
+
+仅当前版发布说明留在 `docs/RELEASE-<version>.md`；旧版移到 `docs/archive/release-notes/`，同步修正引用及归档索引。验证报告与截图保留原位置。文档整理不需要提高 App 版本号或重新构建未改变的 APK。
+
+源码同步 GitHub 与 APK 发布是独立步骤。更新 OSS 时先上传并确认 APK 可下载，再替换 `android-latest.json`，避免手机先看到一个尚不可下载的新版本；字段与校验规则见 [更新协议](APP-UPDATE-CONTRACT.md)。
 
 如需正式上架，再补充正式签名、隐私政策、崩溃监控、混淆映射保管和商店素材，不要直接把 Debug 包作为生产发布包。

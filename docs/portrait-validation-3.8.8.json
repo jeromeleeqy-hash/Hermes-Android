@@ -1,0 +1,56 @@
+[
+  {
+    "asset": "home_portrait_breathe.webp",
+    "frames": 90,
+    "durationMs": 4800,
+    "transparentCorners": true,
+    "movingFrames": 89,
+    "firstLastVisibleMeanDifference": 1.7734,
+    "firstLastAlphaDifference": 0.0
+  },
+  {
+    "asset": "home_portrait_greet.webp",
+    "frames": 110,
+    "durationMs": 5550,
+    "transparentCorners": true,
+    "movingFrames": 109,
+    "firstLastVisibleMeanDifference": 1.7734,
+    "firstLastAlphaDifference": 0.0
+  },
+  {
+    "asset": "home_portrait_listen.webp",
+    "frames": 109,
+    "durationMs": 5500,
+    "transparentCorners": true,
+    "movingFrames": 107,
+    "firstLastVisibleMeanDifference": 0.0,
+    "firstLastAlphaDifference": 0.0
+  },
+  {
+    "asset": "home_portrait_nod.webp",
+    "frames": 100,
+    "durationMs": 5050,
+    "transparentCorners": true,
+    "movingFrames": 99,
+    "firstLastVisibleMeanDifference": 1.7734,
+    "firstLastAlphaDifference": 0.0
+  },
+  {
+    "asset": "home_portrait_think.webp",
+    "frames": 110,
+    "durationMs": 5550,
+    "transparentCorners": true,
+    "movingFrames": 109,
+    "firstLastVisibleMeanDifference": 1.7734,
+    "firstLastAlphaDifference": 0.0
+  },
+  {
+    "asset": "home_portrait_wink.webp",
+    "frames": 108,
+    "durationMs": 5450,
+    "transparentCorners": true,
+    "movingFrames": 106,
+    "firstLastVisibleMeanDifference": 0.0,
+    "firstLastAlphaDifference": 0.0
+  }
+]

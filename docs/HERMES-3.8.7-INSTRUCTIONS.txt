@@ -1,0 +1,54 @@
+Hermes Android 3.8.7 · 安装与使用
+
+一、安装
+直接覆盖安装 Hermes-Android-3.8.7-release.apk，不用卸载。
+版本 3.8.7 / 387，沿用 com.qingyu.hermescompanion.preview 和原签名，保留连接与本地设置。
+
+二、本次更新
+1. 从事项卡片进入聊天，告诉 Hermes 最新变化；本轮结束后 App 自动核对并同步首页，不用再手动刷新。卡片按钮操作完成、断线恢复后也会自动读取结果。
+2. 连续更新会合并处理。普通讨论不会被标为任务完成；结果未确认时仍保留原卡片，可点“查看处理”。自动同步需要网络和 Agent，稍候完成。
+3. 事项聊天先简短回应，按需展开；提示明确区分事实、推测和建议，减少冗长、训导式的纠错口吻。
+4. 回看中长按对话 → 重命名 → 输入名称 → 保存。最长 120 个字符，不让 AI 改写名字。
+5. 首页标题、数量、更新时间与刷新按钮重新整理。成功后自动收起处理提示，处理中和失败时保留入口。
+
+从升级后的卡片入口开始新对话即可使用新的提示与关联。旧的未关联聊天仍可手动刷新首页，或从卡片重新进入。
+自动整理与 Cron 对话不出现在手机主动聊天列表；在“任务”中可查看记录，PC 端记录仍保留。
+后台时暂缓发起新同步，回到前台继续。如果在同步尚未开始时强制结束 App，重新打开后可点首页刷新核对进展。
+
+三、原配置继续使用
+首页齿轮仍可切换“简洁首页 / 深度助理”，三套外观均保留。
+早晚整理、持久首页规则和文件收纳不用重做，本版保持 3.8.4 的协议、writer 和 Cron 模板。
+
+.hermes-app/today/hermes-today.json
+.hermes-app/today/.hermes-today.lock
+.hermes-app/today/snapshots/
+
+四、上传 OSS
+Bucket：hermes-app-releases-jerome
+目录：releases/
+
+1. 先上传 Hermes-Android-3.8.7-release.apk，保留文件名。
+2. 确认可下载：https://download.leaier.com/releases/Hermes-Android-3.8.7-release.apk
+3. 再上传并覆盖 android-latest.json（versionName=3.8.7，versionCode=387）。
+如果下载的 JSON 文件名带数字后缀，请上传时改回 android-latest.json。
+4. 元数据地址：https://download.leaier.com/releases/android-latest.json
+5. 手机“我的 → 设置 → 软件更新 → 检查更新”。
+
+android-latest.json：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+
+APK：
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=31536000, immutable
+
+JSON 的大小和 SHA-256 来自实际 APK。只上传 APK 和 JSON，不上传源码或密钥。保留旧 APK；若新 APK 地址不能下载，先解决访问问题再覆盖 JSON。
+
+五、安装后核对
+1. 深度助理首页打开一个事项，说明真实进展，等待 Hermes 完成本轮；返回首页检查自动更新。
+2. 只讨论方案时，事项不应自动变为完成。需要授权时“查看处理”仍可打开。
+3. 更新成功后，首页不再常驻成功说明或“查看处理”。
+4. 在回看中手动改名，重新打开对话确认名称保留；空白名称不能保存。
+5. 三套外观切换、简洁首页、现有聊天和早晚任务继续正常使用。
+
+构建环境及模拟网关已验证；实际 Agent 的回复、写回耗时和手机后台行为请安装后核对。

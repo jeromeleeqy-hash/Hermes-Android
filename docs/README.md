@@ -1,22 +1,39 @@
-# Hermes Android 开发文档索引
+# Hermes Android 文档中心
 
-当前交付版本：`3.8.6 (386)`。先阅读本版更新、验证与使用说明；较早的架构和产品文档保留为历史背景，涉及版本行为时以当前代码和本版说明为准。
+当前版本 **3.8.8（388）**。使用者从快速开始阅读，开发者从开发指南阅读；历史文档描述当时的设计，不代表全部当前行为。
 
-| 文档 | 用途 |
+## 开始使用
+
+| 文档 | 内容 |
 | --- | --- |
-| [RELEASE-3.8.6.md](RELEASE-3.8.6.md) | 简洁首页 / 深度助理切换、旧版首页恢复与升级默认值 |
-| [VALIDATION-3.8.6.md](VALIDATION-3.8.6.md) | 两种模式、任务保留、三套外观与发布构建验证 |
-| [HERMES-3.8.6-INSTRUCTIONS.txt](HERMES-3.8.6-INSTRUCTIONS.txt) | 覆盖安装、首页切换与 OSS 上传 |
-| [RELEASE-3.8.5.md](RELEASE-3.8.5.md) | 授权核对与蓝字对齐修复、齿轮首页设置与首次配置说明 |
-| [VALIDATION-3.8.5.md](VALIDATION-3.8.5.md) | 本版实际测试、签名构建结果及尚待真机验证的范围 |
-| [HERMES-3.8.5-INSTRUCTIONS.txt](HERMES-3.8.5-INSTRUCTIONS.txt) | 覆盖安装、一次性迁移、验收和 OSS 上传 |
-| [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) | 工程架构、构建环境、关键数据流、签名、测试与发布流程 |
-| [HANDOFF_STATUS.md](HANDOFF_STATUS.md) | 当前实现状态、稳定性约束、已知边界和后续接手建议 |
-| [PRODUCT_PLAN.md](PRODUCT_PLAN.md) | 产品定位、页面能力、验收基线与路线规划 |
-| [UI_SYSTEM.md](UI_SYSTEM.md) | 统一界面、排版、尺寸、颜色和页面层级规范 |
-| [ICON_SYSTEM.md](ICON_SYSTEM.md) | Hermes Light 图标语言、语义色和工程入口 |
-| [SERVER_SETUP.md](SERVER_SETUP.md) | 远程网关、HTTPS、反向代理及故障排查 |
-| 根目录 [README.md](../README.md) | 面向使用者和开发者的功能总览、连接说明与构建入口 |
-| 根目录 [CHANGELOG.md](../CHANGELOG.md) | 2.0 与 3.0 两个主要版本节点的关键更新汇总 |
+| [项目介绍](../README.md) | 当前功能、两种首页、界面示例与安装入口 |
+| [快速开始](QUICK-START.md) | 首次连接、首页配置与常见问题 |
+| [English quick start](QUICK-START-EN.md) | Installation, connection and optional Home setup |
+| [远程网关接入](SERVER_SETUP.md) | 地址、HTTPS、反向代理及连接排查 |
+| [常用操作指南](OPERATION-GUIDE.md) | 聊天、语音、项目和文件；最新分步说明也可在 App 内查看 |
 
-首次接手建议依次阅读：`HANDOFF_STATUS` → `DEVELOPMENT_GUIDE` → `SERVER_SETUP` → `UI_SYSTEM`。
+## 当前版本
+
+| 文档 | 内容 |
+| --- | --- |
+| [3.8.8 更新说明](RELEASE-3.8.8.md) | 首页头胸部人物、自然轮播与点按互动 |
+| [3.8.8 验证记录](VALIDATION-3.8.8.md) | 测试、素材、生命周期、外观及发布包检查 |
+| [安装与维护说明](HERMES-3.8.8-INSTRUCTIONS.txt) | 覆盖安装、体验检查和 OSS 上传 |
+| [中文更新日志](../CHANGELOG.md) / [English](../CHANGELOG.en.md) | 按版本倒序汇总功能变化 |
+| [历史发布说明](archive/release-notes/README.md) | 旧版独立 release notes，集中归档并按版本索引 |
+
+## 开发与维护
+
+| 文档 | 内容 |
+| --- | --- |
+| [开发指南](DEVELOPMENT_GUIDE.md) | 构建、目录、关键流程、签名、测试和发布 |
+| [软件更新协议](APP-UPDATE-CONTRACT.md) | APK 更新元数据、验证和下载流程 |
+| [首页数据协议](../app/src/main/assets/hermes-today-contract.md) | 当前 JSON、写入回执与并发规则 |
+| [首页写入脚本](../app/src/main/assets/hermes-today-writer.py) | 服务器工作区内的概览写入与校验 |
+| [人物资源清单](portrait-assets-3.8.8.json) | 本版动画尺寸、时长、来源及校验值 |
+
+## 历史设计资料
+
+[产品规划](PRODUCT_PLAN.md)、[旧交接记录](HANDOFF_STATUS.md)、[交互卡片设计](INTERACTIVE-CARDS-DESIGN.md)、[界面规范](UI_SYSTEM.md)、[图标规范](ICON_SYSTEM.md) 用于了解演进背景。具体交付范围以当前代码、当前更新说明和验证记录为准。
+
+旧版验证报告、安装说明和界面截图继续保留在原位置，便于从归档发布说明回查；Git 历史也完整保留。
