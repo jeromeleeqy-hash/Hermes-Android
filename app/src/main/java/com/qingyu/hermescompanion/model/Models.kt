@@ -302,6 +302,9 @@ data class AgentRequest(
     val allowSession: Boolean = true,
     val allowPermanent: Boolean = false,
     val isResponding: Boolean = false,
+    val profile: String = "",
+    val serverRequestId: String = "",
+    val questionId: String = "",
 )
 
 data class QueuedRunMessage(
@@ -522,7 +525,7 @@ sealed interface StreamEvent {
     data class ToolProgress(val name: String, val preview: String) : StreamEvent
     data class ToolFailed(val name: String, val preview: String) : StreamEvent
     data class AgentRequestPending(val request: AgentRequest) : StreamEvent
-    data class AgentRequestExpired(val requestId: String) : StreamEvent
+    data class AgentRequestExpired(val requestId: String, val reason: String = "") : StreamEvent
     data class ConnectionInterrupted(val message: String) : StreamEvent
     data class Error(val message: String) : StreamEvent
     data object Completed : StreamEvent
