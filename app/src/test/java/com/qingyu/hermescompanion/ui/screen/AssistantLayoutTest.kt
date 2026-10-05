@@ -103,7 +103,7 @@ class AssistantLayoutTest {
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT, SkinMode.CLEAN) {
             DecisionCard(request.copy(choices=(1..12).map {AgentRequestChoice("选项 $it：保留完整的说明和阅读空间","$it")}),{_,value->reply=value})
         } }
-        compose.onNodeWithText("看看建议").performClick()
+        compose.onNodeWithText("查看并确认").performClick()
         compose.onNodeWithText("确认并继续").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("选项 12：保留完整的说明和阅读空间").performScrollTo().performClick()
         compose.onNodeWithText("确认并继续").assertIsDisplayed().assertIsEnabled()
@@ -260,6 +260,8 @@ class AssistantLayoutTest {
         compose.onNodeWithText("任务").assertIsDisplayed()
     }
 
+    // The test deliberately places content behind the dock to verify its occlusion.
+    @android.annotation.SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @Test fun navigationBlocksAllContentBelowItsTopIncludingSystemGestureInset() {
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
             Scaffold(modifier=Modifier.fillMaxSize().testTag("occlusion_root"),
@@ -321,7 +323,7 @@ class AssistantLayoutTest {
         compose.onNodeWithText("/help").assertIsDisplayed().performClick()
         assertEquals(1,loads);assertEquals("/help",draft)
     }
-    @Test fun workspacePickerRoutesRecentAndProjectFilesToAttachmentActions() {
+    @Test fun workspacePickerOpensFilesDirectlyAndRoutesSelectionToAttachmentActions() {
         var recent=0;var files=0;var previews=0;var cancelled=false
         val artifact=RecentArtifact("default","source","九月运营汇报","m","/work/日报.md","日报.md","Markdown")
         val preview=state.copy(route=AppRoute.WORKSPACE,workspaceAttachmentTarget=session,selectedSession=session,
@@ -334,8 +336,9 @@ class AssistantLayoutTest {
         compose.onNodeWithText("切换项目").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回来源对话").assertDoesNotExist()
         capture("workspace-picker")
-        compose.onNodeWithText("日报.md").performClick();assertEquals(1,recent)
-        compose.onNodeWithText("项目文件").performClick()
+        compose.onNodeWithText("日报.md").assertDoesNotExist()
+        compose.onNodeWithText("最近产物").assertDoesNotExist()
+        assertEquals(0,recent)
         compose.onNodeWithText("运营数据.xlsx").performClick();assertEquals(1,files)
         assertEquals(0,previews)
         compose.onNodeWithText("取消").performClick();assertTrue(cancelled)

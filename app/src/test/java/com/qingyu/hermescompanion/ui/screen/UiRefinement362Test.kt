@@ -113,6 +113,7 @@ class UiRefinement362Test {
         compose.onNodeWithTag("release_history").performScrollToNode(hasTestTag("release_3.3.0-preview"))
         compose.onNodeWithTag("release_3.3.0-preview").assertIsDisplayed()
         compose.onNodeWithText("Version 3.3.0-preview").performClick()
+        compose.onNodeWithTag("release_history").performScrollToNode(hasText("Collaboration used a separate service.", substring = true))
         compose.onNodeWithText("Collaboration used a separate service.", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("release_history").performScrollToNode(hasTestTag("release_0.5.1"))
         compose.onNodeWithTag("release_0.5.1").assertIsDisplayed()

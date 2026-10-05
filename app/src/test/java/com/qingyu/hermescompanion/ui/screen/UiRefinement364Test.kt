@@ -114,6 +114,8 @@ class UiRefinement364Test {
         compose.onNodeWithTag("launcher_icon_SPRITE").assertIsNotEnabled()
     }
 
+    // The test deliberately ignores padding so the dock must cover opaque content.
+    @android.annotation.SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @Test fun lowerDockCornersExposeTheSameSceneWithOpaqueContentBehindThem() {
         var dark by mutableStateOf(false)
         var whiteContent by mutableStateOf(true)
