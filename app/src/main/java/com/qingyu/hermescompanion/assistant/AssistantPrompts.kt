@@ -13,6 +13,15 @@ object AssistantPrompts {
     fun envelope(prompt: String, context: String): String = if (context.isBlank()) prompt else
         prompt + WIRE_START + context.length + " -->\n" + context + WIRE_END
     fun visibleText(value: String): String {
+        var result = value
+        repeat(12) {
+            val next = removeOneEnvelope(result)
+            if (next == result) return result
+            result = next
+        }
+        return result
+    }
+    private fun removeOneEnvelope(value: String): String {
         val start = value.indexOf(WIRE_START)
         if (start < 0) return value
         val headerEnd = value.indexOf(" -->\n", start + WIRE_START.length)
@@ -39,7 +48,7 @@ object AssistantPrompts {
     fun brief(scope: AssistantScope, records: List<AssistantRecord>, mode: String): String {
         val instruction = when (mode) {
             "today" -> uiText(R.string.ui_0007, "帮我安排今天。结合近期重点和已确认计划，先问清缺少的会议时间、可用时间或硬约束。给出最多三项重点、各自下一步与建议时间块，并说明今天可以暂缓什么。生活安排与工作安排可以一起考虑。不要编造日历或业务数据；先给草案，不创建任务或提醒。")
-            "week" -> uiText(R.string.ui_0008, "和我梳理本周计划。围绕当前业务目标、AI 短视频内容生产、私域获客以及我明确提到的生活安排，识别关键成果、待拍板事项和依赖。先指出资料不足之处；输出可讨论的周计划草案，不自动拆待办。")
+            "week" -> uiText(R.string.ui_0008, "和我梳理本周计划。围绕我明确表达的近期重点、工作目标、学习和生活安排，识别关键成果、待拍板事项和依赖。先指出资料不足之处；输出可讨论的周计划草案，不自动拆待办。")
             "review" -> uiText(R.string.ui_0009, "帮我做一次简短复盘。先核实哪些工作真正完成、哪些只是讨论或已交给团队。对照计划列出实际结果、卡点、一个可调整的动作，并问我是否更新下一次计划。没有数据就明确未知。")
             "handoff" -> uiText(R.string.ui_0010, "把当前讨论整理为可以交给团队的说明稿：背景与目标、已确认决策、内容或操作要求、验收标准、尚待确认的问题。负责人和截止时间仅使用我明确给出的信息。不要替我发给任何人。")
             else -> uiText(R.string.ui_0011, "帮我梳理目前最值得关注的事，区分已确认事实、建议和需要我决定的事。")
