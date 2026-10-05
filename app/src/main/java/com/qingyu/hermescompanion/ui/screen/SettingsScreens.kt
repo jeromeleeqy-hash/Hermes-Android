@@ -47,6 +47,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.qingyu.hermescompanion.ui.component.HermesContentAction
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -598,7 +599,7 @@ private fun VoiceOptionDialog(
 }
 
 @Composable
-fun AboutScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
+fun AboutScreen(contentPadding: PaddingValues, onBack: () -> Unit, onAppUpdate: () -> Unit = {}) {
     SettingsPage(uiText(R.string.ui_0873, "关于 Hermes"), uiText(R.string.ui_1090, "版本与客户端能力"), contentPadding, onBack) {
         GlassPanel(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -609,6 +610,7 @@ fun AboutScreen(contentPadding: PaddingValues, onBack: () -> Unit) {
                 }
             }
         }
+        HermesContentAction(onClick = onAppUpdate) { Text(com.qingyu.hermescompanion.today.todayText("检查软件更新", "Check for app updates")) }
         GlassPanel(modifier = Modifier.fillMaxWidth().padding(top = 9.dp), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 CapabilityRow(HermesIconKind.CHAT, uiText(R.string.ui_1092, "远程对话"), uiText(R.string.ui_1093, "通过登录网关连接自部署 Hermes Agent"))

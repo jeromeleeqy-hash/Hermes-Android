@@ -89,6 +89,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.qingyu.hermescompanion.today.todayText
 import com.qingyu.hermescompanion.ui.AppUiState
 import com.qingyu.hermescompanion.ui.ThemeMode
 import com.qingyu.hermescompanion.ui.SkinMode
@@ -139,6 +141,8 @@ fun ProfileScreen(
     onLanguageChange: (com.qingyu.hermescompanion.i18n.AppLanguageMode) -> Unit = {},
     onReplayIntro: () -> Unit = {},
     onLauncherIconChange: (com.qingyu.hermescompanion.appearance.LauncherIcon) -> Unit = {},
+    onAppUpdate: () -> Unit = {},
+    hasAppUpdate: Boolean = false,
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
@@ -217,6 +221,8 @@ fun ProfileScreen(
                     onArchivedSessions = onArchivedSessions,
                     onChangeLog = onChangeLog,
                     onAbout = onAbout,
+                    onAppUpdate = onAppUpdate,
+                    hasAppUpdate = hasAppUpdate,
                 )
                 ProfilePane.GUIDE -> OperationGuideScreen(
                     contentPadding = PaddingValues(bottom = LocalProfileDockInset.current),
@@ -353,27 +359,17 @@ private fun ProfileHomeContent(
             .padding(horizontal = HermesSpacing.page),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(16.dp))
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable(onClick = onAvatarClick)) {
-            Surface(shape = CircleShape, shadowElevation = 8.dp, border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)) {
-                UserAvatar(state.userProfile.avatarUri, displayName, 122.dp, shape = CircleShape)
+        Text(todayText("我的", "You"), Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 22.dp), fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable(onClick = onAvatarClick)) {
+                UserAvatar(state.userProfile.avatarUri, displayName, 72.dp, shape = CircleShape)
+                if (state.isAvatarUpdating) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
             }
-            if (state.isAvatarUpdating) CircularProgressIndicator(Modifier.size(34.dp), strokeWidth = 2.5.dp)
-        }
-        Text(displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 13.dp))
-        Text(
-            bio,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProfileActionButton(uiText(R.string.ui_0857, "设置照片"), HermesIconKind.CAMERA_ADD, onSetPhoto, Modifier.weight(1f))
-            ProfileActionButton(uiText(R.string.ui_0858, "编辑信息"), HermesIconKind.EDIT, onEdit, Modifier.weight(1f))
-            ProfileActionButton(uiText(R.string.ui_0859, "设置"), HermesIconKind.SETTINGS, onSettings, Modifier.weight(1f))
+            Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                Text(displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(bio, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                TextButton(onClick = onEdit, contentPadding = PaddingValues(0.dp)) { Text(todayText("编辑资料", "Edit profile"), style = MaterialTheme.typography.labelMedium) }
+            }
         }
 
         GlassPanel(
@@ -382,8 +378,8 @@ private fun ProfileHomeContent(
         ) {
             ProfileInfoRow(
                 icon = HermesIconKind.CONNECTION,
-                title = uiText(R.string.ui_0761, "远程网关"),
-                value = uiText(R.string.ui_0860, "连接正常 · %1\$s", maskAddress(state.baseUrl)),
+                title = todayText("我的服务器", "My server"),
+                value = if (state.isRecoveringConnection) todayText("正在重新连接", "Reconnecting") else if (state.baseUrl.isBlank()) todayText("尚未配置", "Not configured") else todayText("已配置 · 点击查看连接", "Configured · Connection details"),
                 showChevron = true,
             )
         }
@@ -393,7 +389,7 @@ private fun ProfileHomeContent(
                     ProfileInfoRow(
                         HermesIconKind.MEMORY,
                         uiText(R.string.ui_0861, "我的记忆"),
-                        uiText(R.string.ui_0862, "长期事实、偏好与经验 · %1\$s/MEMORY.md", state.activeProfile),
+                        todayText("长期事实、偏好与经验", "Facts, preferences and experience"),
                         showChevron = true,
                     )
                 }
@@ -406,11 +402,14 @@ private fun ProfileHomeContent(
                     ProfileInfoRow(
                         HermesIconKind.SOUL,
                         uiText(R.string.ui_0863, "我的心智"),
-                        uiText(R.string.ui_0864, "人格、原则与行为边界 · %1\$s/SOUL.md", state.activeProfile),
+                        todayText("人格、原则与行为边界", "Personality, principles and boundaries"),
                         showChevron = true,
                     )
                 }
             }
+        }
+        GlassPanel(Modifier.fillMaxWidth().padding(top = 10.dp).clickable(onClick = onSettings), shape = RoundedCornerShape(20.dp)) {
+            ProfileInfoRow(HermesIconKind.SETTINGS, uiText(R.string.ui_0859, "设置"), todayText("外观、语音、通知与权限", "Appearance, voice, notifications and permissions"), showChevron = true)
         }
         GlassPanel(
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp).clickable(onClick = onGuide),
@@ -443,6 +442,8 @@ private fun ProfileSettingsListContent(
     onArchivedSessions: () -> Unit,
     onChangeLog: () -> Unit,
     onAbout: () -> Unit,
+    onAppUpdate: () -> Unit,
+    hasAppUpdate: Boolean,
 ) {
     Column(Modifier.fillMaxSize()) {
         ProfilePageHeader(uiText(R.string.ui_0859, "设置"), onBack)
@@ -471,6 +472,7 @@ private fun ProfileSettingsListContent(
             }
             com.qingyu.hermescompanion.ui.component.SettingsBlock(uiText(R.string.ui_0871, "关于")) {
                 Column(Modifier.fillMaxWidth()) {
+                    SettingRow(HermesIconKind.DOWNLOAD, if (hasAppUpdate) todayText("软件更新 · 有新版本", "App updates · New version") else todayText("软件更新", "App updates"), onAppUpdate)
                     SettingRow(HermesIconKind.CHANGELOG, uiText(R.string.ui_0872, "更新日志"), onChangeLog)
                     SettingRow(HermesIconKind.INFORMATION, uiText(R.string.ui_0873, "关于 Hermes"), onAbout)
                 }

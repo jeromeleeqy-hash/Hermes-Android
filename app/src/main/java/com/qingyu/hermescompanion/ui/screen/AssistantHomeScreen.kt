@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.qingyu.hermescompanion.model.*
 import com.qingyu.hermescompanion.ui.AppUiState
+import com.qingyu.hermescompanion.data.isTaskConversation
 import com.qingyu.hermescompanion.ui.SkinMode
 import com.qingyu.hermescompanion.ui.component.*
 import com.qingyu.hermescompanion.ui.theme.HermesSkin
@@ -56,12 +57,13 @@ fun AssistantHomeScreen(
     onRespond: (AgentRequest, String) -> Unit, onSearch: () -> Unit,
     onDaily: () -> Unit = { onStart("") },
     onWelcomed: () -> Unit = {},
+    onSettings: () -> Unit = {},
 ) {
     val skin = HermesSkin.current.mode
     val user = state.userProfile.displayName.ifBlank { state.username }.ifBlank { uiText(R.string.ui_0605, "朋友") }
-    val runs = state.runningRuns.filter { it.session.profile == state.activeProfile }
+    val runs = state.runningRuns.filter { it.session.profile == state.activeProfile && !isTaskConversation(it.session, state.taskSessionKeys) }
     val recent = (runs.map { it.session } + state.sessions.filter { it.profile == state.activeProfile })
-        .distinctBy { it.scopedId }.take(2)
+        .filterNot { isTaskConversation(it, state.taskSessionKeys) }.distinctBy { it.scopedId }.take(2)
     val now = rememberHomeTime()
     val locale = AppLanguage.locale
     val dateLabel = remember(now.toLocalDate(), locale) {
@@ -109,6 +111,10 @@ fun AssistantHomeScreen(
                         .then(if (skin == SkinMode.GLASS) Modifier.hermesChrome(CircleShape, .30f, backgroundOnly = true)
                         else if (skin == SkinMode.CLEAN) Modifier.background(MaterialTheme.colorScheme.surfaceContainer, CircleShape) else Modifier)
                         .semantics { contentDescription = uiText(R.string.ui_0613, "搜索对话") }) { AssistantGlyph("search", Modifier.size(23.dp)) }
+                    IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).testTag("today-settings")
+                        .semantics { contentDescription = com.qingyu.hermescompanion.today.todayText("首页设置", "Home settings") }) {
+                        HermesMulticolorIcon(HermesIconKind.SETTINGS, null, iconSize = 23.dp)
+                    }
                 }
             }
             item(key = "hero") {

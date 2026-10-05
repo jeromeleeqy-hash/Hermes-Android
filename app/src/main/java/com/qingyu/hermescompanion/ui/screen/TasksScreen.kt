@@ -24,6 +24,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.qingyu.hermescompanion.today.todayText
+import com.qingyu.hermescompanion.ui.component.AssistantGlyph
 import com.qingyu.hermescompanion.ui.component.HermesAlertDialog as AlertDialog
 import com.qingyu.hermescompanion.ui.component.HermesButton as Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.qingyu.hermescompanion.ui.component.HermesContentAction
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,11 +80,9 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private enum class TaskTab(val label: String) {
-    PENDING(uiText(R.string.ui_1271, "待处理")),
-    RUNNING(uiText(R.string.ui_0622, "进行中")),
-    SCHEDULED(uiText(R.string.ui_0116, "定时任务")),
-    COMPLETED(uiText(R.string.ui_1272, "执行记录")),
+private enum class TaskTab(val zh: String, val en: String) {
+    CURRENT("当前", "Current"), SCHEDULED("定时", "Scheduled"), COMPLETED("记录", "History");
+    val label get() = todayText(zh, en)
 }
 
 @Composable
@@ -96,152 +104,83 @@ fun TasksScreen(
     onTriggerCron: (CronJob) -> Unit,
     onDeleteCron: (CronJob) -> Unit,
 ) {
-    var selectedTab by remember {
-        mutableStateOf(
-            when {
-                state.pendingAgentRequests.isNotEmpty() -> TaskTab.PENDING
-                state.isStreaming -> TaskTab.RUNNING
-                else -> TaskTab.SCHEDULED
-            },
-        )
+    var selectedTab by rememberSaveable(state.baseUrl, state.activeProfile) {
+        mutableStateOf(if (state.pendingAgentRequests.isNotEmpty() || state.runningRuns.isNotEmpty()) TaskTab.CURRENT else TaskTab.SCHEDULED)
     }
+    var showPaused by rememberSaveable(state.baseUrl, state.activeProfile) { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<CronJob?>(null) }
-    val activeTools = state.toolActivities.filter { it.status == ToolStatus.RUNNING }
     val runningCronJobs = state.cronJobs.filter(CronJob::isRunning)
-    val cronSessions = remember(state.sessions) {
-        state.sessions.filter { it.source.equals("cron", ignoreCase = true) }
+    val taskSessions = remember(state.sessions, state.activeProfile, state.taskSessionKeys) {
+        state.sessions.filter { it.profile == state.activeProfile && com.qingyu.hermescompanion.data.isTaskConversation(it, state.taskSessionKeys) }
             .sortedByDescending(HermesSession::updatedAt)
     }
-    val cronSessionIds = remember(cronSessions) { cronSessions.mapTo(mutableSetOf(), HermesSession::id) }
-    val regularCompletions = remember(state.recentCompletions, cronSessionIds) {
-        state.recentCompletions.filterNot { it.sessionId in cronSessionIds }
-    }
+    val taskSessionIds = taskSessions.mapTo(mutableSetOf(), HermesSession::id)
+    val regularCompletions = state.recentCompletions.filterNot { it.sessionId in taskSessionIds }
     val runningCount = state.runningRuns.size + runningCronJobs.size
-    val completedJobs = regularCompletions.size + cronSessions.size
-    LaunchedEffect(state.pendingAgentRequests.size) {
-        if (state.pendingAgentRequests.isNotEmpty()) selectedTab = TaskTab.PENDING
-    }
-
-    Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = contentPadding.calculateBottomPadding())
-                .padding(horizontal = HermesSpacing.page, vertical = 8.dp),
-        ) {
-            TaskPageHeader(
-                running = runningCount,
-                refreshing = state.isCronLoading,
-                onRefresh = onRefreshCron,
-                onCreate = { showCreate = true },
-            )
-            TaskSummaryStrip(
-                pending = state.pendingAgentRequests.size,
-                running = runningCount,
-                enabled = state.cronJobs.count(CronJob::enabled),
-                completed = completedJobs,
-            )
-
-            HermesSegmentedControl(
-                items = TaskTab.entries.map(TaskTab::label),
-                selectedIndex = selectedTab.ordinal,
-                onSelect = { selectedTab = TaskTab.entries[it] },
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                compact = true,
-            )
-
-        when (selectedTab) {
-            TaskTab.PENDING -> {
-                if (state.pendingAgentRequests.isEmpty()) {
-                    TaskEmptyState(HermesIconKind.CHECK_CIRCLE, uiText(R.string.ui_1273, "没有待处理请求"), uiText(R.string.ui_1274, "Hermes 需要确认操作或补充信息时，会集中显示在这里。"))
-                } else {
-                    Text(uiText(R.string.ui_1275, "需要你的决定"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
-                    state.pendingAgentRequests.forEach { request ->
-                        TaskAgentRequestCard(request, onRespondRequest)
-                    }
-                }
-            }
-
-            TaskTab.RUNNING -> {
-                if (state.isStreaming || runningCronJobs.isNotEmpty()) {
-                    Text(uiText(R.string.ui_1276, "当前运行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
-                    state.runningRuns.forEach { run ->
-                        ActiveRunCard(
-                            title = run.session.title.ifBlank { uiText(R.string.ui_0159, "Hermes 任务") },
-                            stage = run.stage,
-                            recovering = run.recovering,
-                            startedAtMillis = run.startedAtMillis,
-                            onOpen = { onOpenActiveRun(run.session) },
-                            onStop = { onStopActiveRun(run.session) },
-                        )
-                    }
-                    activeTools.takeLast(8).forEach { activity -> ToolRunCard(activity.name, activity.preview, activity.status) }
-                    runningCronJobs.forEach { job ->
-                        CronJobCard(
-                            job = job,
-                            busy = state.cronActionId == job.id,
-                            onOpen = { onOpenCron(job) },
-                            onToggle = { onToggleCron(job) },
-                            onTrigger = { onTriggerCron(job) },
-                            onDelete = { deleteTarget = job },
-                        )
-                    }
-                } else {
-                    TaskEmptyState(
-                        icon = HermesIconKind.TASK,
-                        title = uiText(R.string.ui_1277, "没有正在运行的任务"),
-                        description = uiText(R.string.ui_1278, "在对话中发起任务后，当前工具执行状态会显示在这里。"),
-                        actionLabel = uiText(R.string.ui_1279, "发起新任务"),
-                        onAction = onStartConversation,
-                    )
-                }
-            }
-
-            TaskTab.SCHEDULED -> {
-                if (state.cronJobs.isEmpty() && !state.isCronLoading) {
-                    TaskEmptyState(
-                        icon = HermesIconKind.RECENT,
-                        title = uiText(R.string.ui_1280, "还没有定时任务"),
-                        description = uiText(R.string.ui_1281, "可以让 Hermes 按 Cron 计划自动执行日报、检查与提醒。"),
-                        actionLabel = uiText(R.string.ui_1282, "新建定时任务"),
-                        onAction = { showCreate = true },
-                    )
-                } else {
-                    Text(uiText(R.string.ui_1283, "自动执行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
-                    state.cronJobs.forEach { job ->
-                        CronJobCard(
-                            job = job,
-                            busy = state.cronActionId == job.id,
-                            onOpen = { onOpenCron(job) },
-                            onToggle = { onToggleCron(job) },
-                            onTrigger = { onTriggerCron(job) },
-                            onDelete = { deleteTarget = job },
-                        )
-                    }
-                }
-            }
-
-            TaskTab.COMPLETED -> {
-                val history = state.cronJobs.filter { it.lastRunAt.isNotBlank() }
-                if (history.isEmpty() && regularCompletions.isEmpty() && cronSessions.isEmpty()) {
-                    TaskEmptyState(HermesIconKind.ARCHIVE, uiText(R.string.ui_1284, "暂无执行记录"), uiText(R.string.ui_1285, "对话任务或定时任务完成后，会在这里保留最近结果。"))
-                } else {
-                    Text(uiText(R.string.ui_1286, "最近执行"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 13.dp, bottom = 6.dp))
-                    regularCompletions.forEach { completion ->
-                        RunCompletionCard(completion, { onOpenCompletion(completion) }, onOpenArtifact)
-                    }
-                    if (cronSessions.isNotEmpty()) {
-                        Text(uiText(R.string.ui_1287, "Cron 会话"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
-                        cronSessions.forEach { session ->
-                            CronSessionCard(session, onClick = { onOpenCronSession(session) })
-                        }
-                    }
-                    history.sortedByDescending(CronJob::lastRunAt).forEach { job ->
-                        CronHistoryCard(job, onClick = { onOpenCron(job) })
-                    }
-                }
+    val pendingCount = state.pendingAgentRequests.size
+    LazyColumn(
+        Modifier.fillMaxSize().testTag("tasks-page").padding(top = contentPadding.calculateTopPadding()).statusBarsPadding(),
+        contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 12.dp, bottom = contentPadding.calculateBottomPadding() + 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "header") { TaskPageHeader(runningCount, state.isCronLoading, onRefreshCron, { showCreate = true }) }
+        item(key = "tabs") {
+            HermesSegmentedControl(items = TaskTab.entries.map { it.label + if (it == TaskTab.CURRENT && pendingCount + runningCount > 0) " · ${pendingCount + runningCount}" else "" },
+                selectedIndex = selectedTab.ordinal, onSelect = { selectedTab = TaskTab.entries[it] }, modifier = Modifier.fillMaxWidth(), compact = true)
+        }
+        if (pendingCount > 0 && selectedTab != TaskTab.CURRENT) item(key = "needs-you") {
+            HermesContentAction(onClick = { selectedTab = TaskTab.CURRENT }) {
+                Text(todayText("有 $pendingCount 件事需要你确认", "$pendingCount requests need your input"))
             }
         }
-            Spacer(Modifier.height(24.dp))
+        when (selectedTab) {
+            TaskTab.CURRENT -> {
+                if (pendingCount + runningCount == 0) item {
+                    TaskEmptyState(HermesIconKind.CHECK_CIRCLE, todayText("暂时没有需要处理的事", "Nothing waiting right now"),
+                        todayText("交给 Hermes 的工作和需要你确认的事项，会出现在这里。", "Work in progress and requests for your input will appear here."),
+                        todayText("聊点什么", "Start a conversation"), onStartConversation)
+                }
+                items(state.pendingAgentRequests, key = { "request:${com.qingyu.hermescompanion.data.agentRequestKey(it)}" }) { TaskAgentRequestCard(it, onRespondRequest) }
+                items(state.runningRuns, key = { "run:${it.session.profile}:${it.session.id}" }) { run ->
+                    ActiveRunCard(run.session.title.ifBlank { todayText("正在处理的事", "Work in progress") }, run.stage, run.recovering, run.startedAtMillis,
+                        { onOpenActiveRun(run.session) }, { onStopActiveRun(run.session) })
+                }
+                items(runningCronJobs, key = { "running-cron:${it.id}" }) { job ->
+                    CronJobCard(job, state.cronActionId == job.id, { onOpenCron(job) }, { onToggleCron(job) }, { onTriggerCron(job) }, { deleteTarget = job })
+                }
+            }
+            TaskTab.SCHEDULED -> {
+                if (state.cronJobs.isEmpty() && !state.isCronLoading) item {
+                    TaskEmptyState(HermesIconKind.RECENT, todayText("还没有定时安排", "No scheduled work yet"),
+                        todayText("把例行整理和提醒交给 Hermes，按约定的时间帮你完成。", "Let Hermes take care of regular briefings and reminders."),
+                        todayText("添加安排", "Add a schedule"), { showCreate = true })
+                }
+                items(state.cronJobs.filter { it.enabled || it.isRunning || showPaused }.sortedWith(compareBy<CronJob> { !it.enabled }.thenBy { com.qingyu.hermescompanion.ui.format.parseHermesInstant(it.nextRunAt) ?: Instant.MAX }), key = { "cron:${it.id}" }) { job ->
+                    CronJobCard(job, state.cronActionId == job.id, { onOpenCron(job) }, { onToggleCron(job) }, { onTriggerCron(job) }, { deleteTarget = job })
+                }
+                val paused = state.cronJobs.count { !it.enabled && !it.isRunning }
+                if (paused > 0) item(key = "paused-toggle") {
+                    HermesContentAction(onClick = { showPaused = !showPaused }, modifier = Modifier.testTag("paused-tasks-toggle")) {
+                        Text(if (showPaused) todayText("收起已暂停安排", "Hide paused schedules") else todayText("已暂停 · $paused", "Paused · $paused"))
+                    }
+                }
+            }
+            TaskTab.COMPLETED -> {
+                val history = state.cronJobs.filter { it.lastRunAt.isNotBlank() }
+                if (history.isEmpty() && regularCompletions.isEmpty() && taskSessions.isEmpty()) item {
+                    TaskEmptyState(HermesIconKind.ARCHIVE, todayText("这里会留下处理结果", "Your results will appear here"),
+                        todayText("刷新、整理和自动执行的记录都在这里。点开可查看处理详情。", "Refreshes, briefings and automated work are recorded here. Open an item to see its details."))
+                }
+                items(regularCompletions, key = { "completion:${it.sessionId}:${it.completedAtMillis}" }) { completion ->
+                    RunCompletionCard(completion.copy(title = state.sessions.firstOrNull { it.id == completion.sessionId && it.profile == state.activeProfile }?.title ?: completion.title), { onOpenCompletion(completion) }, onOpenArtifact)
+                }
+                items(taskSessions, key = { "history:${it.profile}:${it.id}" }) { session -> CronSessionCard(session) { onOpenCronSession(session) } }
+                // Only use job summaries when conversation history is unavailable, avoiding two copies of every run.
+                if (taskSessions.none { it.source.equals("cron", true) }) items(history.sortedByDescending(CronJob::lastRunAt), key = { "last-run:${it.id}" }) { job ->
+                    CronHistoryCard(job) { onOpenCron(job) }
+                }
+            }
         }
     }
 
@@ -278,11 +217,10 @@ private fun TaskPageHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(uiText(R.string.ui_1288, "执行中心"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(todayText("任务", "Tasks"), fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HermesStatusIcon(if (running > 0) HermesStatusKind.BUSY else HermesStatusKind.CONNECTED)
                 Text(
-                    if (running > 0) uiText(R.string.ui_1289, "%1\$s 个 Agent 正在工作", running) else uiText(R.string.ui_1290, "Agent 当前空闲"),
+                    if (running > 0) todayText("正在帮你处理 $running 件事", "Working on $running things") else todayText("把约好的事，稳稳接住", "Your work, kept in view"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 6.dp),
@@ -298,7 +236,7 @@ private fun TaskPageHeader(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        com.qingyu.hermescompanion.ui.component.AssistantCreateButton(uiText(R.string.ui_1291, "新建任务"),onCreate)
+        com.qingyu.hermescompanion.ui.component.AssistantCreateButton(todayText("添加定时安排", "Add a schedule"),onCreate)
 
     }
 }
@@ -315,7 +253,7 @@ private fun ActiveRunCard(
     val elapsedMinutes = ((System.currentTimeMillis() - startedAtMillis).coerceAtLeast(0) / 60_000L)
     GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp).clickable(onClick = onOpen),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(22.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -323,7 +261,7 @@ private fun ActiveRunCard(
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        if (recovering) uiText(R.string.ui_1292, "连接中断，正在自动取回结果") else stage.ifBlank { uiText(R.string.ui_0373, "Hermes 正在执行") },
+                        if (recovering) uiText(R.string.ui_1292, "连接中断，正在自动取回结果") else todayText("正在为你处理", "Working on your request"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -331,7 +269,7 @@ private fun ActiveRunCard(
                 Text(if (elapsedMinutes < 1) uiText(R.string.ui_0483, "刚刚") else uiText(R.string.ui_1293, "%1\$s 分钟", elapsedMinutes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             Row(Modifier.align(Alignment.End).padding(top = 4.dp)) {
-                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpen) { Text(uiText(R.string.ui_0162, "打开会话")) }
+                TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onOpen) { Text(todayText("查看处理详情", "View details")) }
                 TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = onStop) { Text(uiText(R.string.ui_0192, "停止"), color = MaterialTheme.colorScheme.error) }
             }
         }
@@ -355,20 +293,12 @@ private fun RunCompletionCard(
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HermesStatusIcon(HermesStatusKind.CONNECTED)
-                Text(completion.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                AssistantGlyph("chat", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(com.qingyu.hermescompanion.data.readableConversationTitle(completion.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(taskCompletionTime(completion.completedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(completion.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            completion.artifacts.take(3).forEach { artifact ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clickable { onOpenArtifact(artifact) },
-                    shape = RoundedCornerShape(9.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                ) {
-                    Text(uiText(R.string.ui_1294, "打开产物 · %1\$s", artifact.name), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(9.dp))
-                }
-            }
+            Text(com.qingyu.hermescompanion.data.replyExcerpt(completion.summary).ifBlank { todayText("点开核对这次回复", "Open to check this reply") }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
         }
     }
 }
@@ -377,52 +307,64 @@ private fun taskCompletionTime(millis: Long): String = runCatching {
     DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(millis))
 }.getOrDefault("")
 
+internal fun taskScheduleLabel(job: CronJob): String {
+    val bits = job.schedule.expression.trim().split(Regex("\\s+"))
+    if (job.schedule.kind == "cron" && bits.size == 5 && bits[2] == "*" && bits[3] == "*") {
+        val minute = bits[0].toIntOrNull(); val hour = bits[1].toIntOrNull()
+        if (minute != null && minute in 0..59 && hour != null && hour in 0..23) {
+            val time = "%02d:%02d".format(hour, minute)
+            if (bits[4] == "*") return todayText("每天 ", "Daily ") + time
+            val rawDays = bits[4].split(',').flatMap { value ->
+                val range = value.split('-').map { it.toIntOrNull() }
+                when {
+                    range.size == 1 && range[0] != null && range[0]!! in 0..7 -> listOf(range[0]!! % 7)
+                    range.size == 2 && range[0] != null && range[1] != null && range[0]!! in 0..7 && range[1]!! in range[0]!!..7 -> (range[0]!!..range[1]!!).map { it % 7 }
+                    else -> listOf(-1)
+                }
+            }.distinct().sorted()
+            if (-1 !in rawDays && rawDays.isNotEmpty()) {
+                if (rawDays.size == 7) return todayText("每天 ", "Daily ") + time
+                if (rawDays == listOf(1, 2, 3, 4, 5)) return todayText("周一至周五 ", "Mon–Fri ") + time
+                if (rawDays == listOf(0, 6)) return todayText("每周六、日 ", "Sat–Sun ") + time
+                val names = rawDays.map { listOf(todayText("日", "Sun"), todayText("一", "Mon"), todayText("二", "Tue"), todayText("三", "Wed"), todayText("四", "Thu"), todayText("五", "Fri"), todayText("六", "Sat"))[it] }
+                return todayText("每周", "Every ") + names.joinToString(todayText("、", ", ")) + " " + time
+            }
+        }
+    }
+    return job.schedule.display.takeIf { it.isNotBlank() && it != job.schedule.expression }
+        ?: todayText("按约定时间", "On schedule")
+}
+
 @Composable
-private fun CronJobCard(
-    job: CronJob,
-    busy: Boolean,
-    onOpen: () -> Unit,
-    onToggle: () -> Unit,
-    onTrigger: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    GlassPanel(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable(onClick = onOpen),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+private fun CronJobCard(job: CronJob, busy: Boolean, onOpen: () -> Unit, onToggle: () -> Unit, onTrigger: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember(job.id) { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    GlassPanel(Modifier.fillMaxWidth().testTag("task-cron:${job.id}").clickable(onClick = onOpen), shape = RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
-                        .background(if (job.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) { HermesMulticolorIcon(HermesIconKind.RECENT, contentDescription = null, iconSize = 20.dp) }
-                Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-                    Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        job.schedule.display.ifBlank { job.schedule.expression.ifBlank { uiText(R.string.ui_1295, "未设置计划") } },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
+                Column(Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(taskScheduleLabel(job), style = MaterialTheme.typography.labelMedium, color = colors.primary)
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 else HermesSwitch(checked = job.enabled, onCheckedChange = { onToggle() })
             }
-            if (job.prompt.isNotBlank()) {
-                Text(job.prompt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-            }
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (job.nextRunAt.isBlank()) uiText(R.string.ui_1296, "等待服务器计算下次时间") else uiText(R.string.ui_1297, "下次 %1\$s", cronTimeLabel(job.nextRunAt)),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onTrigger, enabled = !busy, modifier = Modifier.size(36.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.PLAY, contentDescription = uiText(R.string.ui_0822, "立即运行"), iconSize = 20.dp)
-                }
-                IconButton(onClick = onDelete, enabled = !busy, modifier = Modifier.size(36.dp)) {
-                    HermesMulticolorIcon(HermesIconKind.DELETE, contentDescription = uiText(R.string.ui_0826, "删除任务"), iconSize = 19.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(when {
+                    job.isRunning -> todayText("正在处理", "Running")
+                    !job.enabled -> todayText("已暂停", "Paused")
+                    job.nextRunAt.isNotBlank() -> todayText("下次 ", "Next ") + cronTimeLabel(job.nextRunAt)
+                    else -> todayText("已启用 · 时间待同步", "Enabled · Awaiting next run time")
+                }, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+                Box {
+                    IconButton(onClick = { menu = true }, enabled = !busy, modifier = Modifier.size(32.dp).semantics { contentDescription = todayText("任务选项", "Task options") }) {
+                        AssistantGlyph("more", Modifier.size(18.dp), colors.onSurfaceVariant)
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(todayText("查看安排", "View schedule")) }, onClick = { menu = false; onOpen() })
+                        DropdownMenuItem(text = { Text(todayText("现在运行一次", "Run once now")) }, onClick = { menu = false; onTrigger() }, enabled = !job.isRunning)
+                        DropdownMenuItem(text = { Text(todayText("删除安排", "Delete schedule"), color = colors.error) }, onClick = { menu = false; onDelete() })
+                    }
                 }
             }
         }
@@ -434,15 +376,16 @@ private fun CronHistoryCard(job: CronJob, onClick: () -> Unit) {
     val failed = job.lastStatus.contains("fail", true) || job.lastStatus.contains("error", true)
     GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(22.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            HermesStatusIcon(if (failed) HermesStatusKind.ERROR else HermesStatusKind.CONNECTED)
+            if (failed) HermesStatusIcon(HermesStatusKind.ERROR) else AssistantGlyph("chat", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
             Column(modifier = Modifier.weight(1f).padding(start = 9.dp)) {
                 Text(job.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(cronTimeLabel(job.lastRunAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(job.lastStatus.ifBlank { job.state }, style = MaterialTheme.typography.labelMedium, color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            Text(if (failed) todayText("需要查看", "Needs attention") else todayText("查看结果", "View result"),
+                style = MaterialTheme.typography.labelMedium, color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -451,7 +394,7 @@ private fun CronHistoryCard(job: CronJob, onClick: () -> Unit) {
 private fun CronSessionCard(session: HermesSession, onClick: () -> Unit) {
     GlassPanel(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(22.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -463,14 +406,14 @@ private fun CronSessionCard(session: HermesSession, onClick: () -> Unit) {
             }
             Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(
-                    session.title.ifBlank { uiText(R.string.ui_1298, "定时任务会话") },
+                    com.qingyu.hermescompanion.data.readableConversationTitle(session.title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    com.qingyu.hermescompanion.ui.format.conversationPreview(session.preview).ifBlank { uiText(R.string.ui_1299, "点按查看完整执行内容") },
+                    com.qingyu.hermescompanion.ui.format.conversationPreview(session.preview).ifBlank { todayText("点开查看结果", "Open to view results") },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -603,7 +546,7 @@ private fun TaskSummaryStrip(
 ) {
     GlassPanel(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(22.dp),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp),
     ) {
         Column(Modifier.fillMaxWidth()) {
@@ -671,12 +614,12 @@ private fun TaskEmptyState(icon: HermesIconKind, title: String, description: Str
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { HermesMulticolorIcon(icon, contentDescription = null, iconSize = 29.dp) }
+                Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { HermesMulticolorIcon(icon, contentDescription = null, iconSize = 22.dp) }
             }
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
             if (actionLabel != null && onAction != null) {
-                Button(onClick = onAction, modifier = Modifier.padding(top = 12.dp)) {
+                HermesContentAction(onClick = onAction, modifier = Modifier.padding(top = 8.dp)) {
                     Text(actionLabel)
                 }
             }

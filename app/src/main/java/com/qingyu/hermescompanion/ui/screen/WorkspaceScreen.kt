@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,6 +37,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import com.qingyu.hermescompanion.today.todayText
+import com.qingyu.hermescompanion.ui.component.AssistantGlyph
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.qingyu.hermescompanion.model.WorkspaceDocument
 import com.qingyu.hermescompanion.model.WorkspaceEntry
@@ -64,11 +74,6 @@ import com.qingyu.hermescompanion.ui.component.PlainTextDocumentPreview
 import com.qingyu.hermescompanion.ui.component.VisualMarkdownEditor
 import com.qingyu.hermescompanion.ui.theme.HermesSpacing
 import java.util.Locale
-
-private enum class WorkspaceTab(val label: String) {
-    RECENT(uiText(R.string.ui_1351, "最近产物")),
-    FILES(uiText(R.string.ui_1352, "项目文件")),
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,36 +119,42 @@ fun WorkspaceScreen(
         return
     }
 
+    var showHidden by rememberSaveable(state.baseUrl, state.activeProfile) { mutableStateOf(false) }
+    var fileMenu by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     val listing = state.workspaceListing
-    val recentArtifacts = state.recentArtifacts.filter { it.profile == state.activeProfile }
-    var selectedTab by remember(state.workspaceAttachmentTarget?.scopedId) { mutableStateOf(if (recentArtifacts.isEmpty()) WorkspaceTab.FILES else WorkspaceTab.RECENT) }
+    val entries = listing?.entries.orEmpty().filter { showHidden || !isWorkspaceSystemEntry(it, listing?.path == state.workspaceRootPath) }
+    val folders = entries.filter { it.isDirectory }
+    val files = entries.filterNot { it.isDirectory }
+    val columns = if (LocalDensity.current.fontScale > 1.3f) 1 else 2
     val canGoUp = listing?.parent != null && listing.path != state.workspaceRootPath
-    BackHandler(enabled = picking || selectedTab == WorkspaceTab.FILES && canGoUp) {
-        if (selectedTab == WorkspaceTab.FILES && canGoUp && !state.isWorkspaceAttaching) {
+    BackHandler(enabled = picking || canGoUp) {
+        if (canGoUp && !state.isWorkspaceAttaching) {
             listing?.parent?.let(onOpenDirectory)
         } else if (picking) onCancelAttachmentPicker()
     }
     Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding()).then(if (picking) Modifier.navigationBarsPadding() else Modifier)) {
         Column(modifier = Modifier.statusBarsPadding().padding(start = HermesSpacing.page, end = HermesSpacing.page, top = 12.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(if (picking) uiText(R.string.ui_1353, "选择附件") else uiText(R.string.ui_0618, "文件与成果"),Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
+                Text(if (picking) uiText(R.string.ui_1353, "选择附件") else com.qingyu.hermescompanion.today.todayText("文件", "Files"),Modifier.weight(1f),fontSize=30.sp,fontWeight=FontWeight.SemiBold)
                 if (picking) TextButton(onClick=onCancelAttachmentPicker) { Text(uiText(R.string.ui_0553, "取消")) }
-                else TextButton(onClick=onChooseProject) { Text(uiText(R.string.ui_1354, "切换项目")) }
+                else Box {
+                    IconButton(onClick = { fileMenu = true }, modifier = Modifier.testTag("workspace-menu")) { AssistantGlyph("more", Modifier.size(22.dp)) }
+                    DropdownMenu(fileMenu, { fileMenu = false }) {
+                        DropdownMenuItem(text = { Text(uiText(R.string.ui_1354, "切换项目")) }, onClick = { fileMenu = false; onChooseProject() })
+                        DropdownMenuItem(text = { Text(if (showHidden) todayText("隐藏系统文件", "Hide system files") else todayText("显示隐藏与系统文件", "Show hidden and system files")) }, onClick = { showHidden = !showHidden; fileMenu = false })
+                        DropdownMenuItem(text = { Text(todayText("复制当前路径", "Copy folder path")) }, onClick = { clipboard.setText(AnnotatedString(listing?.path.orEmpty())); fileMenu = false }, enabled = listing != null)
+                    }
+                }
+                if (picking) TextButton(onClick = { showHidden = !showHidden }) { Text(if (showHidden) todayText("隐藏系统文件", "Hide system files") else todayText("显示全部", "Show all")) }
             }
-            Text(state.activeProfile + (listing?.projectName?.let { " · $it" } ?: ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=4.dp,bottom=16.dp))
+            Text(state.activeProfile + (listing?.projectName?.let { " · $it" } ?: ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=4.dp,bottom=8.dp))
             if (picking) Text(
                 uiText(R.string.ui_1355, "点击文件，添加到「%1\$s」", state.workspaceAttachmentTarget?.title?.ifBlank { uiText(R.string.ui_1356, "当前对话") }),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
-            HermesSegmentedControl(
-                items = WorkspaceTab.entries.map(WorkspaceTab::label),
-                selectedIndex = selectedTab.ordinal,
-                onSelect = { if (!state.isWorkspaceAttaching) selectedTab = WorkspaceTab.entries[it] },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
-                compact = true,
-            )
-            if (selectedTab == WorkspaceTab.FILES) GlassPanel(
+            GlassPanel(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(13.dp),
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 3.dp),
@@ -157,7 +168,7 @@ fun WorkspaceScreen(
                         HermesMulticolorIcon(HermesIconKind.FOLDER_UP, contentDescription = uiText(R.string.ui_1357, "返回上级"), iconSize = 18.dp)
                     }
                     Text(
-                        listing?.path ?: uiText(R.string.ui_0975, "正在读取工作区…"),
+                        listing?.let { todayText("工作区", "Workspace") + it.path.removePrefix(state.workspaceRootPath.orEmpty()).replace("/", " / ") } ?: uiText(R.string.ui_0975, "正在读取工作区…"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -173,23 +184,7 @@ fun WorkspaceScreen(
             Text(uiText(R.string.ui_1358, "正在添加附件…"), Modifier.padding(horizontal = HermesSpacing.page, vertical = 8.dp),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
-        if (selectedTab == WorkspaceTab.RECENT) {
-            PullToRefreshBox(
-                isRefreshing = state.isRecentArtifactsLoading,
-                onRefresh = { if (!state.isWorkspaceAttaching) onRefreshRecentArtifacts() },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                RecentArtifactsList(
-                    items = recentArtifacts,
-                    bottomInset = contentPadding.calculateBottomPadding(),
-                    isLoading = state.isRecentArtifactsLoading,
-                    onOpen = if (picking) onSelectRecentAttachment else onOpenRecentArtifact,
-                    onOpenSource = onOpenArtifactSource,
-                    picking = picking,
-                    enabled = !state.isWorkspaceAttaching,
-                )
-            }
-        } else PullToRefreshBox(
+        PullToRefreshBox(
             isRefreshing = state.isWorkspaceLoading,
             onRefresh = { if (!state.isWorkspaceAttaching) onRefresh() },
             modifier = Modifier.fillMaxSize(),
@@ -199,16 +194,31 @@ fun WorkspaceScreen(
                     CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.2.dp)
                 }
 
-                listing == null -> WorkspaceEmpty(if (picking) uiText(R.string.ui_1359, "未能打开对话目录，请下拉重试，或从最近产物选择文件") else uiText(R.string.ui_1360, "未能打开项目目录，请点击上方“切换项目”重新选择"))
-                listing.entries.isEmpty() -> WorkspaceEmpty(uiText(R.string.ui_1361, "这个文件夹是空的"))
+                listing == null -> WorkspaceEmpty(if (picking) com.qingyu.hermescompanion.today.todayText("暂时无法打开目录，请下拉重试", "Cannot open this folder. Pull to retry.") else uiText(R.string.ui_1360, "未能打开项目目录，请点击上方“切换项目”重新选择"))
+                entries.isEmpty() -> WorkspaceEmpty(if (listing.entries.isEmpty()) uiText(R.string.ui_1361, "这个文件夹是空的") else todayText("此处只有隐藏文件，可在菜单中显示", "Only hidden files here. Show them in the menu."))
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = HermesSpacing.page, end = HermesSpacing.page, top = 2.dp, bottom = contentPadding.calculateBottomPadding() + 12.dp),
                 ) {
-                    items(listing.entries, key = { it.path }) { entry ->
+                    items(folders.chunked(columns), key = { "folders:" + it.first().path }) { row ->
+                        Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { entry ->
+                                GlassPanel(Modifier.weight(1f).clickable(enabled = !state.isWorkspaceAttaching) { onOpenDirectory(entry.path) }, shape = RoundedCornerShape(22.dp)) {
+                                    Column(Modifier.fillMaxWidth().heightIn(min = 108.dp).padding(17.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        AssistantGlyph("folder", Modifier.size(26.dp), MaterialTheme.colorScheme.primary)
+                                        Text(entry.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
+                            if (row.size < columns) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                    if (files.isNotEmpty() && folders.isNotEmpty()) item(key = "file-label") {
+                        Text(todayText("文件", "Files"), Modifier.padding(top = 4.dp, bottom = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    items(files, key = { it.path }) { entry ->
                         WorkspaceEntryRow(entry, picking = picking, enabled = !state.isWorkspaceAttaching) {
                             when {
-                                entry.isDirectory -> onOpenDirectory(entry.path)
                                 picking -> onSelectAttachment(entry)
                                 entry.isImage -> onOpenImage(entry.path, entry.name)
                                 entry.isPreviewable -> onOpenDocument(entry.path)
@@ -607,3 +617,7 @@ private fun localizedArtifactKind(kind: String): String = when (kind) {
     "文件", "File" -> uiText(R.string.ui_0064, "文件")
     else -> kind
 }
+
+/** View filter only: never renames, moves, or deletes server data. */
+internal fun isWorkspaceSystemEntry(entry: WorkspaceEntry, atRoot: Boolean): Boolean =
+    entry.name.startsWith(".") || (atRoot && (entry.name == "hermes-today.json" || com.qingyu.hermescompanion.data.isAssistantSupportFile(entry.path)))

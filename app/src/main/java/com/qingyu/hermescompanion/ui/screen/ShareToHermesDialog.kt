@@ -142,7 +142,7 @@ fun ShareToHermesDialog(
                 if (chooseConversation) {
                 ShareSessionRow(uiText(R.string.ui_0045, "日常助理"), selectedSessionId == DailyConversation.SHARE_TARGET, !state.isShareSending) { selectedSessionId = DailyConversation.SHARE_TARGET }
                 ShareSessionRow(uiText(R.string.ui_1268, "新建对话"), selectedSessionId == null, !state.isShareSending) { selectedSessionId = null }
-                state.sessions.filter { it.profile == state.activeProfile && !it.source.equals("cron", true) && !DailyConversation.isDailyTitle(it.title) }.take(5).forEach { session ->
+                state.sessions.filter { it.profile == state.activeProfile && !com.qingyu.hermescompanion.data.isTaskConversation(it, state.taskSessionKeys) && !DailyConversation.isDailyTitle(it.title) }.take(5).forEach { session ->
                     ShareSessionRow(
                         ellipsizeSessionTitle(session.title),
                         selectedSessionId == session.id,

@@ -1,7 +1,11 @@
 package com.qingyu.hermescompanion.ui.screen
 
 import com.qingyu.hermescompanion.i18n.uiText
+import com.qingyu.hermescompanion.data.replyPresentation
 import com.qingyu.hermescompanion.R
+import com.qingyu.hermescompanion.data.currentConversationMaterials
+import com.qingyu.hermescompanion.data.isAssistantSupportFile
+import com.qingyu.hermescompanion.today.todayText
 
 
 import android.Manifest
@@ -58,6 +62,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -386,32 +391,36 @@ fun ChatScreen(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
                 !showHistory && state.messages.isNotEmpty() -> {
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        item {
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                val project = state.selectedSession?.workspacePath?.let { projectForWorkspace(state.projects, it) }
-                                Text(project?.name?.let { uiText(R.string.ui_0661, "%1\$s · 当前对话", it) } ?: uiText(R.string.ui_0661, "%1\$s · 当前对话", state.activeProfile), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(if(isCurrentSessionStreaming) state.chatTodos.firstOrNull { it.status == com.qingyu.hermescompanion.model.TodoStatus.IN_PROGRESS }?.content ?: uiText(R.string.ui_0662, "正在处理，\n你交给我的这件事") else uiText(R.string.ui_0663, "最近一次答复"), fontSize = 25.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
-                                Row(Modifier.padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (characterState != null) HermesMascot(characterState, Modifier.size(66.dp, 86.dp), onFinished = { celebrate = false })
-                                    else UserAvatar(state.userProfile.hermesAvatarUri, hermesName, 42.dp, hermesFallback = true, shape = CircleShape)
-                                    Text(if(isCurrentSessionRecovering) uiText(R.string.ui_0664, "%1\$s 正在重连", hermesName) else if(isCurrentSessionStreaming) uiText(R.string.ui_0665, "%1\$s 正在处理", hermesName) else uiText(R.string.ui_0666, "%1\$s 的回复", hermesName), Modifier.weight(1f).padding(start = 12.dp), fontSize = 15.sp)
-                                    if(isCurrentSessionStreaming) CircularProgressIndicator(Modifier.size(15.dp), color = AssistantBlue, strokeWidth = 2.dp)
+                    LazyColumn(Modifier.fillMaxSize().testTag("chat-focus-feed"), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item(key = "question-context") {
+                            val question = state.messages.lastOrNull { it.role == MessageRole.USER }
+                            var expandedQuestion by rememberSaveable(question?.id) { mutableStateOf(false) }
+                            question?.let {
+                                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = .05f),
+                                    modifier = Modifier.fillMaxWidth().clickable { expandedQuestion = !expandedQuestion }) {
+                                    Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                                        Text(com.qingyu.hermescompanion.assistant.AssistantPrompts.visibleText(it.content),
+                                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = if (expandedQuestion) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+                                    }
                                 }
+                            }
+                            if (characterState != null || isCurrentSessionStreaming || isCurrentSessionRecovering) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (characterState != null) HermesMascot(characterState, Modifier.size(36.dp, 44.dp), onFinished = { celebrate = false })
+                                else CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Text(if (isCurrentSessionRecovering) todayText("正在取回回复", "Recovering your reply") else if (isCurrentSessionStreaming) todayText("正在为你处理", "Working on your request") else todayText("回复已更新", "Reply updated"),
+                                    Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         state.pendingAgentRequests.filter { it.conversationId == state.selectedSession?.id }.forEach { request ->
                             item(key = "focus-request-${request.requestId}") { AgentRequestCard(request, onRespondRequest) }
                         }
-                        if(state.chatTodos.isNotEmpty() || state.toolActivities.isNotEmpty()) item {
-                            WorkProgress(state.chatTodos, state.toolActivities)
-                        }
-                        val answer = state.messages.lastOrNull { it.role == MessageRole.ASSISTANT }
+                        val answer = state.messages.drop(state.messages.indexOfLast { it.role == MessageRole.USER }.coerceAtLeast(0)).lastOrNull { it.role == MessageRole.ASSISTANT }
                         if (answer != null) {
                             item(key = "focus-answer-${answer.id}") {
                                 Surface(shape = MaterialTheme.shapes.large, color = if(isCurrentSessionStreaming) AssistantBlue.copy(alpha = .06f) else MaterialTheme.colorScheme.surface) {
                                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                        MessageItem(answer, true, false, onOpenImage, onOpenLink,
+                                        MessageItem(answer, false, false, onOpenImage, onOpenLink,
                                             state.userProfile.displayName, state.userProfile.avatarUri,
                                             hermesName, state.userProfile.hermesAvatarUri, state.inlineImagePreviews,
                                             state.toolActivities.count { it.status == ToolStatus.RUNNING }, readerMode = true,
@@ -422,22 +431,13 @@ fun ChatScreen(
                                 }
                             }
                         }
-                        if(state.chatArtifacts.isNotEmpty()) item {
-                            AssistantPanel(Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(uiText(R.string.ui_0667, "本次资料"), fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    state.chatArtifacts.forEach { artifact ->
-                                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.background,
-                                            modifier = Modifier.fillMaxWidth().clickable { onOpenArtifact(artifact) }) {
-                                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                AssistantIconWell("file", AssistantMint, Modifier.size(38.dp))
-                                                Text(artifact.name, Modifier.weight(1f).padding(horizontal = 12.dp), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                                AssistantGlyph("chevron", Modifier.size(18.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        val turnKey = state.messages.lastOrNull { it.role == MessageRole.USER }?.id.orEmpty()
+                        val materials = currentConversationMaterials(state.messages, state.toolActivities)
+                        if (materials.isNotEmpty()) item(key = "reference-materials") {
+                            ConversationMaterials(materials, turnKey, onOpenArtifact)
+                        }
+                        if (state.chatTodos.isNotEmpty() || state.toolActivities.isNotEmpty()) item(key = "processing-details") {
+                            ConversationProcessDetails(state.chatTodos, state.toolActivities, turnKey)
                         }
                         item { TextButton(colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer), onClick = { showHistory = true }) { Text(uiText(R.string.ui_0668, "查看完整对话与上下文 →")) } }
                     }
@@ -590,7 +590,7 @@ fun ChatScreen(
             onCancelVoice = onCancelVoiceInput,
             onRemoveAttachment = onRemoveAttachment,
             onPreviewAttachment = { attachment ->
-                attachment.dataUrl?.let { onOpenImage(it, attachment.name) }
+                attachment.dataUrl?.takeIf { attachment.mimeType.startsWith("image/") }?.let { onOpenImage(it, attachment.name) }
             },
             onSend = onSend,
             failedSend = state.failedSend != null,
@@ -768,7 +768,12 @@ internal fun MessageItem(
     val councilMessages = remember(message.content) { parseCouncilAgentMessages(message.content) }
     val syntheticProcessing = message.role == MessageRole.ASSISTANT && message.isStreaming &&
         isSyntheticProcessingStatus(message.content)
-    val visibleContent = if (syntheticProcessing) "" else message.content
+    val rawContent = if (syntheticProcessing) "" else message.content
+    val presentation = remember(rawContent, readerMode, message.isStreaming) {
+        if (readerMode && !message.isStreaming) replyPresentation(rawContent) else com.qingyu.hermescompanion.data.ReplyPresentation(rawContent)
+    }
+    val visibleContent = presentation.body
+    var showReplyLog by rememberSaveable(message.id) { mutableStateOf(false) }
     val visibleReasoning = message.reasoning.takeUnless { it.trim().trimEnd('.', '…') == uiText(R.string.ui_0676, "正在思考") }.orEmpty()
     BoxWithConstraints(
         modifier = Modifier.fillMaxWidth().then(
@@ -913,6 +918,14 @@ internal fun MessageItem(
                         }
                     }
                 }
+                if (presentation.details.isNotEmpty()) {
+                    TextButton(onClick = { showReplyLog = !showReplyLog }, contentPadding = PaddingValues(0.dp), modifier = Modifier.testTag("reply-log-toggle")) {
+                        Text(if (showReplyLog) todayText("收起处理日志", "Hide processing log") else todayText("查看处理日志", "View processing log"),
+                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (showReplyLog) MarkdownContent(markdown = presentation.details.joinToString("\n\n"), onOpenImage = onOpenImage,
+                        onOpenLink = onOpenLink, inlineImagePreviews = inlineImagePreviews, modifier = Modifier.testTag("reply-log"))
+                }
                 if (message.images.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         message.images.forEach { image ->
@@ -925,8 +938,8 @@ internal fun MessageItem(
                         }
                     }
                 }
-                if (!message.isStreaming && visibleContent.isNotBlank()) {
-                    com.qingyu.hermescompanion.ui.component.ReplyActions(visibleContent, reading, preparing, onReadAloud)
+                if (!message.isStreaming && rawContent.isNotBlank()) {
+                    com.qingyu.hermescompanion.ui.component.ReplyActions(rawContent, reading, preparing, onReadAloud)
                 }
                 if (message.isStreaming && !(visibleReasoning.isNotBlank() && visibleContent.isBlank() && runningToolCount == 0 && !syntheticProcessing)) {
                     Row(
@@ -1355,7 +1368,13 @@ private fun Composer(
                     modifier = Modifier.padding(bottom = 7.dp),
                 )
             }
-            AnimatedVisibility(attachments.isNotEmpty()) {
+            val supportAttachments = attachments.filter { isAssistantSupportFile(it.name) }
+            var showSupport by remember(supportAttachments.map { it.id }) { mutableStateOf(false) }
+            if (supportAttachments.isNotEmpty()) TextButton(onClick = { showSupport = !showSupport }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                Text(todayText("已带上相关背景", "Context attached"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val displayedAttachments = attachments.filter { !isAssistantSupportFile(it.name) || showSupport }
+            AnimatedVisibility(displayedAttachments.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1363,7 +1382,7 @@ private fun Composer(
                         .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    attachments.forEach { attachment ->
+                    displayedAttachments.forEach { attachment ->
                         AttachmentChip(
                             attachment,
                             onOpen = { onPreviewAttachment(attachment) },
@@ -1371,7 +1390,7 @@ private fun Composer(
                         )
                     }
                     Text(
-                        text = "${attachments.size}/10",
+                        text = "${displayedAttachments.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
@@ -1725,7 +1744,7 @@ private fun AttachmentChip(attachment: PendingAttachment, onOpen: () -> Unit, on
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
-                    .clickable(enabled = attachment.dataUrl != null, onClick = onOpen)
+                    .clickable(enabled = attachment.dataUrl != null && attachment.mimeType.startsWith("image/"), onClick = onOpen)
                     .padding(start = 5.dp)
                     .width(95.dp),
             )

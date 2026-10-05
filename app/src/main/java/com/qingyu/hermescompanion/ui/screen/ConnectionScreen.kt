@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.qingyu.hermescompanion.ui.component.HermesContentAction
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -116,7 +117,7 @@ fun ConnectionScreen(
                     label = { Text(uiText(R.string.ui_0767, "远程网关地址")) },
                     placeholder = { Text("https://your-server.example") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), singleLine = true)
-                TextButton(onClick = { addressHelp = !addressHelp }, modifier = Modifier.testTag("gateway_address_help")) {
+                HermesContentAction(onClick = { addressHelp = !addressHelp }, modifier = Modifier.testTag("gateway_address_help")) {
                     Text(uiText(R.string.gateway_find_address, "在哪里找到地址？"))
                 }
                 if (addressHelp) Text(uiText(R.string.gateway_address_steps, "在电脑端打开 Hermes Desktop 的远程访问设置，复制“远程 URL”。手机与服务器需要能够互相访问；不要在地址后追加 /api 或 /v1。"),
@@ -159,7 +160,7 @@ fun ConnectionScreen(
                 else Text(if (state.hasSavedConnection) uiText(R.string.ui_0777, "验证并更新连接") else uiText(R.string.ui_0778, "验证并连接"))
             }
             if (state.hasSavedConnection) {
-                TextButton(onClick = { diagnosticsOpen = !diagnosticsOpen }, modifier = Modifier.fillMaxWidth()) {
+                HermesContentAction(onClick = { diagnosticsOpen = !diagnosticsOpen }, modifier = Modifier.fillMaxWidth()) {
                     Text(uiText(R.string.gateway_diagnostics, "诊断与 Agent 版本"))
                     HermesMulticolorIcon(if (diagnosticsOpen) HermesIconKind.EXPAND_UP else HermesIconKind.EXPAND_DOWN, null, iconSize = 18.dp)
                 }

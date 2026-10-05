@@ -141,8 +141,8 @@ fun SessionsScreen(
     val selectedProjectId = state.selectedProjectId
     var timeFilter by remember(state.activeProfile) { mutableStateOf(SessionTimeFilter.ALL) }
 
-    val regularSessions = remember(state.sessions) {
-        val regular = state.sessions.filterNot(HermesSession::isCron)
+    val regularSessions = remember(state.sessions, state.taskSessionKeys) {
+        val regular = state.sessions.filterNot { com.qingyu.hermescompanion.data.isTaskConversation(it, state.taskSessionKeys) }
         regular.filter(HermesSession::isPinned) + regular.filterNot(HermesSession::isPinned)
     }
     val filteredRegularSessions = remember(regularSessions, state.projects, selectedProjectId, timeFilter) {
@@ -685,7 +685,7 @@ private fun SessionRow(
                             )
                         }
                         Text(
-                            session.title,
+                            com.qingyu.hermescompanion.data.readableConversationTitle(session.title),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
