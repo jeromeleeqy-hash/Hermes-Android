@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import com.qingyu.hermescompanion.R
 import com.qingyu.hermescompanion.i18n.AppLanguage
 import java.time.LocalDate
@@ -14,9 +15,10 @@ import kotlin.random.Random
 @Composable
 internal fun rememberHomeQuote(day: LocalDate): String {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val locale = AppLanguage.locale
-    val quotes = remember(context, locale) {
-        context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(locale) })
+    val quotes = remember(context, configuration, locale) {
+        context.createConfigurationContext(Configuration(configuration).apply { setLocale(locale) })
             .resources.getStringArray(R.array.home_quotes)
     }
     val index = rememberSaveable(day.toEpochDay()) { HomeQuoteSelection.next(quotes.size) }

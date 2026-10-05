@@ -101,13 +101,37 @@ fun AssistantGlyph(kind: String, modifier: Modifier = Modifier.size(24.dp), tint
             val stroke = Stroke(1.65f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             fun line(x: Float, y: Float, x2: Float, y2: Float) = drawLine(tint, Offset(x,y), Offset(x2,y2), 1.65f, StrokeCap.Round)
             when (kind) {
-                "spark" -> { val p = Path().apply { moveTo(12f,2f); quadraticTo(13.5f,10.5f,22f,12f); quadraticTo(13.5f,13.5f,12f,22f); quadraticTo(10.5f,13.5f,2f,12f); quadraticTo(10.5f,10.5f,12f,2f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
+                "spark", "sparkles" -> { val p = Path().apply { moveTo(12f,2f); quadraticTo(13.5f,10.5f,22f,12f); quadraticTo(13.5f,13.5f,12f,22f); quadraticTo(10.5f,13.5f,2f,12f); quadraticTo(10.5f,10.5f,12f,2f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
                 "home" -> { val p = Path().apply { moveTo(3f,11f); lineTo(12f,3f); lineTo(21f,11f); lineTo(21f,21f); lineTo(15f,21f); lineTo(15f,15f); lineTo(9f,15f); lineTo(9f,21f); lineTo(3f,21f); close() }; drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
                 "history" -> { if(filled) { drawCircle(ink,9f,Offset(12f,12f)); drawLine(cutout,Offset(12f,6f),Offset(12f,12f),1.8f,StrokeCap.Round); drawLine(cutout,Offset(12f,12f),Offset(17f,12f),1.8f,StrokeCap.Round) } else { drawCircle(tint,9f,Offset(12f,12f),style=stroke); line(12f,6f,12f,12f);line(12f,12f,17f,12f) } }
-                "user" -> { drawCircle(ink,4.1f,Offset(12f,6.5f),style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke); val p=Path().apply{moveTo(3f,22f);cubicTo(3f,10f,21f,10f,21f,22f);close()};drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
+                "user", "profile" -> { drawCircle(ink,4.1f,Offset(12f,6.5f),style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke); val p=Path().apply{moveTo(3f,22f);cubicTo(3f,10f,21f,10f,21f,22f);close()};drawPath(p,ink,style=if(filled) androidx.compose.ui.graphics.drawscope.Fill else stroke) }
+                "chat" -> {
+                    val p = Path().apply {
+                        moveTo(6f,4f); lineTo(18f,4f); quadraticTo(21f,4f,21f,7f)
+                        lineTo(21f,15f); quadraticTo(21f,18f,18f,18f); lineTo(10f,18f)
+                        lineTo(5f,21f); lineTo(5f,18f); quadraticTo(3f,18f,3f,15f)
+                        lineTo(3f,7f); quadraticTo(3f,4f,6f,4f); close()
+                    }
+                    drawPath(p, ink, style = stroke); line(7f,9f,17f,9f); line(7f,13f,14f,13f)
+                }
+                "calendar" -> {
+                    drawRoundRect(tint, topLeft = Offset(3f,5f), size = androidx.compose.ui.geometry.Size(18f,16f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f), style = stroke)
+                    line(7f,3f,7f,7f); line(17f,3f,17f,7f); line(3f,10f,21f,10f)
+                    listOf(8f,12f,16f).forEach { x -> drawCircle(tint, .8f, Offset(x,15f)) }
+                }
+                "heart" -> {
+                    val p = Path().apply {
+                        moveTo(12f,21f); cubicTo(8f,17f,3f,13f,3f,8f)
+                        cubicTo(3f,3f,9f,2f,12f,7f); cubicTo(15f,2f,21f,3f,21f,8f)
+                        cubicTo(21f,13f,16f,17f,12f,21f); close()
+                    }
+                    drawPath(p, ink, style = if (filled) androidx.compose.ui.graphics.drawscope.Fill else stroke)
+                }
                 "plus" -> {line(12f,4f,12f,20f);line(4f,12f,20f,12f)}
                 "wave" -> listOf(8f,16f,22f,14f,5f).forEachIndexed { i,h -> line(3f+i*4.5f,12f-h/2,3f+i*4.5f,12f+h/2) }
                 "search" -> { drawCircle(tint,7f,Offset(10f,10f),style=stroke);line(15f,15f,21f,21f) }
+                "refresh" -> { drawArc(tint,45f,285f,false,Offset(4f,4f),androidx.compose.ui.geometry.Size(16f,16f),style=stroke);line(20f,3f,20f,9f);line(20f,9f,14f,9f) }
                 "arrow" -> {line(5f,12f,20f,12f);line(14f,6f,20f,12f);line(20f,12f,14f,18f)}
                 "chevron" -> {line(9f,6f,15f,12f);line(15f,12f,9f,18f)}
                 "more" -> listOf(5f,12f,19f).forEach {drawCircle(tint,1.8f,Offset(it,12f))}
@@ -166,7 +190,7 @@ fun ReferenceBottomDock(selected: AppRoute, hasUnread: Boolean, onSelect: (AppRo
         .then(if (skin.glass) Modifier else Modifier.background(colors.background))
         .windowInsetsPadding(navigationInsets.only(WindowInsetsSides.Horizontal))) {
         if (!skin.glass) HorizontalDivider(color = colors.outlineVariant, thickness = .5.dp)
-        val dock = Modifier.fillMaxWidth().padding(horizontal = if (skin.glass) 16.dp else 8.dp)
+        val dock = Modifier.fillMaxWidth().padding(horizontal = if (skin.glass) com.qingyu.hermescompanion.ui.theme.HermesSpacing.floatingInset else 8.dp)
             .trackFloatingDock()
             .testTag("floating_bottom_dock")
         Box(if (skin.glass) dock.hermesChrome(RoundedCornerShape(skin.dockRadius.dp), tintAlpha = .42f) else dock) {
