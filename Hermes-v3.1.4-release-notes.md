@@ -1,4 +1,4 @@
-# Hermes 3.1.4
+docs/archive/release-notes/Hermes-v3.1.4-release-notes.md# Hermes 3.1.4
 
 - 导航取消点击灰底，保留渐变和缩放；未选中中性灰，选中柔和蓝紫。
 - 助理导航从用户提供的女孩轮廓原图提取为矢量路径，在原生绘制中完成灰色与蓝紫色填色过渡；不改变首页托腮插画。
