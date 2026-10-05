@@ -31,6 +31,8 @@ class ConcurrentSessionsTest {
     private lateinit var client: HermesApiClient
     private val drafts = ConcurrentHashMap<String, String>()
     private val dailyBindings = ConcurrentHashMap<String, String>()
+    private val cardBindings = ConcurrentHashMap<String, String>()
+    private val manualTitles = ConcurrentHashMap<String, String>()
     private val a = HermesSession(id = "a", title = "Project A", profile = "default", workspacePath = "/projects/a", messageCount = 4)
     private val b = HermesSession(id = "b", title = "Project B", profile = "default", workspacePath = "/projects/b", messageCount = 4)
 
@@ -39,6 +41,12 @@ class ConcurrentSessionsTest {
         stores = mockConstruction(SecureConfigStore::class.java) { store, _ ->
             `when`(store.readActiveHermesProfile()).thenReturn("default")
             `when`(store.readTodayOperations(anyString())).thenReturn("[]")
+            `when`(store.readTodayConversation(anyString(), anyString())).thenAnswer { cardBindings[it.arguments.take(2).joinToString("|")] }
+            doAnswer { cardBindings[it.arguments.take(2).joinToString("|")] = it.arguments[2] as String; null }
+                .`when`(store).saveTodayConversation(anyString(), anyString(), anyString())
+            `when`(store.readManualSessionTitle(anyString(), anyString())).thenAnswer { manualTitles[it.arguments.take(2).joinToString("|")] }
+            doAnswer { manualTitles[it.arguments.take(2).joinToString("|")] = it.arguments[2] as String; null }
+                .`when`(store).saveManualSessionTitle(anyString(), anyString(), anyString())
             `when`(store.readTaskSessionKeys(anyString())).thenReturn(emptySet())
             `when`(store.readInspectedTaskSessions(anyString())).thenReturn(emptySet())
             `when`(store.readUnreadSessionIds()).thenReturn(emptySet())
@@ -390,7 +398,7 @@ class ConcurrentSessionsTest {
         verify(client, never()).saveWorkspaceDocumentForProfile(anyString(), anyString(), anyString())
     }
 
-    @Test fun cardStaysOnHomeUntilMatchingServerReceiptConfirmsTheUpdate() {
+    @Test fun cardCompletionAutomaticallyReadsMatchingReceiptEvenAfterSwitchingToSimpleHome() {
         val (card, raw) = prepareInteractiveToday()
         mockTodayCache()
         val created = HermesSession(id = "confirmed-action", title = "Card action", runtimeId = "runtime-card", workspacePath = "/work")
@@ -407,7 +415,8 @@ class ConcurrentSessionsTest {
         }
         `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default"))
             .thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", confirmed.toString()))
-        vm.refreshToday()
+        setState(vm.uiState.copy(homeMode = HomeMode.SIMPLE))
+        emit(runs().getValue(created.scopedId), StreamEvent.Completed)
         awaitState { vm.uiState.todayActions.values.singleOrNull()?.status == "applied" }
         assertEquals("关联已确认，事项已收口", vm.uiState.todayActions.values.single().message)
         assertEquals("done", vm.uiState.today.board!!.cards.first().status)
@@ -853,6 +862,124 @@ class ConcurrentSessionsTest {
         assertTrue(created.scopedId in vm.uiState.taskSessionKeys)
         verify(stores.constructed().single()).saveTaskSessionKeys(vm.uiState.baseUrl.trimEnd('/') + "\n" + vm.uiState.username, setOf(background.scopedId, created.scopedId))
         verify(client, times(1)).createSessionForProfile("/work", "default")
+    }
+
+    private fun bindCardConversation(session: HermesSession, cardId: String, root: String = "/work") {
+        stores.constructed().single().saveTodayConversation(vm.uiState.baseUrl.trimEnd('/') + "\n" + vm.uiState.username,
+            session.scopedId, TodayConversationBinding(session.profile, root, session.id, cardId).encode())
+    }
+
+    private fun completeConversation(session: HermesSession, progress: String, recovered: Boolean = false): SessionRun {
+        setState(vm.uiState.copy(route = AppRoute.CHAT, selectedSession = session, messages = emptyList(), draft = progress,
+            sessions = (listOf(session) + vm.uiState.sessions).distinctBy { it.scopedId }))
+        vm.sendMessage()
+        val run = runs().getValue(session.scopedId)
+        emit(run, StreamEvent.AssistantCompleted("已了解你的最新进展。"))
+        if (recovered) {
+            run.recovering = true
+            HermesViewModel::class.java.getDeclaredMethod("finishStreaming", SessionRun::class.java)
+                .apply { isAccessible = true }.invoke(vm, run)
+        } else emit(run, StreamEvent.Completed)
+        return run
+    }
+
+    @Test fun cardChatAutomaticallySyncsCompletedEvidenceWithoutChangingNavigationOrClaimingCompletion() {
+        val (card, raw) = prepareInteractiveToday(); mockTodayCache()
+        val chat = HermesSession("card-chat", "继续聊", workspacePath = "/work", runtimeId = "chat-runtime")
+        val refresh = HermesSession("auto-overview", "自动更新", workspacePath = "/work", runtimeId = "refresh-runtime")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(chat, refresh)
+        vm.discussTodayCard(card.id, "progress")
+        awaitState { vm.uiState.selectedSession?.id == chat.id && !vm.uiState.isBusy }
+        assertTrue(cardBindings.values.any { it.contains(card.id) })
+        assertFalse(vm.uiState.attachments.any { it.name == "hermes-today-writer.py" || it.name == "hermes-today-request.json" })
+        val context = vm.uiState.attachments.single { it.name == "today-card-context.json.txt" }.textContent!!
+        assertFalse(context.contains("\"interaction\"")); assertFalse(context.contains("\"layout\""))
+        vm.updateDraft("这件事已经完成，原记录已经核实")
+        vm.sendMessage()
+        val chatRun = runs().getValue(chat.scopedId)
+        emit(chatRun, StreamEvent.AssistantCompleted("这件事已处理完。"))
+        emit(chatRun, StreamEvent.Completed)
+        vm.updateDraft("下一条尚未发送")
+        assertEquals("open", vm.uiState.today.board!!.cards.first().status)
+        dispatcher.scheduler.advanceTimeBy(1_100)
+        awaitState { runs().containsKey(refresh.scopedId) }
+        val run = runs().getValue(refresh.scopedId)
+        val request = JSONObject(run.submittedAttachments.single { it.name == "hermes-today-request.json" }.textContent!!)
+        assertEquals(listOf(card.id), request.getJSONArray("card_ids").let { List(it.length()) { index -> it.getString(index) } })
+        val evidence = JSONObject(run.submittedAttachments.single { it.name == "today-recent-conversations.json" }.textContent!!)
+        assertEquals(1, evidence.getJSONArray("conversations").length())
+        assertTrue(evidence.toString().contains("这件事已经完成"))
+        verify(client, never()).loadOverviewMessages(anySession())
+        assertTrue(refresh.scopedId in vm.uiState.taskSessionKeys)
+        assertEquals(AppRoute.CHAT, vm.uiState.route)
+        assertEquals(chat.id, vm.uiState.selectedSession?.id)
+        assertEquals("下一条尚未发送", vm.uiState.draft)
+        val updated = JSONObject(raw).apply {
+            getJSONArray("cards").getJSONObject(0).put("status", "done")
+            put("refresh_receipts", org.json.JSONArray().put(JSONObject().put("request_id", request.getString("refresh_id")).put("status", "applied")))
+        }
+        `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default"))
+            .thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", updated.toString()))
+        emit(run, StreamEvent.Completed)
+        awaitState { vm.uiState.today.board?.cards?.first()?.status == "done" && !vm.uiState.todayRefresh.busy }
+        assertEquals("", vm.uiState.todayRefresh.message)
+        dispatcher.scheduler.advanceTimeBy(6_000); dispatcher.scheduler.runCurrent()
+        verify(client, times(2)).createSessionForProfile("/work", "default")
+        assertEquals("下一条尚未发送", vm.uiState.draft)
+    }
+
+    @Test fun recoveredAndConsecutiveCardTurnsCoalesceAndQueueOneFollowupBehindAnActiveRefresh() {
+        val (card, raw) = prepareInteractiveToday(); mockTodayCache()
+        val chat = HermesSession("recovered-card", "事项对话", workspacePath = "/work", messageCount = 4)
+        val first = HermesSession("sync-first", "更新", workspacePath = "/work", runtimeId = "first-runtime")
+        val second = first.copy(id = "sync-second", runtimeId = "second-runtime")
+        bindCardConversation(chat, card.id)
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(first, second)
+        completeConversation(chat, "已完成第一部分", recovered = true)
+        completeConversation(chat, "现在已完成第二部分")
+        dispatcher.scheduler.advanceTimeBy(1_100)
+        awaitState { runs().containsKey(first.scopedId) }
+        val initial = runs().getValue(first.scopedId)
+        assertTrue(initial.submittedAttachments.single { it.name == "today-recent-conversations.json" }.textContent!!.contains("现在已完成第二部分"))
+        completeConversation(chat, "又补充了最后一点")
+        dispatcher.scheduler.advanceTimeBy(1_100); dispatcher.scheduler.runCurrent()
+        verify(client, times(1)).createSessionForProfile("/work", "default")
+        val receipt = JSONObject(raw).put("refresh_receipts", org.json.JSONArray().put(JSONObject()
+            .put("request_id", vm.uiState.todayRefresh.requestId).put("status", "applied")))
+        `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default"))
+            .thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", receipt.toString()))
+        emit(initial, StreamEvent.Completed)
+        awaitState { !vm.uiState.todayRefresh.busy }
+        dispatcher.scheduler.advanceTimeBy(1_100)
+        awaitState { runs().containsKey(second.scopedId) }
+        val followup = runs().getValue(second.scopedId)
+        assertTrue(followup.submittedAttachments.single { it.name == "today-recent-conversations.json" }.textContent!!.contains("又补充了最后一点"))
+        assertEquals("open", vm.uiState.today.board!!.cards.first().status)
+        verify(client, times(2)).createSessionForProfile("/work", "default")
+    }
+
+    @Test fun ordinaryOrMismatchedCardConversationsNeverStartAnOverviewAgent() {
+        val (card, _) = prepareInteractiveToday(); mockTodayCache()
+        setState(vm.uiState.copy(homeMode = HomeMode.SIMPLE))
+        bindCardConversation(a, card.id) // A belongs to /projects/a, not the card's /work.
+        completeConversation(a, "随便聊聊")
+        completeConversation(b, "普通聊天")
+        dispatcher.scheduler.advanceTimeBy(2_000); dispatcher.scheduler.runCurrent()
+        verify(client, never()).createSessionForProfile(anyString(), anyString())
+        verify(client, never()).initialWorkspaceForProfile(anyString())
+    }
+
+    @Test fun manualRenameUsesExactInputAndCannotMutateAnotherProfile() {
+        val name = "项目 A · 十月份详细复盘与下一阶段计划"
+        `when`(client.setSessionTitleForProfile(a.id, name, a.profile)).thenReturn(name)
+        vm.renameSession(a, "  $name  ")
+        awaitState { vm.uiState.selectedSession?.title == name && vm.uiState.sessionActionId == null }
+        verify(client).setSessionTitleForProfile(a.id, name, a.profile)
+        assertTrue(manualTitles.values.contains(name))
+        verify(client, never()).generateSessionTitles(anyList())
+        vm.renameSession(a.copy(profile = "other"), "other title")
+        vm.renameSession(a, " ")
+        verify(client, times(1)).setSessionTitleForProfile(anyString(), anyString(), anyString())
     }
 
     private fun anySession(): HermesSession = any(HermesSession::class.java) ?: a
