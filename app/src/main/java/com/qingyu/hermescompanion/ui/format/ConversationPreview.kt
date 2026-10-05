@@ -11,7 +11,7 @@ import java.time.ZoneId
 fun conversationPreview(raw: String): String {
     val marker = Regex("<!--\\s*hermes-mobile-context-v1:").find(raw)
     val visible = if (marker == null) raw else raw.substring(0, marker.range.first)
-    return visible.replace(Regex("@file:(?:/[^\\s]+)")) { match ->
+    return com.qingyu.hermescompanion.data.replyExcerpt(visible).replace(Regex("@file:(?:/[^\\s]+)")) { match ->
         val file = match.value.substringAfterLast('/').ifBlank { uiText(R.string.ui_0051, "附件") }
         uiText(R.string.ui_0474, "附件 · %1\$s", file)
     }.replace(Regex("\\s+"), " ").trim()
