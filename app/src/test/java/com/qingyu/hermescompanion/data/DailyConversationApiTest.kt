@@ -48,4 +48,18 @@ class DailyConversationApiTest {
         val patch = server.takeRequest()
         assertEquals("PATCH", patch.method); assertEquals("work", patch.requestUrl!!.queryParameter("profile"))
     }
+
+    @Test fun userEnteredTitlePreservesLongNamesAndPunctuationWithoutAiShortening() {
+        val title = "十月份复盘：第二阶段计划与后续安排。"
+        server.enqueue(MockResponse().setBody(JSONObject().put("title", title).toString()))
+        assertEquals(title, client.setSessionTitleForProfile("session", " $title ", "work"))
+        val request = server.takeRequest()
+        assertEquals("PATCH", request.method)
+        assertEquals("work", request.requestUrl!!.queryParameter("profile"))
+        assertEquals(title, JSONObject(request.body.readUtf8()).getString("title"))
+        server.enqueue(MockResponse().setBody(JSONObject().put("id", "session").put("title", title).toString()))
+        assertEquals(title, client.sessionForProfile("session", "work")?.title)
+        assertThrows(IllegalArgumentException::class.java) { client.setSessionTitleForProfile("session", " ", "work") }
+        assertEquals(2, server.requestCount)
+    }
 }
