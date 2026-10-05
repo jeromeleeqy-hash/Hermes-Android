@@ -2,6 +2,112 @@
 
 All releases documented by the available release notes, newest first. Unknown early dates and undocumented version numbers are not invented. Historical entries describe behavior at that time; see the latest entry for current behavior.
 
+## 3.8.4 · 2026-10-05
+
+- Use a fixed authorization window with scrolling content and full-width review buttons.
+- Recheck pending requests on foreground and while waiting; reconcile requests handled on another device before submitting.
+- Simplify Home to Daily schedule and Home settings, with one-time storage setup and folded maintenance tools.
+- Keep automated App work in Tasks and user conversations in the conversation list, including recognized legacy App tasks.
+
+## 3.8.3 · 2026-10-05
+
+- Align notices with the glass navigation dock.
+- Refresh the overview against recent progress with a server receipt; keep read-only sync in the menu.
+- Show operation details and reconcile unavailable conversations without replaying completed work.
+- Add guarded overview storage migration and compatible old-path reads.
+
+## 3.8.2 · 2026-10-04
+
+- Use high-contrast home voice icons and the existing animated half portrait.
+- Redesign Help me with six scene cards and free text; only start a chat after explicit confirmation.
+- Align the five main pages with shared outer gutters and content widths.
+- Add app updates with release notes, background download, package verification and system-confirmed installation.
+- Optional daily checks on opening the app; Wi-Fi-only downloads by default, independent of the Hermes gateway.
+
+## 3.8.1 · 2026-10-04
+
+- Compact home greeting and cards; distinguish historical dates from real schedules and keep short detail windows stable.
+- Show the current question and answer directly. Fold explicitly labelled logs while keeping blockers and approvals visible.
+- Use neutral reply history instead of success ticks. Sort schedules by next run, explain common weekly timings, and fold paused schedules.
+- Browse folders in two columns (one at large font sizes). Reveal system files from the menu and use a compact profile page.
+- Preserve confirmed decisions across briefings; missing receipts or newer summaries must not silently undo user confirmation.
+
+## 3.8.0 · 2026-10-04
+
+- Organize Home around focus, meaningful unfinished work and justified reminders, with context first and conversation as the primary next step.
+- Use readable notes, schedules, recorded steps and metrics. Keep optional quick responses without forcing every open matter into a form.
+- Deduplicate references within the current conversation turn and collapse them by default. Keep processing details and internal attachments out of the main reading flow.
+- Browse the workspace directly without recent outputs. Simplify Tasks into Current, Scheduled and History while retaining approvals, stopping and schedule management.
+- Update briefing rules to use stated preferences and recent evidence, reducing archive-based guesses and processing logs. Existing briefing jobs can adopt the rules from the Home menu.
+- Retain legacy briefings, receipts, concurrency protection, approvals and reconnection, using the same self-hosted JSON and Markdown storage.
+
+## 3.7.8 · 2026-10-04
+
+- Support modern Hermes server requests for approvals and multi-question clarification; advertise capability on every connection and retain legacy support.
+- Show pending requests above card details and other pages, respecting server-offered approval scope and request expiry.
+- Distinguish waiting for input from unconfirmed results. Resume unfinished work with the original session, input and operation ID after checking receipts.
+- Restore open requests after reconnecting. Card success still requires a server receipt; existing briefing jobs need no reconfiguration.
+
+## 3.7.7 · 2026-10-04
+
+- Unify card spacing and typography, simplify category tabs, and expand longer context only when requested.
+- Upgrade the card contract with explicit notes, metrics, records and 20 interaction types, with migration guidance for older cards.
+- Process card actions in place, preserve input and operation IDs, and confirm results using server write receipts.
+- Verify morning and evening jobs by their actual IDs, enabled state, workspace rules and next run times.
+- Measure heartbeat timeouts from actual probes, handle app lifecycle and delayed timers, and retain recent connection diagnostics.
+- Strengthen operation deduplication, refresh merging and closed-card protection while retaining the self-hosted Hermes workspace.
+
+## 3.7.6 · 2026-10-03
+
+- Use the same borderless, shadowless panel styling as History, softer category buttons, and context before decisions.
+- Use fixed card detail and preview windows with independent scrolling and fixed actions, removing draggable sheet anchors.
+- Require clear subjects, context, status and requested responses. Separate independent issues and move processing notes out of cards; update verified briefing jobs without changing their schedules or enabled state.
+- Separate per-request context from persistent rules. Use full Cron templates and runtime dates, retry interrupted reads once without replaying writes, negotiate heartbeat and retain categorized connection issues.
+
+## 3.7.5 · 2026-10-03
+
+- Simplify Home: remove the segmented switch, duplicate memory entry and recent conversations; move tools and overview details to the top-right menu.
+- Use opaque 20dp rounded cards with subtle borders for clearer separation in light and dark themes.
+- Check quietly about once a minute on foreground Home, coalesce triggers, avoid unnecessary JSON downloads and retain saved content with retry backoff.
+- Wait for gateway readiness before concurrent RPCs, fence stale socket callbacks and reuse healthy connections during connection checks.
+
+## 3.7.4 · 2026-10-03
+
+- Add 20 native card layouts for clarification, comparison, meetings, metrics, revisions, memory corrections and more, with direct structured inputs.
+- Explore every layout using isolated sample data. Real submissions recheck the server card before starting a Hermes conversation; confirmed changes sync back.
+- Configure morning and evening briefings with an explicit timezone. Hermes persists the contract and configures matching Cron jobs, verifying their actual IDs and run times.
+- Retain existing JSON and encrypted-cache compatibility. Add validated interactive fields and operation receipts while preserving records, snapshots and uncertainty.
+
+## 3.7.3 · 2026-10-03
+
+- Keep an encrypted, app-private overview copy. Show cached content first; invalid responses retain the last good copy of the same workspace.
+- Sync about every 45 seconds while foregrounded, on resume and after a completed turn. Catch up after reconnecting; no additional database or push service.
+- Details separate questions, facts, options and collapsed background. Expand sources when needed; discussion actions remain visible. Clarifications have their own label.
+- Restructure existing cards separately from finding changes. Requests include an updated contract and writer with short-content limits, read budgets and concurrent-write checks.
+
+## 3.7.2 · 2026-10-03
+
+- Rebuilt from the saved 3.6.6 source and resources recovered from the 3.7.1 APK; this is not the missing original 3.7.1 source.
+- Home highlights four items, with options, recorded steps and metrics where provided. Full summaries and sources open in details.
+- Browse real workspace folders in a two-column memory view with verified direct-child counts.
+- Keep the existing JSON and Markdown workflow with no additional database or server. Existing v1 overviews remain compatible.
+- Restore system sharing, verified binary uploads and workspace boundaries with explicit Profile isolation.
+
+## 3.7.1 · 2026-10-02
+
+- Keep valid daily cards visible when a source cannot be opened. Show unsupported references separately without expanding workspace access.
+- Distinguish initial setup from repairing an existing brief. Format repair preserves facts and states without rescanning the workspace.
+- Include the actual writer with each update request. Overview updates leave original records unchanged; record edits require a specific item update.
+- Compact the greeting and summary to bring decision cards higher. Browse knowledge and memory through horizontal shortcuts.
+
+## 3.7.0 · 2026-10-02
+
+- Home now reads a daily brief from the active Profile workspace, with decisions, plans, follow-ups, changes, sources and update time.
+- Cards carry their context into a chat draft. The displayed state changes only after Hermes saves the record and the page refreshes.
+- Add eleven scene categories covering work, life, learning and more. Add details or material before continuing to a chat draft.
+- Open existing folders and Markdown directly, with a JSON contract and a companion Hermes Skill. No additional database or service.
+- Improve Android sharing with rich text, ClipData and general files. Files upload to the selected server only on Send, with read-back verification and retry support.
+
 ## 3.6.6 · 2026-09-14
 
 - Fix joined English words in reasoning by preserving spaces, line breaks and indentation in reasoning.delta and thinking.delta fragments.

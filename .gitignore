@@ -9,3 +9,5 @@ captures/
 .DS_Store
 *.jks
 *.keystore
+__pycache__/
+*.pyc

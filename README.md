@@ -2,19 +2,30 @@
 
 Hermes 是面向个人自部署 Hermes Agent 的轻量安卓客户端。模型、Skills、工具和记忆继续在服务器运行，手机端提供日常聊天、会话和附件入口。
 
-当前版本：`3.6.6` 正式版（英文思考排版、语音语言入口、回复复制与朗读）。
+当前试用版本：`3.8.6`（简洁首页 / 深度助理随时切换、恢复原版三套首页布局、模式自动记忆）。沿用自部署 Hermes、JSON 和 Markdown，无新增数据库或服务。
 
-本版说明见 [3.6.6 更新说明](docs/RELEASE-3.6.6.md)，English users: [Quick start](docs/QUICK-START-EN.md)。常见操作见应用内“我的 → 使用说明”或 [分级操作指南](docs/OPERATION-GUIDE.md)。
+本版说明见 [3.8.6 更新说明](docs/RELEASE-3.8.6.md)，安装、文件收纳和 OSS 上传见 [使用说明](docs/HERMES-3.8.6-INSTRUCTIONS.txt)，验证见 [VALIDATION-3.8.6.md](docs/VALIDATION-3.8.6.md)。常见操作见应用内“我的 → 使用说明”。
 
 首页“跟我说”打开固定的普通 Hermes 日常对话；分享默认进入同一对话。移除 3.4.0 的分类收集、计划采用和独立助理资料同步，记忆、文件与定时任务沿用 Hermes 原有能力。保留可恢复的单次录音转写。无需安装新的服务器服务或配置专用 workspace。
 
 助理首页、集中阅读视图和独立决策面板，配合「助理 / 回看 / 任务 / 文件 / 我的」五栏导航。点击“任务”直接进入执行中心。
 
-> 安装说明：日常使用请选择 `Hermes-Android-3.6.6-release.apk`，桌面名称为 Hermes，版本为 3.6.6 / 366。正式包沿用 `com.qingyu.hermescompanion.preview` 与 3.6.5 原签名，支持覆盖同包名、同签名的旧版并保留本机数据。`Hermes-Android-3.6.6-debug.apk` 仅用于调试，与正式包使用相同应用 ID，二者不能并存。源码不包含签名私钥。
+> 安装说明：本次请选择 `Hermes-Android-3.8.6-release.apk`，版本为 3.8.6 / 386。交付包沿用 `com.qingyu.hermescompanion.preview` 和原签名，支持覆盖同包名、同签名的旧版。源码不包含签名私钥；自行构建请提供自己的密钥。
 
 热修说明与验收步骤见 [3.0.4a 修复说明](Hermes-v3.0.4a-release-notes.md)。
 
 ## 本次更新
+
+- 首页齿轮 → 首页模式：简洁首页 / 深度助理，即时切换并记住选择，独立于外观皮肤。
+- 简洁首页沿用 GitHub 3.6.6 的人物、问候、“跟我说”和最近主动聊天；无需配置整理功能。
+- 新用户默认简洁首页；首次升级时，本机已有加密概览文件或整理任务记录的用户保留深度助理。之后始终遵循用户保存的选择。
+- 简洁模式停止被动的概览轮询，不新建整理任务；已发起工作的结果核对继续进行。
+- 两种模式都能使用聊天、文件、任务、授权和搜索。切换不删除资料、不删除服务器对话，也不暂停已有早晚任务；暂停请到“任务”。
+- 自动整理与 Cron 对话不进入简洁首页的最近聊天。保留 3.8.5 的授权核对、蓝字对齐和首页设置修复。
+
+已有早晚配置与文件收纳不必重做。需要配置时先选择深度助理，再从首页齿轮进入相关说明。未配置过的新用户可一直使用简洁首页。
+
+## 3.6.6 保留能力
 
 - 保留思考过程流式片段中的空格、换行和缩进，修复英文单词粘连。
 - 完整 AI 回复下方增加“复制”“朗读 / 停止朗读”，支持历史消息、集中阅读和三套皮肤。
@@ -144,9 +155,9 @@ Hermes 密码：与电脑端相同
 - Kotlin 2.3.20
 - Jetpack Compose BOM 2026.06.00
 - Android 8.0+（`minSdk 26`）
-- 本机存在 `signing/hermes-debug.keystore` 时使用固定测试签名；公开源码不包含该文件，缺失时自动使用 Android 默认 Debug 签名
+- 本机存在 `signing/hermes-debug.keystore` 时使用固定测试签名；公开源码不包含该文件，缺失时 Debug 构建使用 Android 默认 Debug 签名，Release 构建不签名
 
-用 Android Studio 打开项目根目录，等待 Gradle Sync 后运行 `app`。3.6.6 正式覆盖升级包构建命令（签名参数使用单独保存的原预览签名路径）：
+用 Android Studio 打开项目根目录，等待 Gradle Sync 后运行 `app`。3.8.1 正式覆盖升级包构建命令（签名参数使用单独保存的原预览签名路径）：
 
 ```bash
 ./gradlew testDebugUnitTest assembleRelease -PhermesPreview=true -PhermesSigningFile=/absolute/path/hermes-preview.keystore
