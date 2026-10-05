@@ -25,7 +25,7 @@
 
 ## 发布与配置
 
-详见 [上传与安装步骤](HERMES-3.8.2-INSTRUCTIONS.txt) 和 [更新协议](APP-UPDATE-CONTRACT.md)。这次不需要重新整理 workspace、安装新数据库、修改记忆或重建 Cron。
+详见 [上传与安装步骤](../../HERMES-3.8.2-INSTRUCTIONS.txt) 和 [更新协议](../../APP-UPDATE-CONTRACT.md)。这次不需要重新整理 workspace、安装新数据库、修改记忆或重建 Cron。
 
 交付包与源码测试使用 preview 包名。使用其他 applicationId 或自有签名自行发行时，需要自己的版本信息文件及更新源；本发布源不混用不同包名或签名。
 

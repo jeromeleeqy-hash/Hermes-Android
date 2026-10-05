@@ -34,6 +34,6 @@
 
 源代码不包含签名私钥。重新构建可覆盖升级的预览版时，使用此前单独保存的预览签名备份。
 
-验证结果见 [验证记录](docs/VALIDATION_3.2.0.md)。手机麦克风、环境声与 Hermes 服务端尚需真机联调。
+验证结果见 [验证记录](../../VALIDATION_3.2.0.md)。手机麦克风、环境声与 Hermes 服务端尚需真机联调。
 
 实现参考：[Android MediaRecorder 音量接口](https://developer.android.com/reference/android/media/MediaRecorder#getMaxAmplitude())、[Android 系统识别停顿参数](https://developer.android.com/reference/android/speech/RecognizerIntent#EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS)。

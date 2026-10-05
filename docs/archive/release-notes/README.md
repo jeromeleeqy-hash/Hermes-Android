@@ -1,0 +1,85 @@
+# 历史发布说明
+
+当前版本：[3.8.8](../../RELEASE-3.8.8.md) · [项目介绍](../../../README.md) · [完整中文更新日志](../../../CHANGELOG.md) · [English release history](../../../CHANGELOG.en.md)
+
+这里集中保留 75 份旧版独立发布说明。它们描述当时的功能、限制和验证结果；阅读当前使用方法请从 [快速开始](../../QUICK-START.md) 进入。
+
+本次只调整文档位置并修正相对链接，保留原始记录与 Git 历史。旧安装包名称、当时的交付状态和路径示例属于历史上下文，不应直接当作当前安装指引。
+
+| 版本 | 原始发布说明 |
+| --- | --- |
+| 3.8.7 | [RELEASE-3.8.7.md](RELEASE-3.8.7.md) |
+| 3.8.6 | [RELEASE-3.8.6.md](RELEASE-3.8.6.md) |
+| 3.8.5 | [RELEASE-3.8.5.md](RELEASE-3.8.5.md) |
+| 3.8.4 | [RELEASE-3.8.4.md](RELEASE-3.8.4.md) |
+| 3.8.3 | [RELEASE-3.8.3.md](RELEASE-3.8.3.md) |
+| 3.8.2 | [RELEASE-3.8.2.md](RELEASE-3.8.2.md) |
+| 3.8.1 | [RELEASE-3.8.1.md](RELEASE-3.8.1.md) |
+| 3.8.0 | [RELEASE-3.8.0.md](RELEASE-3.8.0.md) |
+| 3.7.8 | [RELEASE-3.7.8.md](RELEASE-3.7.8.md) |
+| 3.7.7 | [RELEASE-3.7.7.md](RELEASE-3.7.7.md) |
+| 3.7.6 | [RELEASE-3.7.6.md](RELEASE-3.7.6.md) |
+| 3.7.5 | [RELEASE-3.7.5.md](RELEASE-3.7.5.md) |
+| 3.7.4 | [RELEASE-3.7.4.md](RELEASE-3.7.4.md) |
+| 3.7.3 | [RELEASE-3.7.3.md](RELEASE-3.7.3.md) |
+| 3.6.6 | [RELEASE-3.6.6.md](RELEASE-3.6.6.md) |
+| 3.6.5 | [RELEASE-3.6.5.md](RELEASE-3.6.5.md) |
+| 3.6.4 | [RELEASE-3.6.4.md](RELEASE-3.6.4.md) |
+| 3.6.3 | [RELEASE-3.6.3.md](RELEASE-3.6.3.md) |
+| 3.6.2 | [RELEASE-3.6.2.md](RELEASE-3.6.2.md) |
+| 3.6.1 | [RELEASE-3.6.1.md](RELEASE-3.6.1.md) |
+| 3.6.0 | [RELEASE-3.6.0.md](RELEASE-3.6.0.md) |
+| 3.5.1 | [RELEASE-3.5.1.md](RELEASE-3.5.1.md) |
+| 3.2.0-preview | [Hermes-v3.2.0-preview-notes.md](Hermes-v3.2.0-preview-notes.md) |
+| 3.1.6 | [Hermes-v3.1.6-release-notes.md](Hermes-v3.1.6-release-notes.md) |
+| 3.1.5 | [Hermes-v3.1.5-release-notes.md](Hermes-v3.1.5-release-notes.md) |
+| 3.1.4 | [Hermes-v3.1.4-release-notes.md](Hermes-v3.1.4-release-notes.md) |
+| 3.1.3 | [Hermes-v3.1.3-release-notes.md](Hermes-v3.1.3-release-notes.md) |
+| 3.1.2 | [Hermes-v3.1.2-release-notes.md](Hermes-v3.1.2-release-notes.md) |
+| 3.1.1 | [Hermes-v3.1.1-release-notes.md](Hermes-v3.1.1-release-notes.md) |
+| 3.1.0 | [Hermes-v3.1.0-release-notes.md](Hermes-v3.1.0-release-notes.md) |
+| 3.0.4a | [Hermes-v3.0.4a-release-notes.md](Hermes-v3.0.4a-release-notes.md) |
+| 3.0.4 | [Hermes-v3.0.4-release-notes.md](Hermes-v3.0.4-release-notes.md) |
+| 3.0.3a | [Hermes-v3.0.3a-release-notes.md](Hermes-v3.0.3a-release-notes.md) |
+| 3.0.3 | [Hermes-v3.0.3-release-notes.md](Hermes-v3.0.3-release-notes.md) |
+| 3.0.2 | [Hermes-v3.0.2-release-notes.md](Hermes-v3.0.2-release-notes.md) |
+| 3.0.0 | [Hermes-v3.0.0-release-notes.md](Hermes-v3.0.0-release-notes.md) |
+| 2.8.1 | [Hermes-v2.8.1-release-notes.md](Hermes-v2.8.1-release-notes.md) |
+| 2.7.0 | [Hermes-v2.7.0-release-notes.md](Hermes-v2.7.0-release-notes.md) |
+| 2.5.1 | [Hermes-v2.5.1-release-notes.md](Hermes-v2.5.1-release-notes.md) |
+| 2.5.0 | [Hermes-v2.5.0-release-notes.md](Hermes-v2.5.0-release-notes.md) |
+| 2.4.0 | [Hermes-v2.4.0-release-notes.md](Hermes-v2.4.0-release-notes.md) |
+| 2.3.0 | [Hermes-v2.3.0-release-notes.md](Hermes-v2.3.0-release-notes.md) |
+| 2.2.0 | [Hermes-v2.2.0-release-notes.md](Hermes-v2.2.0-release-notes.md) |
+| 2.1.0 | [Hermes-v2.1.0-release-notes.md](Hermes-v2.1.0-release-notes.md) |
+| 2.0.0 | [Hermes-v2.0.0-release-notes.md](Hermes-v2.0.0-release-notes.md) |
+| 1.7.0 | [Hermes-v1.7.0-release-notes.md](Hermes-v1.7.0-release-notes.md) |
+| 1.6.1 | [Hermes-v1.6.1-release-notes.md](Hermes-v1.6.1-release-notes.md) |
+| 1.6.0 | [Hermes-v1.6.0-release-notes.md](Hermes-v1.6.0-release-notes.md) |
+| 1.5.1 | [Hermes-v1.5.1-release-notes.md](Hermes-v1.5.1-release-notes.md) |
+| 1.5.0 | [Hermes-v1.5.0-release-notes.md](Hermes-v1.5.0-release-notes.md) |
+| 1.4.0 | [Hermes-v1.4.0-release-notes.md](Hermes-v1.4.0-release-notes.md) |
+| 1.3.0 | [Hermes-v1.3.0-release-notes.md](Hermes-v1.3.0-release-notes.md) |
+| 1.2.0 | [Hermes-v1.2.0-release-notes.md](Hermes-v1.2.0-release-notes.md) |
+| 1.1.0 | [Hermes-v1.1.0-release-notes.md](Hermes-v1.1.0-release-notes.md) |
+| 1.0 | [Hermes-v1.0-release-notes.md](Hermes-v1.0-release-notes.md) |
+| 0.8.1 | [Hermes-v0.8.1-release-notes.md](Hermes-v0.8.1-release-notes.md) |
+| 0.8 | [Hermes-v0.8-release-notes.md](Hermes-v0.8-release-notes.md) |
+| 0.6.5.11 | [Hermes-v0.6.5.11-release-notes.md](Hermes-v0.6.5.11-release-notes.md) |
+| 0.6.5.10 | [Hermes-v0.6.5.10-release-notes.md](Hermes-v0.6.5.10-release-notes.md) |
+| 0.6.5.9 | [Hermes-v0.6.5.9-release-notes.md](Hermes-v0.6.5.9-release-notes.md) |
+| 0.6.5.8 | [Hermes-v0.6.5.8-release-notes.md](Hermes-v0.6.5.8-release-notes.md) |
+| 0.6.5.7 | [Hermes-v0.6.5.7-release-notes.md](Hermes-v0.6.5.7-release-notes.md) |
+| 0.6.5.6 | [Hermes-v0.6.5.6-release-notes.md](Hermes-v0.6.5.6-release-notes.md) |
+| 0.6.5.5 | [Hermes-v0.6.5.5-release-notes.md](Hermes-v0.6.5.5-release-notes.md) |
+| 0.6.5.4 | [Hermes-v0.6.5.4-release-notes.md](Hermes-v0.6.5.4-release-notes.md) |
+| 0.6.5.3 | [Hermes-v0.6.5.3-release-notes.md](Hermes-v0.6.5.3-release-notes.md) |
+| 0.6.5.2 | [Hermes-v0.6.5.2-release-notes.md](Hermes-v0.6.5.2-release-notes.md) |
+| 0.6.5.1 | [Hermes-v0.6.5.1-release-notes.md](Hermes-v0.6.5.1-release-notes.md) |
+| 0.6.5 | [Hermes-v0.6.5-release-notes.md](Hermes-v0.6.5-release-notes.md) |
+| 0.6.4 | [Hermes-v0.6.4-release-notes.md](Hermes-v0.6.4-release-notes.md) |
+| 0.6.3 | [Hermes-v0.6.3-release-notes.md](Hermes-v0.6.3-release-notes.md) |
+| 0.6.2 | [Hermes-v0.6.2-release-notes.md](Hermes-v0.6.2-release-notes.md) |
+| 0.6.1 | [Hermes-v0.6.1-release-notes.md](Hermes-v0.6.1-release-notes.md) |
+| 0.6.0 | [Hermes-v0.6.0-release-notes.md](Hermes-v0.6.0-release-notes.md) |
+| 0.5.1 | [Hermes-v0.5.1-release-notes.md](Hermes-v0.5.1-release-notes.md) |

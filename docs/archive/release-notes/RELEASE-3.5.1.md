@@ -50,4 +50,4 @@ JDK 21、Gradle 8.13、Android SDK 36 / Build Tools 36.0.0。APP 保持 Java 17 
 - APK 文件 SHA-256：`a23be869dcbeb1e478968c766ad2e9f507fbc2e4f975094e485bc83a6dbbac1d`。
 - 已检查回看、语音、模型、弹层的实际渲染截图；静态渲染和真机验证的区别见上文。
 
-界面对比见 [实际渲染对比](UI-3.5.1.png)。
+界面对比见 [实际渲染对比](../../UI-3.5.1.png)。

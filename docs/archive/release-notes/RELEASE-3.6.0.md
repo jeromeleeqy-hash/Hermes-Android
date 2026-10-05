@@ -55,4 +55,4 @@
 ./gradlew -PhermesPreview=true -PhermesSigningFile=/absolute/path/to/preview.keystore :app:testDebugUnitTest :app:assembleDebug
 ```
 
-设计与交互规范：[UI-3.6.0.md](UI-3.6.0.md)。三套首页实际渲染：[UI-3.6.0.png](UI-3.6.0.png)。
+设计与交互规范：[UI-3.6.0.md](../../UI-3.6.0.md)。三套首页实际渲染：[UI-3.6.0.png](../../UI-3.6.0.png)。

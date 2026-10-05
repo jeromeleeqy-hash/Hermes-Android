@@ -33,7 +33,7 @@
 gradle :app:assembleDebug -PhermesPreview=true -PhermesSigningFile=/absolute/path/hermes-preview.keystore
 ```
 
-默认不传 `hermesPreview` 时仍使用原来的 `.debug` 应用 ID。162 项自动化测试全部通过；完整记录见 [验证报告](docs/VALIDATION_3.1.6.md)。
+默认不传 `hermesPreview` 时仍使用原来的 `.debug` 应用 ID。162 项自动化测试全部通过；完整记录见 [验证报告](../../VALIDATION_3.1.6.md)。
 
 ## 验证边界
 

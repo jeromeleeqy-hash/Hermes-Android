@@ -25,7 +25,7 @@
 
 核对仓库 [jeromeleeqy-hash/Hermes-Android](https://github.com/jeromeleeqy-hash/Hermes-Android)，当时 main 为 `589ee0f8efd0e27ca621d33a80eda25e89869214`，版本 3.6.6。
 
-本地原 `AssistantHomeScreen.kt` 与该提交的 [原版首页](https://github.com/jeromeleeqy-hash/Hermes-Android/blob/589ee0f8efd0e27ca621d33a80eda25e89869214/app/src/main/java/com/qingyu/hermescompanion/ui/screen/AssistantHomeScreen.kt) 逐字节一致。本版复用这套布局，只加入共享设置入口与自动任务过滤；保留后续版本的连接、授权、文件与任务修复。
+本地原 `AssistantHomeScreen.kt` 与该提交的 [原版首页](https://github.com/jeromeleeqy-hash/Hermes-Android/blob/589ee0f8efd0e27ca621d33a80eda25e89869214/app/src/main/java/com/qingyu/hermescompanion/ui/screen/AssistantHomeScreen.kt) 逐字节一致。本版复用这套布局，只加入共享设置入口与自动任务过滤；保留后续版本的连接、授权、文件与任务修复。未向 GitHub 推送或发布。
 
 ## 安装和兼容
 
@@ -33,4 +33,4 @@
 
 首页协议、writer、Cron 模板与持久提示词保持 3.8.4，无需为此次首页模式切换重新收纳文件或配置定时任务。
 
-验证结果见 [VALIDATION-3.8.6.md](VALIDATION-3.8.6.md)，操作与上传步骤见 [HERMES-3.8.6-INSTRUCTIONS.txt](HERMES-3.8.6-INSTRUCTIONS.txt)。
+验证结果见 [VALIDATION-3.8.6.md](../../VALIDATION-3.8.6.md)，操作与上传步骤见 [HERMES-3.8.6-INSTRUCTIONS.txt](../../HERMES-3.8.6-INSTRUCTIONS.txt)。
