@@ -2,6 +2,7 @@ package com.qingyu.hermescompanion.ui
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.content.res.AssetManager
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import androidx.lifecycle.ViewModelStore
@@ -10,6 +11,9 @@ import com.qingyu.hermescompanion.data.ApiException
 import com.qingyu.hermescompanion.data.HermesApiClient
 import com.qingyu.hermescompanion.model.*
 import com.qingyu.hermescompanion.storage.SecureConfigStore
+import com.qingyu.hermescompanion.today.*
+import org.json.JSONObject
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -34,6 +38,9 @@ class ConcurrentSessionsTest {
         Dispatchers.setMain(dispatcher)
         stores = mockConstruction(SecureConfigStore::class.java) { store, _ ->
             `when`(store.readActiveHermesProfile()).thenReturn("default")
+            `when`(store.readTodayOperations(anyString())).thenReturn("[]")
+            `when`(store.readTaskSessionKeys(anyString())).thenReturn(emptySet())
+            `when`(store.readInspectedTaskSessions(anyString())).thenReturn(emptySet())
             `when`(store.readUnreadSessionIds()).thenReturn(emptySet())
             `when`(store.readUserProfile()).thenReturn(UserProfilePreferences())
             `when`(store.readNotificationPreferences()).thenReturn(NotificationPreferences(enabled = false))
@@ -60,8 +67,13 @@ class ConcurrentSessionsTest {
         val app = mock(Application::class.java)
         val prefs = mock(SharedPreferences::class.java)
         `when`(app.getSharedPreferences(anyString(), anyInt())).thenReturn(prefs)
+        val assets = mock(AssetManager::class.java)
+        `when`(app.assets).thenReturn(assets)
+        `when`(assets.open(anyString())).thenAnswer { File("src/main/assets", it.arguments[0] as String).inputStream() }
         vm = HermesViewModel(app)
         client = mock(HermesApiClient::class.java)
+        doAnswer { throw ApiException(404, "Missing directory") }.`when`(client)
+            .listWorkspaceForProfile(org.mockito.ArgumentMatchers.endsWith("/.hermes-app/today"), anyString())
         `when`(client.currentProfile()).thenReturn("default")
         `when`(client.listSessions()).thenReturn(SessionPage(emptyList(), 0))
         `when`(client.projectCatalog()).thenReturn(emptyList())
@@ -345,6 +357,143 @@ class ConcurrentSessionsTest {
         assertEquals("整理今天的运营记录", drafts[created.scopedId])
     }
 
+    private fun prepareInteractiveToday(): Pair<TodayCard, String> {
+        val raw = File("src/main/assets/hermes-today-interactions.json").readText()
+        val board = TodayBoard.decode(raw, "/work")
+        setState(vm.uiState.copy(route = AppRoute.HOME, homeMode = HomeMode.DEEP, selectedSession = null,
+            today = TodayState(profile = "default", root = "/work", rootVerified = true, loaded = true, fileExists = true, board = board, rawJson = raw)))
+        `when`(client.initialWorkspaceForProfile("default")).thenReturn(WorkspaceListing(path = "/work", entries = listOf(WorkspaceEntry(TodayBoard.FILE, "/work/${TodayBoard.FILE}", false))))
+        `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default")).thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", raw))
+        return board.cards.first() to raw
+    }
+
+    @Test fun interactiveSubmissionChecksFreshnessAndSendsScopedAttachmentsOnce() {
+        val (card, raw) = prepareInteractiveToday()
+        val created = HermesSession(id = "card-action", title = "Card action", runtimeId = "runtime-card", workspacePath = "/work")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "action-123")
+        vm.submitTodayInteraction(card.id, request)
+        vm.submitTodayInteraction(card.id, request) // A second tap while checking cannot create another run.
+        awaitState { runs().containsKey(created.scopedId) }
+        verify(client, times(1)).createSessionForProfile("/work", "default")
+        val run = runs().getValue(created.scopedId)
+        val action = JSONObject(run.submittedAttachments.single { it.name == "today-card-action.json" }.textContent!!)
+        assertEquals(todayFingerprint(raw), action.getString("expected_board_sha256"))
+        assertEquals("action-123", action.getString("operation_id"))
+        assertEquals("/work", action.getString("workspace"))
+        assertEquals("same", action.getJSONObject("input").getString("selection"))
+        assertTrue(run.submittedAttachments.any { it.name == "hermes-today-examples.json" })
+        assertEquals("open", vm.uiState.today.board!!.cards.first().status)
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        assertEquals("running", vm.uiState.todayActions.values.single().status)
+        assertEquals("", vm.uiState.draft)
+        verify(client, never()).saveWorkspaceDocumentForProfile(anyString(), anyString(), anyString())
+    }
+
+    @Test fun cardStaysOnHomeUntilMatchingServerReceiptConfirmsTheUpdate() {
+        val (card, raw) = prepareInteractiveToday()
+        mockTodayCache()
+        val created = HermesSession(id = "confirmed-action", title = "Card action", runtimeId = "runtime-card", workspacePath = "/work")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "receipt-123")
+        vm.submitTodayInteraction(card.id, request)
+        awaitState { runs().containsKey(created.scopedId) }
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        assertEquals("running", vm.uiState.todayActions.values.single().status)
+        val confirmed = JSONObject(raw).apply {
+            getJSONArray("cards").getJSONObject(0).put("status", "done")
+            put("action_receipts", org.json.JSONArray().put(JSONObject().put("operation_id", "receipt-123")
+                .put("card_id", card.id).put("status", "applied").put("message", "关联已确认，事项已收口")))
+        }
+        `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default"))
+            .thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", confirmed.toString()))
+        vm.refreshToday()
+        awaitState { vm.uiState.todayActions.values.singleOrNull()?.status == "applied" }
+        assertEquals("关联已确认，事项已收口", vm.uiState.todayActions.values.single().message)
+        assertEquals("done", vm.uiState.today.board!!.cards.first().status)
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        verify(client, times(1)).createSessionForProfile("/work", "default")
+        verify(client, never()).saveWorkspaceDocumentForProfile(anyString(), anyString(), anyString())
+    }
+
+    @Test fun pendingApprovalUpdatesCardAndExpirationKeepsOperationForRecovery() {
+        val (card, _) = prepareInteractiveToday()
+        val created = HermesSession(id = "approval-action", title = "Card", runtimeId = "runtime-card", workspacePath = "/work")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        vm.submitTodayInteraction(card.id, todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "approval-original"))
+        awaitState { runs().containsKey(created.scopedId) }
+        val run = runs().getValue(created.scopedId)
+        emit(run, StreamEvent.AgentRequestPending(AgentRequest("srq-one", "runtime-card", type = AgentRequestType.APPROVAL, title = "write JSON")))
+        assertEquals("awaiting_input", vm.uiState.todayActions.values.single().status)
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        emit(run, StreamEvent.AgentRequestExpired("srq-one", "timeout"))
+        assertEquals("uncertain", vm.uiState.todayActions.values.single().status)
+        assertEquals("approval-original", vm.uiState.todayActions.values.single().operationId)
+        assertTrue(vm.uiState.pendingAgentRequests.isEmpty())
+    }
+
+    @Test fun explicitRecoveryReusesSessionInputAndOperationWithoutCreatingAnotherConversation() {
+        val (card, _) = prepareInteractiveToday()
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "keep-original")
+        val action = TodayActionState("keep-original", card.id, "default", "/work", request, "old-operation", "uncertain")
+        val previousSession = HermesSession("old-operation", "Previous card operation", workspacePath = "/work")
+        setState(vm.uiState.copy(todayActions = mapOf(action.key to action), sessions = vm.uiState.sessions + previousSession))
+        `when`(client.inspectAgentRequests(previousSession)).thenReturn(emptyList())
+        `when`(client.isSessionConfirmedIdle(previousSession)).thenReturn(true)
+        vm.discussTodayCard(card.id, "recover")
+        vm.discussTodayCard(card.id, "recover")
+        awaitState { runs().containsKey("default::old-operation") }
+        val run = runs().getValue("default::old-operation")
+        val input = JSONObject(run.submittedAttachments.single { it.name == "today-card-action.json" }.textContent!!)
+        assertEquals("keep-original", input.getString("operation_id"))
+        assertEquals("same", input.getJSONObject("input").getString("selection"))
+        assertTrue(input.getBoolean("resume_only"))
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        verify(client, never()).createSessionForProfile(anyString(), anyString())
+    }
+
+    @Test fun recoveryDoesNotResubmitWhileServerSessionIsStillRunning() {
+        val (card, _) = prepareInteractiveToday()
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "still-running")
+        val action = TodayActionState("still-running", card.id, "default", "/work", request, "remote-running", "uncertain")
+        val session = HermesSession("remote-running", "Running remotely", workspacePath = "/work")
+        setState(vm.uiState.copy(todayActions = mapOf(action.key to action), sessions = listOf(session)))
+        `when`(client.inspectAgentRequests(session)).thenReturn(emptyList())
+        `when`(client.isSessionConfirmedIdle(session)).thenReturn(false)
+        vm.discussTodayCard(card.id, "recover")
+        awaitState { vm.uiState.todayActions.values.single().status == "uncertain" }
+        assertTrue(runs().isEmpty())
+        assertEquals("still-running", vm.uiState.todayActions.values.single().operationId)
+    }
+
+    @Test fun changedServerCardBlocksSubmissionBeforeCreatingAConversation() {
+        val (card, raw) = prepareInteractiveToday()
+        val changed = JSONObject(raw).apply { getJSONArray("cards").getJSONObject(0).put("summary", "Updated server record") }
+        `when`(client.readWorkspaceDocumentForProfile("/work/${TodayBoard.FILE}", "default")).thenReturn(WorkspaceDocument(TodayBoard.FILE, "/work/${TodayBoard.FILE}", "application/json", changed.toString()))
+        vm.submitTodayInteraction(card.id, todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString()))
+        awaitState { !vm.uiState.isBusy && vm.uiState.todayActions.values.singleOrNull()?.status == "failed" }
+        verify(client, never()).createSessionForProfile(any(), anyString())
+        assertTrue(runs().isEmpty())
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+    }
+
+    @Test fun scheduleSetupSendsThePersistentContractAndExplicitTimezone() {
+        prepareInteractiveToday()
+        val created = HermesSession(id = "schedule", title = "Schedule setup", runtimeId = "runtime-schedule", workspacePath = "/work")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        vm.configureTodaySchedule("08:30", "20:30", "Asia/Shanghai")
+        awaitState { runs().containsKey(created.scopedId) }
+        val run = runs().getValue(created.scopedId)
+        assertTrue(run.submittedPrompt.contains("Asia/Shanghai"))
+        assertTrue(run.submittedPrompt.contains("08:30"))
+        assertTrue(run.submittedPrompt.contains("hermes-app-today:"))
+        assertEquals(5, run.submittedAttachments.size)
+        assertEquals("configure_card_schedule", JSONObject(run.submittedAttachments.first().textContent!!).getString("mode"))
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        assertTrue(created.scopedId in vm.uiState.taskSessionKeys)
+        verify(client, never()).saveWorkspaceDocumentForProfile(anyString(), anyString(), anyString())
+    }
+
     @Test fun openingActiveWorkFromHomeKeepsReturnRouteAndRun() {
         vm.updateDraft("A question"); vm.sendMessage()
         val run = runs().getValue(a.scopedId)
@@ -538,6 +687,315 @@ class ConcurrentSessionsTest {
         setState(vm.uiState.copy(selectedSession = b))
         vm.submitVoiceConversationText("不能发到 B")
         assertTrue(runs().isEmpty())
+    }
+
+    private fun mockTodayCache() {
+        val cache = mock(TodayCache::class.java)
+        HermesViewModel::class.java.getDeclaredField("todayCacheDelegate").apply { isAccessible = true }.set(vm, lazyOf(cache))
+    }
+    private fun todaySyncIdle(): Boolean = (HermesViewModel::class.java.getDeclaredField("todaySyncJob").apply { isAccessible = true }.get(vm) as Job?)?.isActive != true
+
+    @Test fun simpleHomeSkipsPassiveReadsAndEnteringDeepOnlyReadsExistingOverview() {
+        prepareInteractiveToday(); mockTodayCache()
+        setState(vm.uiState.copy(homeMode = HomeMode.SIMPLE, hasSavedConnection = true))
+        vm.syncToday(); vm.syncToday(force = true); dispatcher.scheduler.runCurrent()
+        verify(client, never()).initialWorkspaceForProfile("default")
+        vm.setHomeMode(HomeMode.DEEP)
+        awaitState { todaySyncIdle() && vm.uiState.today.syncedAt != null }
+        verify(client, times(1)).initialWorkspaceForProfile("default")
+        verify(client, never()).createSessionForProfile(any(), anyString())
+        verify(stores.constructed().first()).saveHomeMode("DEEP")
+    }
+
+    @Test fun switchingHomeRetainsRunningWorkDraftAndOverview() {
+        prepareInteractiveToday()
+        val overview = vm.uiState.today
+        setState(vm.uiState.copy(selectedSession = a))
+        val (first, second) = startBoth()
+        vm.updateDraft("保留未发送的补充")
+        val before = vm.uiState
+        vm.setHomeMode(HomeMode.SIMPLE)
+        assertEquals(HomeMode.SIMPLE, vm.uiState.homeMode)
+        assertEquals(before.draft, vm.uiState.draft)
+        assertEquals(before.todayActions, vm.uiState.todayActions)
+        assertEquals(overview, vm.uiState.today)
+        assertSame(first, runs()[a.scopedId]); assertSame(second, runs()[b.scopedId])
+        assertEquals(2, vm.uiState.runningRuns.size)
+        verify(stores.constructed().first(), atLeastOnce()).saveHomeMode("SIMPLE")
+    }
+
+    @Test fun todayBackgroundSyncIsSilentCoalescesAndThrottlesReentry() {
+        prepareInteractiveToday(); mockTodayCache()
+        setState(vm.uiState.copy(route = AppRoute.HOME, hasSavedConnection = true))
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val listing = WorkspaceListing(path = "/work", entries = listOf(WorkspaceEntry(TodayBoard.FILE, "/work/${TodayBoard.FILE}", false)))
+        `when`(client.initialWorkspaceForProfile("default")).thenAnswer {
+            if (calls.incrementAndGet() == 1) { started.countDown(); check(release.await(3, java.util.concurrent.TimeUnit.SECONDS)) }
+            listing
+        }
+        try {
+            vm.syncToday(); dispatcher.scheduler.runCurrent()
+            awaitState { started.count == 0L }
+            assertFalse(vm.uiState.today.loading)
+            repeat(5) { vm.syncToday() }
+            repeat(3) { vm.syncToday(force = true) }
+            assertEquals(1, calls.get())
+            release.countDown()
+            awaitState { calls.get() == 2 && todaySyncIdle() }
+            assertFalse(vm.uiState.today.loading)
+            vm.syncToday(); dispatcher.scheduler.runCurrent()
+            assertEquals(2, calls.get())
+            vm.refreshToday(); assertTrue(vm.uiState.today.loading)
+            awaitState { calls.get() == 3 && todaySyncIdle() }
+            assertFalse(vm.uiState.today.loading)
+        } finally { release.countDown() }
+    }
+    @Test fun otherPagesDoNotPollAndFailedForcedSyncRetainsSavedCards() {
+        prepareInteractiveToday(); mockTodayCache()
+        val original = vm.uiState.today.board
+        setState(vm.uiState.copy(route = AppRoute.CHAT, hasSavedConnection = true))
+        vm.syncToday(); dispatcher.scheduler.runCurrent()
+        verify(client, never()).initialWorkspaceForProfile("default")
+        `when`(client.initialWorkspaceForProfile("default")).thenThrow(IllegalStateException("offline"))
+        vm.syncToday(force = true)
+        awaitState { todaySyncIdle() && vm.uiState.today.error == "offline" }
+        assertSame(original, vm.uiState.today.board)
+        assertFalse(vm.uiState.today.loading)
+        assertTrue(vm.uiState.today.fromCache)
+    }
+    @Test fun improvingBriefSendsCurrentScopeSeparatelyFromPersistentRules() {
+        prepareInteractiveToday()
+        val created = HermesSession(id = "improve", title = "Improve", runtimeId = "runtime-improve", profile = "default", workspacePath = "/work")
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        vm.compactToday()
+        awaitState { runs().containsKey(created.scopedId) }
+        val run = runs().getValue(created.scopedId)
+        val req = JSONObject(run.submittedAttachments.single { it.name == "hermes-today-request.json" }.textContent!!)
+        assertEquals("improve_overview_and_schedule", req.getString("mode"))
+        assertEquals("/work", req.getString("workspace"))
+        assertEquals("default", req.getString("profile"))
+        val contract = run.submittedAttachments.single { it.name == "hermes-today-contract.md" }.textContent!!
+        assertTrue(contract.startsWith("# Hermes App"))
+        assertFalse(contract.startsWith("Mode:"))
+        assertTrue(contract.contains("不能新建") || contract.contains("不创建新任务"))
+        assertTrue(run.submittedAttachments.any { it.name == "hermes-today-cron-template.txt" })
+    }
+    @Test fun missingProcessingConversationKeepsHomeAndShowsRecoveryMessage() {
+        val (card, _) = prepareInteractiveToday()
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "lost-operation")
+        val action = TodayActionState("lost-operation", card.id, "default", "/work", request, "missing", "uncertain")
+        setState(vm.uiState.copy(route = AppRoute.HOME, todayActions = mapOf(action.key to action)))
+        doAnswer { throw ApiException(404, "Session not found") }.`when`(client).sessionForProfile("missing", "default")
+        vm.discussTodayCard(card.id, "conversation")
+        awaitState { vm.uiState.noticeMessage != null }
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        assertEquals("lost-operation", vm.uiState.todayActions.getValue(action.key).operationId)
+    }
+
+    @Test fun lostSessionCreatesReconciliationOnlyWithOriginalOperationId() {
+        val (card, _) = prepareInteractiveToday()
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "lost-original")
+        val action = TodayActionState("lost-original", card.id, "default", "/work", request, "missing", "uncertain")
+        val missing = HermesSession("missing", "Old", profile = "default", workspacePath = "/work")
+        val recovered = HermesSession("reconcile", "Recovery", profile = "default", workspacePath = "/work", runtimeId = "runtime-reconcile")
+        setState(vm.uiState.copy(route = AppRoute.HOME, todayActions = mapOf(action.key to action), sessions = listOf(missing)))
+        doAnswer { throw ApiException(404, "Session not found") }.`when`(client).inspectAgentRequests(missing)
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(recovered)
+        vm.discussTodayCard(card.id, "recover")
+        vm.discussTodayCard(card.id, "recover")
+        awaitState { runs().containsKey(recovered.scopedId) }
+        val input = JSONObject(runs().getValue(recovered.scopedId).submittedAttachments.single { it.name == "today-card-action.json" }.textContent!!)
+        assertEquals("lost-original", input.getString("operation_id"))
+        assertTrue(input.getBoolean("reconcile_only"))
+        assertEquals("missing", input.getString("original_session_id"))
+        verify(client, times(1)).createSessionForProfile("/work", "default")
+        assertFalse(runs().containsKey(missing.scopedId))
+    }
+
+    @Test fun recoveryNetworkFailureNeverCreatesAReplacementOperation() {
+        val (card, _) = prepareInteractiveToday()
+        val request = todayInteractionRequest(card, JSONObject(initialTodayInput(card)).put("selection", "same").toString(), "offline-operation")
+        val action = TodayActionState("offline-operation", card.id, "default", "/work", request, "old", "uncertain")
+        val old = HermesSession("old", "Old", profile="default", workspacePath="/work")
+        setState(vm.uiState.copy(todayActions=mapOf(action.key to action), sessions=listOf(old)))
+        doAnswer { throw java.io.IOException("offline") }.`when`(client).inspectAgentRequests(old)
+        vm.discussTodayCard(card.id, "recover")
+        awaitState { vm.uiState.todayActions[action.key]?.status == "uncertain" }
+        assertTrue(vm.uiState.todayActions.getValue(action.key).message.contains("offline"))
+        assertNotNull(vm.uiState.noticeMessage)
+        verify(client, never()).createSessionForProfile(anyString(), anyString())
+    }
+
+    @Test fun manualOverviewUpdateCarriesRecentProgressAndStartsOnlyOnce() {
+        prepareInteractiveToday()
+        val recent = HermesSession("progress", "Recent update", profile="default", workspacePath="/work", messageCount=2)
+        val created = HermesSession("overview-refresh", "Overview", profile="default", workspacePath="/work", runtimeId="runtime-overview")
+        val background = recent.copy(id="old-setup", title="配置任务")
+        setState(vm.uiState.copy(route=AppRoute.HOME, sessions=listOf(recent, background), taskSessionKeys=setOf(background.scopedId), selectedSession=null, hasSavedConnection=true))
+        HermesViewModel::class.java.getDeclaredField("taskConversationScope").apply { isAccessible=true }.set(vm, vm.uiState.baseUrl.trimEnd('/') + "\n" + vm.uiState.username)
+        `when`(client.loadOverviewMessages(recent)).thenReturn(listOf(ChatMessage(role=MessageRole.USER, content="两件待办都已经处理完成")))
+        `when`(client.createSessionForProfile("/work", "default")).thenReturn(created)
+        vm.regenerateToday()
+        vm.regenerateToday()
+        awaitState { runs().containsKey(created.scopedId) }
+        val run = runs().getValue(created.scopedId)
+        val request = JSONObject(run.submittedAttachments.single { it.name == "hermes-today-request.json" }.textContent!!)
+        assertEquals(vm.uiState.todayRefresh.requestId, request.getString("refresh_id"))
+        assertEquals("refresh_overview_only", request.getString("mode"))
+        val evidence = run.submittedAttachments.single { it.name == "today-recent-conversations.json" }.textContent!!
+        assertTrue(evidence.contains("两件待办都已经处理完成"))
+        assertFalse(evidence.contains("old-setup"))
+        verify(client, never()).loadOverviewMessages(background)
+        assertEquals(AppRoute.HOME, vm.uiState.route)
+        assertTrue(vm.uiState.todayRefresh.busy)
+        assertTrue(created.scopedId in vm.uiState.taskSessionKeys)
+        verify(stores.constructed().single()).saveTaskSessionKeys(vm.uiState.baseUrl.trimEnd('/') + "\n" + vm.uiState.username, setOf(background.scopedId, created.scopedId))
+        verify(client, times(1)).createSessionForProfile("/work", "default")
+    }
+
+    private fun anySession(): HermesSession = any(HermesSession::class.java) ?: a
+    private fun anyRequest(): AgentRequest = any(AgentRequest::class.java) ?: pendingRequest()
+    private fun pendingRequest(id: String = "approval") = AgentRequest(id, "runtime-a", "a", AgentRequestType.APPROVAL,
+        "write selected record", profile = "default", serverRequestId = id)
+
+    @Test fun pcHandledApprovalDisappearsAfterAuthoritativeCheckIncludingLegacyRequest() {
+        val request = pendingRequest().copy(serverRequestId = "")
+        val other = pendingRequest("other").copy(profile = "personal")
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request, other)))
+        doAnswer { invocation ->
+            if ((invocation.arguments[0] as HermesSession).profile == "default") emptyList<AgentRequest>() else listOf(other)
+        }.`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.pendingAgentRequests == listOf(other) }
+        verify(stores.constructed().single(), atLeastOnce()).savePendingAgentRequests(listOf(other))
+        verify(client, never()).respondAgentRequest(anyRequest(), anyString())
+    }
+
+    @Test fun missingSessionClearsGhostRequestButOfflineOrUnknownSnapshotKeepsIt() {
+        val request = pendingRequest()
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        doAnswer { throw java.io.IOException("offline") }.`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.noticeMessage?.contains("保留") == true }
+        assertEquals(listOf(request), vm.uiState.pendingAgentRequests)
+        doReturn(null).`when`(client).inspectAgentRequests(anySession())
+        setState(vm.uiState.copy(noticeMessage = null))
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.noticeMessage?.contains("保留") == true }
+        assertEquals(listOf(request), vm.uiState.pendingAgentRequests)
+        doAnswer { throw ApiException(404, "Session not found") }.`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.pendingAgentRequests.isEmpty() }
+    }
+
+    @Test fun answeringARequestAlreadyHandledOnPcNeverSubmitsApproval() {
+        val request = pendingRequest()
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        `when`(client.inspectAgentRequests(anySession())).thenReturn(emptyList())
+        vm.respondToAgentRequest(request, "once")
+        awaitState { vm.uiState.pendingAgentRequests.isEmpty() }
+        verify(client, never()).respondAgentRequest(anyRequest(), anyString())
+        assertTrue(vm.uiState.noticeMessage.orEmpty().contains("其他端"))
+    }
+
+    @Test fun changedApprovalMustBeReviewedAgainBeforeSendingTheOldAnswer() {
+        val request = pendingRequest()
+        val changed = request.copy(title = "different command", runtimeSessionId = "new-runtime")
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        `when`(client.inspectAgentRequests(anySession())).thenReturn(listOf(changed))
+        vm.respondToAgentRequest(request, "once")
+        awaitState { vm.uiState.agentRequestChecks.values.any { it.message.contains("变化") } }
+        assertEquals(listOf(changed), vm.uiState.pendingAgentRequests)
+        verify(client, never()).respondAgentRequest(anyRequest(), anyString())
+    }
+
+    @Test fun runtimeReattachmentDoesNotDuplicateOrResetThePendingRequest() {
+        val request = pendingRequest()
+        val resumed = request.copy(runtimeSessionId = "new-runtime")
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        `when`(client.inspectAgentRequests(anySession())).thenReturn(listOf(resumed))
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.pendingAgentRequests == listOf(resumed) }
+        assertEquals(1, vm.uiState.pendingAgentRequests.size)
+    }
+
+    @Test fun switchingConnectionDiscardsInFlightApprovalSnapshot() {
+        val request = pendingRequest()
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        doAnswer { started.countDown(); release.await(5, java.util.concurrent.TimeUnit.SECONDS); emptyList<AgentRequest>() }
+            .`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        dispatcher.scheduler.runCurrent()
+        assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        val other = request.copy(title = "Other server")
+        setState(vm.uiState.copy(baseUrl = "https://other.example", pendingAgentRequests = listOf(other)))
+        release.countDown()
+        awaitState { !(HermesViewModel::class.java.getDeclaredField("agentRequestRefreshJob").apply { isAccessible = true }.get(vm) as Job).isActive }
+        assertEquals(listOf(other), vm.uiState.pendingAgentRequests)
+    }
+
+    @Test fun checkingProgressAndUnknownStatusAreAvailableInsideTheRequestWindow() {
+        val request = pendingRequest()
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        doAnswer { started.countDown(); release.await(5, java.util.concurrent.TimeUnit.SECONDS); null }
+            .`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        assertTrue(vm.uiState.agentRequestChecks.values.single().checking)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        vm.refreshPendingAgentRequests() // duplicate clicks cannot start another check
+        release.countDown()
+        awaitState { vm.uiState.agentRequestChecks.values.single().canDismiss }
+        assertFalse(vm.uiState.agentRequestChecks.values.single().checking)
+        assertTrue(vm.uiState.agentRequestChecks.values.single().message.contains("未提供"))
+        assertEquals(listOf(request), vm.uiState.pendingAgentRequests)
+        verify(client, times(1)).inspectAgentRequests(anySession())
+        vm.dismissAgentRequestReminder(request)
+        assertTrue(vm.uiState.pendingAgentRequests.isEmpty())
+        verify(stores.constructed().single(), atLeastOnce()).savePendingAgentRequests(emptyList())
+        verify(client, never()).respondAgentRequest(anyRequest(), anyString())
+    }
+
+    @Test fun verifiedLiveRequestCannotBeLocallyRemovedAsAnOutdatedReminder() {
+        val request = pendingRequest()
+        setState(vm.uiState.copy(pendingAgentRequests = listOf(request)))
+        doReturn(null).`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests()
+        awaitState { vm.uiState.agentRequestChecks.values.singleOrNull()?.canDismiss == true }
+        doReturn(listOf(request)).`when`(client).inspectAgentRequests(anySession())
+        vm.refreshPendingAgentRequests(manual = false)
+        awaitState { vm.uiState.agentRequestChecks.values.singleOrNull()?.message?.contains("仍在等待") == true }
+        vm.dismissAgentRequestReminder(request)
+        assertEquals(listOf(request), vm.uiState.pendingAgentRequests)
+        assertFalse(vm.uiState.agentRequestChecks.values.single().canDismiss)
+    }
+
+    @Test fun ordinaryUserChatStaysInConversationListAndIsNotMarkedAsTask() {
+        val created = HermesSession("chat", "My conversation", runtimeId = "runtime-chat")
+        `when`(client.createSessionForProfile(null, "default")).thenReturn(created)
+        setState(vm.uiState.copy(route = AppRoute.HOME))
+        vm.startFromHome("帮我讨论一下新的工作安排")
+        awaitState { vm.uiState.selectedSession?.id == created.id }
+        assertEquals(AppRoute.CHAT, vm.uiState.route)
+        assertFalse(created.scopedId in vm.uiState.taskSessionKeys)
+        assertTrue(runs().isEmpty())
+    }
+
+    @Test fun savedTaskClassificationIsScopedToConnectionAndAccount() {
+        val store = stores.constructed().single()
+        `when`(store.readTaskSessionKeys("https://one\njerome")).thenReturn(setOf(a.scopedId))
+        setState(vm.uiState.copy(baseUrl="https://one", username="jerome"))
+        vm.refreshSessions()
+        assertEquals(setOf(a.scopedId), vm.uiState.taskSessionKeys)
+        setState(vm.uiState.copy(baseUrl="https://two"))
+        vm.refreshSessions()
+        assertTrue(vm.uiState.taskSessionKeys.isEmpty())
     }
 
 }
