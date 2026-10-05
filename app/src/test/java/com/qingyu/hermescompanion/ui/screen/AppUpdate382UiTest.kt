@@ -71,12 +71,13 @@ class AppUpdate382UiTest {
         compose.onNodeWithTag("help-start").performClick()
         assertEquals("想一起梳理本周安排", sent)
     }
-    @Test fun homeUsesTheHalfPortraitAndOpensHelp() {
+    @Test fun homeUsesTheCompactPortraitAndOpensHelp() {
         val board = TodayBoard.decode(File("src/main/assets/hermes-today-examples.json").readText(), "/work")
         val state = AppUiState(username = "Jerome", reduceMotion = true,
             today = TodayState(profile = "default", root = "/work", loaded = true, fileExists = true, board = board))
         show { TodayOverviewScreen(state, PaddingValues(bottom = 20.dp), {}, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, { _, _ -> }, {}) }
-        compose.onNodeWithTag("mascot_IDLE_HALF").assertIsDisplayed()
+        compose.onNodeWithTag("home-portrait").assertIsDisplayed()
+        compose.onNodeWithTag("home-portrait-static", useUnmergedTree = true).assertExists()
         screenshot("home-half-portrait", "today_home")
         compose.onNodeWithTag("home-help").performClick()
         compose.onNodeWithText("想一起完成什么？").assertIsDisplayed()

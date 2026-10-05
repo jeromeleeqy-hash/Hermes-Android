@@ -143,7 +143,7 @@ class UiUpgrade361Test {
         val state=AppUiState(route=AppRoute.SESSIONS,skinMode=skin,
             projectPickerListing=WorkspaceListing(path="C:\\Work",parent=null,entries=emptyList()))
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,skin) { AmbientBackground { HermesScene {
-            SessionsScreen(state,PaddingValues(),{},{},{},{},{},{},{},{},{},{_,_->},{},
+            SessionsScreen(state,PaddingValues(),{},{},{},{},{},{},{_,_->},{},{},{_,_->},{},
                 {name,path->created=name to path},{},{},{},{})
         } } } }
         compose.onNodeWithText("Recent",substring=true).performClick()

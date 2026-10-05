@@ -107,7 +107,7 @@ class Hermes384UiTest {
         var opened=""
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
             if (tasks) TasksScreen(state,PaddingValues(),{},{},{},{_,_->},{},{opened=it.id},{},{},{_,_,_->},{},{_,_,_,_->},{},{},{})
-            else SessionsScreen(state,PaddingValues(),{},{},{},{},{},{},{},{},{},{_,_->},{},{_,_->},{},{},{},{})
+            else SessionsScreen(state,PaddingValues(),{},{},{},{},{},{},{_,_->},{},{},{_,_->},{},{_,_->},{},{},{},{})
         } }
         compose.onNodeWithText("主动聊天").assertIsDisplayed()
         compose.onNodeWithText("自动整理首页").assertDoesNotExist()

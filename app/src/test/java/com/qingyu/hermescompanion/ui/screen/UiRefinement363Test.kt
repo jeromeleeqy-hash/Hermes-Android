@@ -182,7 +182,7 @@ class UiRefinement363Test {
         val sessions=(1..7).map { HermesSession("s$it", "会话 $it · 本周进展与内容安排", "讨论团队这周的目标与执行安排。",Instant.now().minusSeconds(it*3600L).toString()) }
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.GLASS) { AmbientBackground {
             Scaffold(containerColor=Color.Transparent,contentWindowInsets=WindowInsets(0,0,0,0),bottomBar={ReferenceBottomDock(AppRoute.SESSIONS,false,{},WindowInsets(0,0,0,24))}) { padding ->
-                HermesScene(contentBottomClip=32.dp) { SessionsScreen(AppUiState(sessions=sessions,skinMode=SkinMode.GLASS),padding,{},{},{},{},{},{},{},{},{},{_,_->},{},{_,_->},{},{},{},{}) }
+                HermesScene(contentBottomClip=32.dp) { SessionsScreen(AppUiState(sessions=sessions,skinMode=SkinMode.GLASS),padding,{},{},{},{},{},{},{_,_->},{},{},{_,_->},{},{_,_->},{},{},{},{}) }
             }
         } } }
         val outer=compose.onNodeWithTag("session_row_s1").fetchSemanticsNode().boundsInRoot

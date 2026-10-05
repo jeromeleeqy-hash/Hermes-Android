@@ -77,7 +77,7 @@ class Onboarding363Test {
         val zh=parseOperationGuide(json,"zh");val en=parseOperationGuide(json,"en")
         assertEquals(7,zh.size);assertEquals(zh.map {it.id},en.map {it.id})
         val za=zh.flatMap {it.articles};val ea=en.flatMap {it.articles}
-        assertEquals(31,za.size);assertEquals(za.map {it.id},ea.map {it.id})
+        assertEquals(34,za.size);assertEquals(za.map {it.id},ea.map {it.id})
         assertEquals(za.size,za.map {it.id}.distinct().size)
         za.zip(ea).forEach { (z,e) ->
             assertNotEquals(z.title,e.title);assertEquals(z.steps.size,e.steps.size)

@@ -203,7 +203,7 @@ class AssistantLayoutTest {
         val preview=state.copy(route=AppRoute.SESSIONS,sessions=listOf(session,running),pendingAgentRequests=emptyList(),runningRuns=emptyList())
         compose.setContent { HermesCompanionTheme(ThemeMode.LIGHT,SkinMode.CLEAN) {
             Scaffold(bottomBar={ReferenceBottomDock(AppRoute.SESSIONS,false,{})},contentWindowInsets=WindowInsets(0,0,0,0)) { padding ->
-                SessionsScreen(state=preview,contentPadding=padding,onRefresh={},onNewSession={},onSelectProject={_ -> },onSearch={},onOpenSession={_ -> },onDeleteSession={_ -> },onAiRenameSession={_ -> },onTogglePinned={_ -> },onArchiveSession={_ -> },onMoveToProject={_,_ -> },onLoadProjects={},onCreateProject={_,_ -> },onLoadProjectDirectories={_ -> },onCloseProjectDirectoryPicker={},onRefreshProfiles={},onSelectProfile={_ -> })
+                SessionsScreen(state=preview,contentPadding=padding,onRefresh={},onNewSession={},onSelectProject={_ -> },onSearch={},onOpenSession={_ -> },onDeleteSession={_ -> },onRenameSession={_,_ -> },onTogglePinned={_ -> },onArchiveSession={_ -> },onMoveToProject={_,_ -> },onLoadProjects={},onCreateProject={_,_ -> },onLoadProjectDirectories={_ -> },onCloseProjectDirectoryPicker={},onRefreshProfiles={},onSelectProfile={_ -> })
             }
         } }
         compose.onNodeWithTag("new_conversation").assertIsDisplayed()

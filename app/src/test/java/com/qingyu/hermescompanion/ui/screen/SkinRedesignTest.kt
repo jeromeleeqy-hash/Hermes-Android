@@ -66,7 +66,7 @@ class SkinRedesignTest {
         var created = false
         render(mode) {
             Scaffold(containerColor = Color.Transparent, contentWindowInsets = WindowInsets(0,0,0,0), bottomBar = { ReferenceBottomDock(AppRoute.SESSIONS,false,{}) }) { padding ->
-                HermesScene { SessionsScreen(sample,padding,{}, {created=true},{},{},{opened=it.id},{},{},{},{},{_,_->},{},{_,_->},{},{},{},{}) }
+                HermesScene { SessionsScreen(sample,padding,{}, {created=true},{},{},{opened=it.id},{},{_,_->},{},{},{_,_->},{},{_,_->},{},{},{},{}) }
             }
         }
         compose.onNodeWithText("今天").assertIsDisplayed()
