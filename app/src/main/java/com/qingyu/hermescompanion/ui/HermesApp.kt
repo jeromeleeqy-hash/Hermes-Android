@@ -1,5 +1,8 @@
 package com.qingyu.hermescompanion.ui
 
+
+import com.qingyu.hermescompanion.ui.screen.TodayOverviewScreen
+
 import com.qingyu.hermescompanion.i18n.uiText
 import com.qingyu.hermescompanion.R
 
@@ -32,6 +35,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.Modifier
@@ -114,10 +124,43 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
     LaunchedEffect(state.baseUrl, state.username, state.activeProfile, state.route, state.selectedSession?.id, state.hasSavedConnection) {
         viewModel.restoreVoiceDraft()
     }
+    val todayLifecycle = LocalLifecycleOwner.current.lifecycle
+    val appUpdater: com.qingyu.hermescompanion.update.AppUpdateViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val appUpdate by appUpdater.state.collectAsState()
+    LaunchedEffect(todayLifecycle, appUpdater) {
+        todayLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            appUpdater.onForeground()
+        }
+    }
+    LaunchedEffect(todayLifecycle, appUpdate.inProgress) {
+        if (appUpdate.inProgress) todayLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) { appUpdater.poll(); delay(1_500) }
+        }
+    }
+    LaunchedEffect(todayLifecycle, state.baseUrl, state.username, state.activeProfile, state.isProfileSwitching,
+        state.hasSavedConnection, state.route == AppRoute.HOME, state.homeMode) {
+        if (state.homeMode == HomeMode.DEEP && state.hasSavedConnection && !state.isProfileSwitching && state.route == AppRoute.HOME) {
+            todayLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (isActive) { viewModel.syncToday(); delay(60_000) }
+            }
+        }
+    }
+    LaunchedEffect(todayLifecycle, state.baseUrl, state.username, state.activeProfile,
+        state.pendingAgentRequests.map { com.qingyu.hermescompanion.data.agentRequestKey(it) }) {
+        if (state.hasSavedConnection && state.pendingAgentRequests.isNotEmpty()) {
+            todayLifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (isActive) { viewModel.refreshPendingAgentRequests(manual = false); delay(10_000) }
+            }
+        }
+    }
     CompositionLocalProvider(LocalRippleConfiguration provides null,
         com.qingyu.hermescompanion.ui.component.LocalReduceMotion provides state.reduceMotion,
         com.qingyu.hermescompanion.ui.component.LocalVoiceRecovery provides com.qingyu.hermescompanion.ui.component.VoiceRecoveryActions(
             state.voiceCapture, viewModel::retrySingleVoiceInput, viewModel::discardSingleVoiceInput)) {
+        com.qingyu.hermescompanion.ui.screen.AgentRequestHost(
+            requests = if (state.route == AppRoute.SETUP) emptyList() else state.pendingAgentRequests,
+            onRespond = viewModel::respondToAgentRequest, onRecheck = viewModel::refreshPendingAgentRequests,
+            checks = state.agentRequestChecks, onDismissReminder = viewModel::dismissAgentRequestReminder) {
         AmbientBackground {
             Scaffold(
         containerColor = Color.Transparent,
@@ -136,7 +179,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             if (state.workspaceAttachmentTarget == null && state.route in setOf(AppRoute.HOME, AppRoute.SESSIONS, AppRoute.WORKSPACE, AppRoute.TASKS, AppRoute.PROFILE, AppRoute.SETTINGS)) {
                 HermesBottomDock(
                     selected = when (state.route) { AppRoute.SETTINGS -> AppRoute.PROFILE; else -> state.route },
-                    hasUnreadConversations = state.unreadSessionIds.isNotEmpty(),
+                    hasUnreadConversations = (state.unreadSessionIds - state.taskSessionKeys - state.sessions.filter { it.source.equals("cron", true) }.map { "${it.profile}::${it.id}" }.toSet()).isNotEmpty(),
                     onSelect = { route ->
                         when (route) {
                             AppRoute.HOME -> viewModel.showHome()
@@ -156,19 +199,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 SnackbarHost(
                     hostState = snackbarHostState,
                     snackbar = { data ->
-                        androidx.compose.material3.Snackbar(
-                            snackbarData = data,
-                            containerColor = if (state.errorMessage != null) {
-                                MaterialTheme.colorScheme.errorContainer
-                            } else {
-                                MaterialTheme.colorScheme.inverseSurface
-                            },
-                            contentColor = if (state.errorMessage != null) {
-                                MaterialTheme.colorScheme.onErrorContainer
-                            } else {
-                                MaterialTheme.colorScheme.inverseOnSurface
-                            },
-                        )
+                        com.qingyu.hermescompanion.ui.component.AppNotice(data.visuals.message, state.errorMessage != null)
                     },
                 )
             }
@@ -178,10 +209,21 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 com.qingyu.hermescompanion.ui.component.HermesScene(contentBottomClip = sceneBottomClip) {
                 com.qingyu.hermescompanion.ui.component.AssistantPageTransition(state.route) {
                 when (state.route) {
-            AppRoute.HOME -> AssistantHomeScreen(
-                state, padding, viewModel::startFromHome, viewModel::openSession,
-                viewModel::showSessions, viewModel::showTasks, viewModel::showWorkspace,
-                viewModel::respondToAgentRequest, viewModel::showSessionSearch,
+            AppRoute.HOME -> com.qingyu.hermescompanion.ui.screen.HermesHomeScreen(
+                state, padding,
+                onHomeMode = viewModel::setHomeMode,
+                onOpen = viewModel::openSession, onHistory = viewModel::showSessions,
+                onTasks = viewModel::showTasks, onFiles = viewModel::showWorkspace,
+                onRefresh = viewModel::refreshToday, onGenerate = viewModel::generateToday,
+                onUpdate = viewModel::regenerateToday, onMigrate = viewModel::migrateTodayStorage, onOpenRefresh = viewModel::openOverviewRefresh,
+                onCompact = viewModel::compactToday,
+                onInteraction = viewModel::submitTodayInteraction,
+                onSchedule = viewModel::configureTodaySchedule,
+                onCheckSchedule = viewModel::checkTodaySchedule,
+                onPath = viewModel::openTodayPath,
+                onCardAction = viewModel::discussTodayCard, onStart = viewModel::startTodayScene,
+                onSearch = viewModel::showSessionSearch,
+                onRespond = viewModel::respondToAgentRequest,
                 onDaily = viewModel::openDailyConversation,
                 onWelcomed = viewModel::markHomeWelcomed,
             )
@@ -340,6 +382,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onUpdateUserAvatar = viewModel::updateUserAvatar,
                 onAbout = viewModel::showAbout,
                 onChangeLog = viewModel::showChangeLog,
+                onAppUpdate = appUpdater::open,
+                hasAppUpdate = appUpdate.hasUpdate,
                 onReplayIntro = viewModel::replayLaunchIntro,
                 onLauncherIconChange = viewModel::setLauncherIcon,
             )
@@ -369,6 +413,8 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onUpdateUserAvatar = viewModel::updateUserAvatar,
                 onAbout = viewModel::showAbout,
                 onChangeLog = viewModel::showChangeLog,
+                onAppUpdate = appUpdater::open,
+                hasAppUpdate = appUpdate.hasUpdate,
                 onReplayIntro = viewModel::replayLaunchIntro,
                 onLauncherIconChange = viewModel::setLauncherIcon,
             )
@@ -485,6 +531,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
             AppRoute.ABOUT -> AboutScreen(
                 contentPadding = padding,
                 onBack = viewModel::closeSettingsPage,
+                onAppUpdate = appUpdater::open,
             )
 
             AppRoute.CHANGELOG -> ChangeLogScreen(
@@ -495,6 +542,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         }
         }
         }
+        if (appUpdate.visible) com.qingyu.hermescompanion.ui.screen.AppUpdateDialog(appUpdate, appUpdater)
         if (state.isImageLoading) ImageLoadingDialog()
         state.imagePreview?.let { image ->
             ImagePreviewDialog(image = image, onDismiss = viewModel::closeImagePreview)
@@ -511,6 +559,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
         state.crashReport?.let { report ->
             CrashReportDialog(report = report, onDismiss = viewModel::dismissCrashReport)
                 }
+        }
             }
         }
     }
