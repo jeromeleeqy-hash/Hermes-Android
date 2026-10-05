@@ -28,7 +28,8 @@ class SecureCookieJar(private val store: SecureConfigStore) : CookieJar {
             }
             if (incoming.expiresAt > now) storedCookies += incoming
         }
-        pruneAndPersist(now)
+        storedCookies.removeAll { it.expiresAt <= now }
+        if (cookies.isNotEmpty()) persist()
     }
 
     @Synchronized
@@ -77,8 +78,9 @@ class SecureCookieJar(private val store: SecureConfigStore) : CookieJar {
 
     private fun pruneAndPersist(now: Long) {
         val changed = storedCookies.removeAll { it.expiresAt <= now }
-        if (changed || storedCookies.isNotEmpty()) persist()
-        else store.clearCookies()
+        if (changed) {
+            if (storedCookies.isEmpty()) store.clearCookies() else persist()
+        }
     }
 
     private fun persist() {

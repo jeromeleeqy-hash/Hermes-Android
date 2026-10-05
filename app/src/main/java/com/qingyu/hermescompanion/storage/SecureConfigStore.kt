@@ -32,6 +32,44 @@ import org.json.JSONObject
 class SecureConfigStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
+    private fun todayStorageKey(scope: String, kind: String) = "today_${kind}_" +
+        java.security.MessageDigest.getInstance("SHA-256").digest(scope.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+    fun readTodayOperations(scope: String): String = runCatching {
+        preferences.getString(todayStorageKey(scope, "operations"), null)?.let(::decrypt) ?: "[]"
+    }.getOrDefault("[]")
+
+    fun saveTodayOperations(scope: String, value: String) {
+        check(preferences.edit().putString(todayStorageKey(scope, "operations"), encrypt(value)).commit()) {
+            "Unable to save operation recovery information"
+        }
+    }
+
+    fun readTaskSessionKeys(scope: String): Set<String> =
+        preferences.getStringSet(todayStorageKey(scope, "task_sessions"), emptySet()).orEmpty().toSet()
+
+    fun saveTaskSessionKeys(scope: String, values: Set<String>) {
+        check(preferences.edit().putStringSet(todayStorageKey(scope, "task_sessions"), values.toSet()).commit()) {
+            "Unable to save task conversation classification"
+        }
+    }
+
+    fun readInspectedTaskSessions(scope: String): Set<String> =
+        preferences.getStringSet(todayStorageKey(scope, "inspected_sessions"), emptySet()).orEmpty().toSet()
+
+    fun saveInspectedTaskSessions(scope: String, values: Set<String>) {
+        preferences.edit { putStringSet(todayStorageKey(scope, "inspected_sessions"), values.toSet()) }
+    }
+
+    fun readTransportHistory(scope: String): List<String> = runCatching {
+        val rows = JSONArray(preferences.getString(todayStorageKey(scope, "transport"), "[]"))
+        (0 until rows.length()).map { rows.getString(it) }.takeLast(40)
+    }.getOrDefault(emptyList())
+
+    fun saveTransportHistory(scope: String, rows: List<String>) {
+        preferences.edit { putString(todayStorageKey(scope, "transport"), JSONArray(rows.takeLast(40)).toString()) }
+    }
+
     private fun dailyConversationKey(server: String, account: String, profile: String): String {
         val scope = listOf(server.trimEnd('/'), account, profile).joinToString("\u0000")
         return "daily_conversation_" + java.security.MessageDigest.getInstance("SHA-256")
@@ -128,6 +166,18 @@ class SecureConfigStore(context: Context) {
 
     fun saveSkinMode(value: String) {
         preferences.edit { putString(KEY_SKIN_MODE, value) }
+    }
+
+    fun readHomeMode(): String? = preferences.getString("home_mode_v1", null)
+
+    fun saveHomeMode(value: String) {
+        preferences.edit { putString("home_mode_v1", value) }
+    }
+
+    /** Read migration evidence without decrypting overview files or contacting the server. */
+    fun hasUsedDeepHome(): Boolean = preferences.all.any { (key, value) ->
+        (key.startsWith("today_operations_") && value is String && value.isNotBlank()) ||
+            (key.startsWith("today_task_sessions_") && value is Set<*> && value.isNotEmpty())
     }
 
     fun readReduceMotion(): Boolean = preferences.getBoolean("reduce_motion", false)
@@ -383,6 +433,9 @@ class SecureConfigStore(context: Context) {
                         requestId = item.optString("requestId"),
                         runtimeSessionId = item.optString("runtimeSessionId"),
                         conversationId = item.optString("conversationId"),
+                        profile = item.optString("profile"),
+                        serverRequestId = item.optString("serverRequestId"),
+                        questionId = item.optString("questionId"),
                         type = runCatching { AgentRequestType.valueOf(item.optString("type")) }
                             .getOrDefault(AgentRequestType.CLARIFICATION),
                         title = item.optString("title"),
@@ -405,6 +458,9 @@ class SecureConfigStore(context: Context) {
                     .put("requestId", request.requestId)
                     .put("runtimeSessionId", request.runtimeSessionId)
                     .put("conversationId", request.conversationId)
+                    .put("profile", request.profile)
+                    .put("serverRequestId", request.serverRequestId)
+                    .put("questionId", request.questionId)
                     .put("type", request.type.name)
                     .put("title", request.title)
                     .put("detail", request.detail)
