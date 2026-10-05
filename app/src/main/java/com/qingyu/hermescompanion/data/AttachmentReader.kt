@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream
 object AttachmentReader {
     private const val MAX_IMAGE_BYTES = 8 * 1024 * 1024
     private const val MAX_TEXT_BYTES = 512 * 1024
+    private const val MAX_FILE_BYTES = 16 * 1024 * 1024
 
     private val textMimeTypes = setOf(
         "application/json",
@@ -46,7 +47,11 @@ object AttachmentReader {
                 )
             }
 
-            else -> error(uiText(R.string.ui_0052, "首版暂不支持 %1\$s；目前支持图片和常见文本文件", name))
+            else -> {
+                val bytes = readLimited(resolver, uri, MAX_FILE_BYTES)
+                PendingAttachment(name = name, mimeType = mimeType,
+                    dataUrl = "data:$mimeType;base64,${Base64.encodeToString(bytes, Base64.NO_WRAP)}")
+            }
         }
     }
 
