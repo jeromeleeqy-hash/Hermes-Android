@@ -95,6 +95,52 @@
       },
       "articles": [
         {
+          "id": "portrait-carousel-388",
+          "title": {
+            "zh": "首页人物会自己动，也可以点一下",
+            "en": "A moving Home companion"
+          },
+          "steps": {
+            "zh": [
+              "在深度助理首页，右上角人物会自动轮流播放几个轻柔动作。",
+              "点击人物，她会眨眼回应，之后继续轮播。",
+              "如需保持安静，可在外观设置中开启“减少动态效果”。"
+            ],
+            "en": [
+              "The compact portrait on Personal assistant Home rotates through gentle movements.",
+              "Tap for a wink, then the carousel resumes.",
+              "Enable Reduce motion in appearance settings for a static portrait."
+            ]
+          },
+          "tip": {
+            "zh": "动画在本机播放，不需要网络，不会创建 Agent 对话；离开首页或退到后台会停止。",
+            "en": "Animations play locally without a network or Agent session, and stop offscreen or in the background."
+          }
+        },
+        {
+          "id": "card-auto-sync-387",
+          "title": {
+            "zh": "聊完事项后自动更新首页",
+            "en": "Automatic Home updates after card conversations"
+          },
+          "steps": {
+            "zh": [
+              "在深度助理首页打开一张卡片，点击“聊聊这件事”或更新进展。",
+              "像平时聊天一样说明变化。Hermes 本轮结束后，App 会在后台核对这张卡片的相关进展。",
+              "返回首页即可查看更新；成功提示会自动收起。如需授权或更新未确认，点击“查看处理”继续。"
+            ],
+            "en": [
+              "Open a card on Personal assistant Home and discuss it or update its progress.",
+              "Explain changes naturally. After Hermes finishes the turn, the app checks progress for this card in the background.",
+              "Return Home to see the result. Successful notices disappear; use processing details if approval is needed or an update is unconfirmed."
+            ]
+          },
+          "tip": {
+            "zh": "仅讨论或收到建议不会自动把事项标为完成。自动同步记录在“任务”中，不进入手机主动聊天列表。普通聊天仍可通过首页刷新合并最新进展。",
+            "en": "Discussion or advice alone does not complete a task. Automatic sync records stay in Tasks rather than the mobile conversation list. Use Home refresh to incorporate ordinary chats."
+          }
+        },
+        {
           "id": "home-modes-386",
           "title": {
             "zh": "切换简洁首页与深度助理",
@@ -299,6 +345,29 @@
         "en": "Start chats, find history and add material"
       },
       "articles": [
+        {
+          "id": "manual-rename-387",
+          "title": {
+            "zh": "手动修改对话名",
+            "en": "Rename a conversation"
+          },
+          "steps": {
+            "zh": [
+              "进入“回看”，长按要改名的对话。",
+              "点击“重命名”，修改输入框里的对话名。",
+              "点击“保存”，名称同步到当前 Profile 的服务器记录。"
+            ],
+            "en": [
+              "Open History and press and hold a conversation.",
+              "Choose Rename and edit its name.",
+              "Choose Save to update the conversation in its server profile."
+            ]
+          },
+          "tip": {
+            "zh": "对话名最多 120 个字符。不会让 AI 重新取名，也不会修改聊天内容；日常对话改名后仍通过原会话继续。",
+            "en": "Names allow up to 120 characters. No AI naming or message changes are involved. A renamed daily conversation retains its original binding."
+          }
+        },
         {
           "id": "reply-actions-366",
           "title": {

@@ -1,5 +1,39 @@
 [
   {
+    "version": "3.8.8",
+    "date": "2026-10-05",
+    "zh": [
+      "深度助理首页改用头胸部人物，脸部和表情在小尺寸下更清楚。",
+      "6 段透明动作自动轮播，轻柔动作交替，转头和眨眼偶尔穿插，片段之间停留 1–3 秒。",
+      "点击人物会眨眼回应，连续点按不反复重播，结束后回到日常轮播。",
+      "人物滑出可见区域、离开首页或 App 退到后台时停止；减少动态效果时使用静态形象。"
+    ],
+    "en": [
+      "Personal assistant Home uses a close-up portrait for clearer expressions in the compact greeting.",
+      "Six transparent clips rotate through shuffled calm actions and occasional accents, with a 1–3 second pause between clips.",
+      "Tap the portrait for a wink, then resume the carousel. Repeated taps do not restart the wink.",
+      "Playback stops offscreen and in the background. Reduced motion uses the static portrait."
+    ]
+  },
+  {
+    "version": "3.8.7",
+    "date": "2026-10-05",
+    "zh": [
+      "从事项卡片进入聊天后，本轮结束会自动核对最新进展并更新首页，不必手动刷新。",
+      "卡片按钮执行完成或断线恢复后自动读取结果；连续补充会合并同步，普通讨论不会被当成任务完成。",
+      "事项聊天采用更自然的简短回复，按需要展开，明确区分事实、推测和建议。",
+      "回看页重命名改为手动输入对话名，保留长名称和标点，不调用 AI 生成标题。",
+      "整理首页标题、事项数量、更新时间和刷新按钮，成功后收起处理提示，保留处理中和异常入口。"
+    ],
+    "en": [
+      "Card conversations automatically check recent progress and update Home after each completed turn.",
+      "Card actions and recovered turns read results automatically. Consecutive updates are coalesced; discussion alone never means task completion.",
+      "Card discussions use a natural, concise tone, expand when needed and distinguish facts, hypotheses and suggestions.",
+      "Rename conversations by typing a name. Long names and punctuation are preserved without AI title generation.",
+      "A clearer Home header groups the count, update time and refresh action. Successful processing notices disappear; ongoing and incomplete work remains accessible."
+    ]
+  },
+  {
     "version": "3.8.6",
     "date": "2026-10-05",
     "zh": [
