@@ -52,6 +52,7 @@ import com.qingyu.hermescompanion.model.WorkspaceListing
 import com.qingyu.hermescompanion.storage.SecureCookieJar
 import com.qingyu.hermescompanion.ui.format.compactSessionTitle
 import com.qingyu.hermescompanion.ui.format.resolvedSessionTitle
+import com.qingyu.hermescompanion.ui.format.isPlaceholderSessionTitle
 import android.util.Base64
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -1041,9 +1042,16 @@ class HermesApiClient(
     fun renameSession(sessionId: String, title: String): String = renameSessionForProfile(sessionId, title, currentProfile())
 
     fun renameSessionForProfile(sessionId: String, title: String, profile: String): String {
-        val body = JSONObject().put("title", compactSessionTitle(title)).toString()
+        return compactSessionTitle(setSessionTitleForProfile(sessionId, compactSessionTitle(title), profile))
+    }
+
+    /** User-entered names must not pass through the AI title shortener. */
+    fun setSessionTitleForProfile(sessionId: String, title: String, profile: String): String {
+        val value = title.trim()
+        require(value.isNotBlank() && value.length <= 120 && '\n' !in value && '\r' !in value) { "Invalid conversation name" }
+        val body = JSONObject().put("title", value).toString()
         val result = JSONObject(request("PATCH", appendProfileQuery("/api/sessions/${pathSegment(sessionId)}", profile), body, includeProfile = false))
-        return compactSessionTitle(firstString(result, "title") ?: title)
+        return firstString(result, "title")?.trim()?.takeIf(String::isNotBlank) ?: value
     }
 
     fun setSessionPinned(sessionId: String, pinned: Boolean) {
@@ -1786,7 +1794,8 @@ class HermesApiClient(
             .orEmpty()
         return HermesSession(
             id = id,
-            title = resolvedSessionTitle(firstString(item, "title", "name").orEmpty(), preview),
+            title = firstString(item, "title", "name")?.trim()?.takeUnless(::isPlaceholderSessionTitle)
+                ?: resolvedSessionTitle("", preview),
             preview = preview,
             updatedAt = firstString(
                 item,
