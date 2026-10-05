@@ -45,6 +45,26 @@ class SecureConfigStore(context: Context) {
         }
     }
 
+    fun readTodayConversation(scope: String, sessionKey: String): String? = runCatching {
+        preferences.getString(todayStorageKey("$scope\u0000$sessionKey", "conversation"), null)?.let(::decrypt)
+    }.getOrNull()
+
+    fun saveTodayConversation(scope: String, sessionKey: String, value: String) {
+        check(preferences.edit().putString(todayStorageKey("$scope\u0000$sessionKey", "conversation"), encrypt(value)).commit()) {
+            "Unable to save the card conversation link"
+        }
+    }
+
+    fun readManualSessionTitle(scope: String, sessionKey: String): String? = runCatching {
+        preferences.getString(todayStorageKey("$scope\u0000$sessionKey", "manual_title"), null)?.let(::decrypt)
+    }.getOrNull()
+
+    fun saveManualSessionTitle(scope: String, sessionKey: String, value: String) {
+        check(preferences.edit().putString(todayStorageKey("$scope\u0000$sessionKey", "manual_title"), encrypt(value)).commit()) {
+            "Unable to save the custom conversation name"
+        }
+    }
+
     fun readTaskSessionKeys(scope: String): Set<String> =
         preferences.getStringSet(todayStorageKey(scope, "task_sessions"), emptySet()).orEmpty().toSet()
 
