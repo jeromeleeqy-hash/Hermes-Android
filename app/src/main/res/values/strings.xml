@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Hermes</string>
+    <string name="app_name" translatable="false">Hermes</string>
     <string name="launcher_icon_title">桌面图标</string>
     <string name="icon_partner">白发伙伴</string>
     <string name="icon_sprite">耳机精灵</string>
