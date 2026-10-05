@@ -58,4 +58,14 @@ class DailyConversationTest {
         assertThrows(IllegalArgumentException::class.java) { DailyConversation.resolve(client, "work", null) { remembered = true } }
         assertFalse(remembered)
     }
+
+    @Test fun manuallyNamedDailyConversationKeepsItsBindingAndCustomName() {
+        val name = "我的日常聊天：工作与生活随手记"
+        `when`(client.sessionForProfile("daily", "work")).thenReturn(daily.copy(title = name))
+        val result = DailyConversation.resolve(client, "work", "daily", preferredTitle = { name }) {}
+        assertEquals("daily", result.id)
+        assertEquals(name, result.title)
+        verify(client, never()).renameSessionForProfile(anyString(), anyString(), anyString())
+        verify(client, never()).createSessionForProfile(any(), anyString())
+    }
 }
