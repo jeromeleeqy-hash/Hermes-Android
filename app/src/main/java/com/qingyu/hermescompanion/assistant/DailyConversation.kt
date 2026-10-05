@@ -20,6 +20,7 @@ object DailyConversation {
         client: HermesApiClient,
         profile: String,
         savedId: String?,
+        preferredTitle: (HermesSession) -> String? = { null },
         remember: (HermesSession) -> Unit,
     ): HermesSession {
         val saved = savedId?.takeIf { it.isNotBlank() }?.let { id ->
@@ -32,9 +33,13 @@ object DailyConversation {
         require(session.profile == profile) { uiText(R.string.ui_0046, "服务器返回了其他档案的会话") }
         // Remember immediately: a lost rename acknowledgement must not create another session.
         remember(session)
-        val targetTitle = stableTitle(session)
+        val customTitle = preferredTitle(session)?.takeIf(String::isNotBlank)
+        val targetTitle = customTitle ?: stableTitle(session)
         if (session.title != targetTitle) {
-            try { client.renameSessionForProfile(session.id, targetTitle, profile) }
+            try {
+                if (customTitle != null) client.setSessionTitleForProfile(session.id, targetTitle, profile)
+                else client.renameSessionForProfile(session.id, targetTitle, profile)
+            }
             catch (error: ApiException) {
                 // Some gateways persist empty live sessions only after their first message.
                 // The first completed turn will save the title again.
