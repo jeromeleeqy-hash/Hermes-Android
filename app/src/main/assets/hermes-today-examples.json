@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "presentation_version": 4,
+  "editorial_version": 2,
+  "example_only": true,
+  "date": "2026-10-04",
+  "generated_at": "2026-10-04T14:00:00+08:00",
+  "headline": "虚构示例：清楚地呈现值得关注的事",
+  "summary": "所有内容仅用于说明结构，绝不能复制成用户事实。",
+  "cards": [
+    {
+      "id": "reading-plan",
+      "title": "方案方向已定，分工还待确认",
+      "summary": "评审已经确定方案方向。执行负责人和完成时间尚未记录，讨论分工后就能继续推进。",
+      "kind": "followup",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "followup",
+        "reason": "示例：用户明确要求跟进此方案。",
+        "priority": 1
+      },
+      "presentation": {
+        "layout": "note",
+        "caption": "评审已经确定方案方向。执行负责人和完成时间尚未记录，讨论分工后就能继续推进。"
+      }
+    },
+    {
+      "id": "reading-progress",
+      "title": "研究材料已整理，接着比较两种观点",
+      "summary": "已有材料和来源索引，接下来需要对照两种观点的证据，整理成自己的判断。",
+      "kind": "followup",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "focus",
+        "reason": "示例：这是用户本周的学习重点。",
+        "priority": 2
+      },
+      "presentation": {
+        "layout": "progress",
+        "caption": "已有材料和来源索引，接下来需要对照两种观点的证据，整理成自己的判断。",
+        "steps": [
+          {
+            "title": "整理材料",
+            "status": "done"
+          },
+          {
+            "title": "核对来源",
+            "status": "done"
+          },
+          {
+            "title": "比较观点并写结论",
+            "status": "open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-schedule",
+      "title": "明天下午，讨论方案的执行安排",
+      "summary": "日历中已有这次讨论。负责人和时间安排是本次需要讨论的内容，可先准备一个分工草稿。",
+      "kind": "schedule",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "focus",
+        "reason": "示例：来自已确认的日历安排。",
+        "priority": 2
+      },
+      "presentation": {
+        "layout": "schedule",
+        "caption": "日历中已有这次讨论。负责人和时间安排是本次需要讨论的内容，可先准备一个分工草稿。"
+      },
+      "when": "2026-10-05 15:00 · Asia/Shanghai"
+    },
+    {
+      "id": "reading-metrics",
+      "title": "本周完成了更多事项",
+      "summary": "这组示例数据来自同一份周记录，统计范围一致。完成数量增加，仍有两项需要继续核对。",
+      "kind": "update",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "reminder",
+        "reason": "示例：与正在跟踪的工作有关的新变化。",
+        "priority": 2
+      },
+      "presentation": {
+        "layout": "metrics",
+        "caption": "这组示例数据来自同一份周记录，统计范围一致。完成数量增加，仍有两项需要继续核对。",
+        "metrics": [
+          {
+            "label": "本周完成",
+            "value": "8",
+            "unit": "项"
+          },
+          {
+            "label": "上周完成",
+            "value": "5",
+            "unit": "项"
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-personal",
+      "title": "给今晚留一点休息时间",
+      "summary": "示例记录显示最近两天工作结束较晚。如果今晚没有紧急安排，可以考虑提前收尾。",
+      "kind": "update",
+      "domain": "life",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "reminder",
+        "reason": "建议，并非已安排的任务。",
+        "priority": 2
+      },
+      "presentation": {
+        "layout": "note",
+        "caption": "示例记录显示最近两天工作结束较晚。如果今晚没有紧急安排，可以考虑提前收尾。"
+      }
+    },
+    {
+      "id": "reading-receipt",
+      "title": "资料订阅费用已记下",
+      "summary": "这笔示例订阅支出已在原记录保存。需要调整分类或补充说明时，可以直接聊。",
+      "kind": "update",
+      "domain": "finance",
+      "status": "open",
+      "sources": [],
+      "attention": {
+        "group": "reminder",
+        "reason": "示例：回应用户刚才的记账请求。",
+        "priority": 2
+      },
+      "presentation": {
+        "layout": "receipt",
+        "caption": "这笔示例订阅支出已在原记录保存。需要调整分类或补充说明时，可以直接聊。",
+        "metrics": [
+          {
+            "label": "订阅费用",
+            "value": "68",
+            "unit": "元"
+          }
+        ]
+      },
+      "when": "2026-10-04"
+    }
+  ]
+}

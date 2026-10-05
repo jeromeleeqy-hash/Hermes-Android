@@ -1,0 +1,910 @@
+{
+  "schema_version": 1,
+  "presentation_version": 4,
+  "date": "2026-10-03",
+  "generated_at": "2026-10-03T19:00:00+08:00",
+  "headline": "交互卡片示例",
+  "summary": "只用于样式体验和格式参考，禁止写入用户的真实概览。",
+  "example_only": true,
+  "cards": [
+    {
+      "id": "example-clarification",
+      "title": "这两条是同一次安排吗？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "clarification",
+          "items": [
+            {
+              "id": "same",
+              "title": "同一件事",
+              "detail": "关联记录，保留各自来源",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "different",
+              "title": "两件不同的事",
+              "detail": "",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "unknown",
+              "title": "暂时不能确定",
+              "detail": "",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "note": "确认关联不等于任务已完成。"
+        },
+        "facts": [
+          "9/28：看场地",
+          "9/29：场地已选定"
+        ],
+        "metrics": [],
+        "intent": "clarify",
+        "question": "这两条是同一次安排吗？",
+        "options": [
+          {
+            "title": "同一件事",
+            "detail": "关联记录，保留各自来源"
+          },
+          {
+            "title": "两件不同的事",
+            "detail": ""
+          },
+          {
+            "title": "暂时不能确定",
+            "detail": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "example-comparison",
+      "title": "新流程，怎样开始？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "comparison",
+          "items": [
+            {
+              "id": "pilot",
+              "title": "先试点",
+              "detail": "准备约 2 天；先验证效果。",
+              "value": "1 个小组",
+              "status": "open"
+            },
+            {
+              "id": "all",
+              "title": "统一推广",
+              "detail": "准备约 1 周；先做好培训。",
+              "value": "全部小组",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "note": "耗时为讨论中的估计。"
+        },
+        "facts": [],
+        "metrics": [],
+        "intent": "decide",
+        "question": "新流程，怎样开始？",
+        "options": [
+          {
+            "title": "先试点",
+            "detail": "准备约 2 天；先验证效果。"
+          },
+          {
+            "title": "统一推广",
+            "detail": "准备约 1 周；先做好培训。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "example-priorities",
+      "title": "先把精力放在哪？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "general",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "priorities",
+          "items": [
+            {
+              "id": "decision",
+              "title": "确认会议决策",
+              "detail": "需要你做决定",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "outline",
+              "title": "完成研究提纲",
+              "detail": "留一段专注时间",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "study",
+              "title": "安排本周学习",
+              "detail": "个人计划",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-time_picker",
+      "title": "哪段时间适合讨论？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "schedule",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "time_picker",
+          "items": [
+            {
+              "id": "morning",
+              "title": "10 月 6 日 · 10:00",
+              "detail": "",
+              "value": "2026-10-06T10:00:00+08:00",
+              "status": "open"
+            },
+            {
+              "id": "afternoon",
+              "title": "10 月 6 日 · 14:00",
+              "detail": "",
+              "value": "2026-10-06T14:00:00+08:00",
+              "status": "open"
+            },
+            {
+              "id": "late",
+              "title": "10 月 6 日 · 16:30",
+              "detail": "",
+              "value": "2026-10-06T16:30:00+08:00",
+              "status": "open"
+            }
+          ],
+          "fields": [
+            {
+              "id": "duration",
+              "label": "讨论时长",
+              "kind": "select",
+              "value": "30 分钟",
+              "choices": [
+                "30 分钟",
+                "45 分钟",
+                "60 分钟"
+              ],
+              "required": true
+            }
+          ],
+          "timezone": "Asia/Shanghai"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-meeting_actions",
+      "title": "把决定落到具体的人",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "meeting_actions",
+          "items": [
+            {
+              "id": "scope",
+              "title": "整理试点范围",
+              "detail": "",
+              "value": "",
+              "status": "open",
+              "owner": "小林",
+              "due": "2026-10-06"
+            },
+            {
+              "id": "criteria",
+              "title": "确认验收标准",
+              "detail": "",
+              "value": "",
+              "status": "open",
+              "owner": "我",
+              "due": "2026-10-07"
+            },
+            {
+              "id": "training",
+              "title": "准备培训资料",
+              "detail": "",
+              "value": "",
+              "status": "open",
+              "owner": "",
+              "due": ""
+            }
+          ],
+          "fields": [],
+          "note": "建立个人跟踪待办，不自动向负责人发消息。"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-checklist",
+      "title": "周末分享会准备",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "life",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "checklist",
+          "items": [
+            {
+              "id": "topic",
+              "title": "确定主题",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "cases",
+              "title": "整理三个案例",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "rehearse",
+              "title": "试讲一遍",
+              "detail": "",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "questions",
+              "title": "准备讨论问题",
+              "detail": "",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": [],
+        "steps": [
+          {
+            "title": "确定主题",
+            "status": "done"
+          },
+          {
+            "title": "整理三个案例",
+            "status": "done"
+          },
+          {
+            "title": "试讲一遍",
+            "status": "open"
+          },
+          {
+            "title": "准备讨论问题",
+            "status": "open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "example-milestones",
+      "title": "试点结束，进入下一阶段？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "milestones",
+          "items": [
+            {
+              "id": "requirements",
+              "title": "需求确认",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "pilot",
+              "title": "小范围试点",
+              "detail": "验收材料已就绪",
+              "value": "",
+              "status": "active"
+            },
+            {
+              "id": "review",
+              "title": "复盘与推广",
+              "detail": "等待启动",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "text": "核对试点记录与问题清单；确认流程可重复，关键问题有处理结论。"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-blocker",
+      "title": "还差交付时间，才能比较",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "blocker",
+          "items": [
+            {
+              "id": "scope",
+              "title": "范围与费用",
+              "detail": "两个方案均已提供",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "deadline",
+              "title": "方案 B 的交付时间",
+              "detail": "尚未提供",
+              "value": "",
+              "status": "waiting"
+            }
+          ],
+          "fields": [],
+          "text": "需要方案 B 的交付时间。补充后由 Hermes 核验，再继续比较。"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-execution",
+      "title": "整理这周的研究资料",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "execution",
+          "items": [
+            {
+              "id": "read",
+              "title": "读取资料",
+              "detail": "已读取 4 份资料",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "compare",
+              "title": "整理差异",
+              "detail": "",
+              "value": "",
+              "status": "active"
+            },
+            {
+              "id": "write",
+              "title": "形成建议",
+              "detail": "",
+              "value": "",
+              "status": "waiting"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-deliverable",
+      "title": "这份方案可以采用了吗？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "deliverable",
+          "items": [
+            {
+              "id": "document",
+              "title": "周会流程优化方案",
+              "detail": "包含会前准备、会上决策和会后跟踪。",
+              "value": "第 2 版",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "note": "采用只表示认可本版本，不会自动发布或发送。"
+        },
+        "facts": [],
+        "metrics": [],
+        "intent": "decide",
+        "question": "这份方案可以采用了吗？"
+      }
+    },
+    {
+      "id": "example-metrics",
+      "title": "任务按期完成率",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "update",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "metrics",
+          "items": [],
+          "fields": [],
+          "series": [
+            {
+              "label": "8/29",
+              "value": 61
+            },
+            {
+              "label": "9/5",
+              "value": 67
+            },
+            {
+              "label": "9/12",
+              "value": 65
+            },
+            {
+              "label": "9/19",
+              "value": 71
+            },
+            {
+              "label": "9/26",
+              "value": 74
+            },
+            {
+              "label": "10/3",
+              "value": 82
+            }
+          ],
+          "text": "本周 41/50，上周 37/50，提高 8 个百分点。已取消任务不计入分母。"
+        },
+        "facts": [],
+        "metrics": [
+          {
+            "label": "本周按期完成率",
+            "value": "82",
+            "unit": "%"
+          }
+        ]
+      }
+    },
+    {
+      "id": "example-change",
+      "title": "交付时间有了新消息",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "change",
+          "items": [
+            {
+              "id": "review",
+              "title": "材料审阅",
+              "detail": "原定 10 月 8 日",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "report",
+              "title": "汇总报告",
+              "detail": "原定 10 月 9 日",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "before": "10 月 7 日 · 周三",
+          "after": "10 月 9 日 · 周五"
+        },
+        "facts": [],
+        "metrics": [],
+        "intent": "decide",
+        "question": "交付时间有了新消息"
+      }
+    },
+    {
+      "id": "example-timeline",
+      "title": "流程试点，推进到哪了？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "work",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "timeline",
+          "items": [
+            {
+              "id": "need",
+              "title": "提出需求",
+              "detail": "讨论记录：希望减少重复汇报。",
+              "value": "9/28",
+              "status": "open"
+            },
+            {
+              "id": "scope",
+              "title": "确定试点范围",
+              "detail": "会议纪要：先由一个小组试行。",
+              "value": "9/30",
+              "status": "open"
+            },
+            {
+              "id": "feedback",
+              "title": "收集反馈中",
+              "detail": "正在收集反馈，尚无效果结论。",
+              "value": "10/3",
+              "status": "open"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-evidence",
+      "title": "先试点，再决定是否推广",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "update",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "evidence",
+          "items": [
+            {
+              "id": "interview",
+              "title": "重复汇报耗时较多",
+              "detail": "示例访谈：不同渠道需要重复填写相同内容。",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "tools",
+              "title": "现有工具支持小组试行",
+              "detail": "示例检查：范围和权限可独立配置。",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "risk",
+              "title": "是否会增加协作遗漏？",
+              "detail": "尚未取得试点后的观察记录。",
+              "value": "",
+              "status": "waiting"
+            }
+          ],
+          "fields": [],
+          "text": "现有资料支持尝试，尚不足以预测整体效果。"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-revision",
+      "title": "把这段话说得更清楚",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "revision",
+          "items": [
+            {
+              "id": "direct",
+              "title": "表达更直接",
+              "detail": "为了进一步提升沟通效率",
+              "value": "为减少重复汇报",
+              "status": "open"
+            },
+            {
+              "id": "specific",
+              "title": "补充具体动作",
+              "detail": "请大家及时反馈",
+              "value": "请在周四前补充试点问题",
+              "status": "open"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": [],
+        "intent": "decide",
+        "question": "把这段话说得更清楚"
+      }
+    },
+    {
+      "id": "example-triage",
+      "title": "这些内容，怎么留下来？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "information",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "triage",
+          "items": [
+            {
+              "id": "chat",
+              "title": "项目讨论记录",
+              "detail": "微信分享 · 已解析",
+              "value": "lead",
+              "status": "open"
+            },
+            {
+              "id": "archive",
+              "title": "去年工作总结",
+              "detail": "PDF · 已解析",
+              "value": "archive",
+              "status": "open"
+            },
+            {
+              "id": "voice",
+              "title": "散步时的想法",
+              "detail": "语音 · 已转写",
+              "value": "later",
+              "status": "open"
+            }
+          ],
+          "fields": []
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-memory_change",
+      "title": "偏好的阅读时段变了",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "decision",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "memory_change",
+          "items": [],
+          "fields": [],
+          "before": "清晨",
+          "after": "睡前",
+          "text": "来自你的明确表达：最近更喜欢睡前读一会儿。"
+        },
+        "facts": [],
+        "metrics": [],
+        "intent": "decide",
+        "question": "偏好的阅读时段变了"
+      }
+    },
+    {
+      "id": "example-person_followup",
+      "title": "记得这个约定",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "relationships",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "person_followup",
+          "items": [
+            {
+              "id": "promise",
+              "title": "你答应过",
+              "detail": "分享最近的阅读清单",
+              "value": "",
+              "status": "open"
+            },
+            {
+              "id": "next",
+              "title": "还没确定",
+              "detail": "下次讨论的时间",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "text": "林同学 · 上次沟通 3 天前"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-quick_log",
+      "title": "今天读了多久？",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "learning",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "quick_log",
+          "items": [],
+          "fields": [
+            {
+              "id": "minutes",
+              "label": "阅读时长 · 分钟",
+              "kind": "number",
+              "value": "25",
+              "required": true,
+              "min": 0,
+              "max": 1440
+            },
+            {
+              "id": "takeaway",
+              "label": "想记住的一点 · 可不填",
+              "kind": "text",
+              "value": ""
+            }
+          ]
+        },
+        "facts": [],
+        "metrics": []
+      }
+    },
+    {
+      "id": "example-reflection",
+      "title": "今天，留住一点收获",
+      "summary": "这是用于体验的虚构示例，不是你的真实记录。",
+      "kind": "followup",
+      "domain": "life",
+      "status": "open",
+      "sources": [],
+      "presentation": {
+        "layout": "interactive",
+        "caption": "这是用于体验的虚构示例，不是你的真实记录。",
+        "interaction": {
+          "version": 1,
+          "type": "reflection",
+          "items": [
+            {
+              "id": "decision",
+              "title": "确认会议决策",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "materials",
+              "title": "整理研究资料",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "read",
+              "title": "完成阅读记录",
+              "detail": "",
+              "value": "",
+              "status": "done"
+            },
+            {
+              "id": "outline",
+              "title": "研究提纲",
+              "detail": "",
+              "value": "",
+              "status": "open"
+            }
+          ],
+          "fields": [],
+          "note": "选中延续事项只调整明日重点，原截止日期保持不变。"
+        },
+        "facts": [],
+        "metrics": []
+      }
+    }
+  ]
+}

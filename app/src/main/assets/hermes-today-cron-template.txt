@@ -1,0 +1,16 @@
+Hermes App 个人助理首页 · 3.8.4
+Profile: {{PROFILE}}
+Workspace: {{WORKSPACE}}
+Timezone: {{TIMEZONE}}
+Period: {{PERIOD}}
+Schedule marker: {{MARKER}}
+Mode: refresh_overview_only
+
+这是一次全新 Cron 对话。读取 {{WORKSPACE}}/.hermes-app/today/contract.md，日期以执行时 {{TIMEZONE}} 当地日期为准，不复用旧 request.json 的日期或模式。
+目标：为用户挑出现在值得关注、值得继续推进和有理由提醒的事情。先理解当前 Profile 已有的近期重点、偏好及用户最近明确的反馈，再结合已有概览和变化的相关摘要。不能从归档或职业猜测用户当前目标；没有后续记录不等于未完成。只读取已授权相关资料，所有新增正文读取合计最多 8 份、约 20000 字，不扫描全盘历史。
+每张卡单独读得懂：明确对象、必要背景、当前进展或影响。通常 4–8 件有意义的事即可。按明确关注/待收尾/建议提醒填写 attention，priority 只凭真实依据，reason 简短说明为何留意；不把建议当用户已采纳。
+可读性和可视化优先，主要通过聊天协作。输出 presentation_version: 4、editorial_version: 2；每张填写 layout 与 caption。note、schedule、progress、metrics、receipt 按实际资料选择；decision/followup 可以没有交互。快捷回应 interactive 仅在确实省事时选用，不能为了凑 20 类制造问题、备选方案、数字或未确认的进度。
+用户已回答的问题不反复问。先核对相关用户确认、动作回执和原记录；新生成的总结或“待核实”尾注不能自动推翻明确确认。已确认定性但细节未定时，只问后续细节。原记录已改、回执缺失属于同步未完成；不能当成用户没回答。真实冲突说明分歧，保留原确认，不擅自回退。真正需要选择时，选项处于同一维度；统计范围与有效标准不能做成互斥项。来源日期、数据日期与实际更新时间分清；读到新事实并更新卡片时推进 generated_at，纯排版保留信息时间。
+若未迁移的旧工作区只有根目录概览，先保留原位置并报告需收纳，不能在本次 Cron 中自行迁移。已迁移或新安装时，仅更新 {{WORKSPACE}}/.hermes-app/today/hermes-today.json，使用 {{WORKSPACE}}/.hermes-app/today/writer.py 对候选校验，基于最初读取的哈希合并写入并回读。保留稳定 id、用户确认、action_receipts 和必要背景；遇到并发更新重新读取合并，不能拿旧候选覆盖新结果。不要把新问题塞到原操作编号下。
+本次不改 Markdown、人物、记忆或原始待办，不修改 Cron，不自行外发。缺来源和处理日志记入 coverage_note / processing_notes，不生成事项卡。
+最终用 1–3 句讲清真正的变化和需要用户留意的事。沿用用户的语言。路径、数量、读取量、校验和哈希只记 processing_notes；不要把“处理日志（详情）”整段粘贴到最终回复。发生失败如实说明影响，保留旧概览。遵守现有 delivery 设置，不自行增加消息接收人或通知渠道。

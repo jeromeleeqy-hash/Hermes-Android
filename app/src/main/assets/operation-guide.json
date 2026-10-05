@@ -77,8 +77,213 @@
             ]
           },
           "tip": {
-            "zh": "",
-            "en": ""
+            "zh": "诊断页会列出本次运行中最近的失败环节和原因，不记录密码、对话正文或文件路径。普通只读请求中断会自动尝试一次，写入未确认时先核对结果再重试。",
+            "en": "Diagnostics list recent failure stages and categories from this run, without credentials, content or file paths. Interrupted reads retry once; verify unacknowledged writes before trying again."
+          }
+        }
+      ]
+    },
+    {
+      "id": "today",
+      "title": {
+        "zh": "今日与事项",
+        "en": "Today & your work"
+      },
+      "hint": {
+        "zh": "概览、卡片、场景和资料",
+        "en": "Briefs, cards, scenes and knowledge"
+      },
+      "articles": [
+        {
+          "id": "home-modes-386",
+          "title": {
+            "zh": "切换简洁首页与深度助理",
+            "en": "Choose your Home mode"
+          },
+          "steps": {
+            "zh": [
+              "首页右上角点击齿轮，在“首页模式”中选择“简洁首页”或“深度助理”，立即生效；重开 App 仍保留选择。",
+              "简洁首页保留人物、问候、“跟我说”和最近主动聊天。聊天、文件、任务和授权均可照常使用，无需配置首页整理。",
+              "深度助理显示事项与进展；选中后，再回到首页齿轮查看首次整理、早晚整理和文件收纳的说明。已有早晚配置无需重做。"
+            ],
+            "en": [
+              "Open the Home settings gear and choose Simple Home or Personal assistant. It applies immediately and survives app restarts.",
+              "Simple Home keeps the companion, greeting, Talk to me and recent user chats. Chat, files, tasks and approvals work without briefing setup.",
+              "Personal assistant shows your work and progress. Open the gear again for first-briefing, daily schedule and storage guidance. Existing schedules need no reconfiguration."
+            ]
+          },
+          "tip": {
+            "zh": "切换只改变本机主页，不会删除资料、清理服务器对话或停止已有早晚任务；如需暂停，请到“任务”中操作。新用户默认简洁首页；检测到已有整理内容或任务记录的老用户升级后保留深度助理。",
+            "en": "Switching only changes Home on this device. It does not delete data, remove server conversations or stop existing schedules; pause them in Tasks. New users start with Simple Home; existing briefing users retain Personal assistant on upgrade."
+          }
+        },
+        {
+          "id": "today-interactive-374",
+          "title": {
+            "zh": "处理首页事项",
+            "en": "Act on an overview item"
+          },
+          "steps": {
+            "zh": [
+              "点开卡片，先看背景、进展和来源；想继续讨论，选择“聊聊这件事”。",
+              "带有快捷回应的卡片可填写选择、日期或进度，再明确提交。App 核对服务器版本后开始处理，可在任务页查看。",
+              "卡片状态以服务器写回及核验结果为准。选择或提交不等于保存完成；冲突、网络失败或记录缺失会保留待核对状态。",
+              "需要更新既有整理规范时，到“首页 → 齿轮（首页设置） → 维护工具 → 更新整理规则”，正常使用不用重复操作。"
+            ],
+            "en": [
+              "Open a card to read its context, progress and sources. Choose Discuss to continue in a user conversation.",
+              "For cards with a quick response, enter your selection, date or progress, then submit explicitly. The app checks the server version and tracks processing in Tasks.",
+              "A selection or submission is not proof of completion. Card updates require verified server writes; conflicts and failures remain unconfirmed.",
+              "To update existing briefing rules, use Home → Settings gear → Maintenance tools → Update briefing rules. Routine use does not require this."
+            ]
+          },
+          "tip": {
+            "zh": "无需数据库。真实写入由 Hermes 按规范处理；本版没有通用的 Agent 暂停/继续控制，也不会自动对外发送消息。",
+            "en": "No database is required. Hermes processes real writes under the contract. This version does not provide universal pause/resume controls or automatically send messages to others."
+          }
+        },
+        {
+          "id": "today-schedule-374",
+          "title": {
+            "zh": "设置早晚自动整理",
+            "en": "Schedule morning and evening briefings"
+          },
+          "steps": {
+            "zh": [
+              "在首页右上角点击齿轮，进入“首页设置 → 早晚整理”。App 会核对已有配置并读取保存的时间与时区；按需修改。",
+              "点击“交给 Hermes 配置”，配置过程在任务页查看。设置一次后自动执行，想调整时间时再打开。",
+              "Hermes 先检查已有任务，避免重复；将规范保存到当前工作区，再创建或更新对应的早晚 Cron。",
+              "在“早晚整理”中核对实际任务是否生效。只有完成回读核验才表示配置成功；每次执行读取同一份已保存规范。"
+            ],
+            "en": [
+              "Open the Home settings gear → Daily schedule. The app checks saved settings and loads existing times and timezone; edit only when needed.",
+              "Tap Configure with Hermes and follow progress in Tasks. Set it once; return when you want to change the times.",
+              "Hermes checks existing jobs, persists the contract in the current workspace and configures the matching morning/evening jobs.",
+              "Verify the actual jobs in Daily schedule. Success requires read-back verification; each run loads the same saved contract."
+            ]
+          },
+          "tip": {
+            "zh": "首页整理是可选功能，不配置也能使用聊天、文件和任务。日常刷新用首页刷新图标；只读同步在“首页设置 → 维护工具 → 同步与读取详情”。",
+            "en": "Home briefings are optional; chat, files and tasks work without setup. Use Home Refresh for new progress, or Home settings → Maintenance tools → Sync and read details for read-only sync."
+          }
+        },
+        {
+          "id": "today-brief",
+          "title": {
+            "zh": "让首页显示我的真实事项",
+            "en": "Show my real work on Home"
+          },
+          "steps": {
+            "zh": [
+              "连接后，在首页齿轮中选择“深度助理”，再点击首页“开始整理”。",
+              "App 会带上工作区约定开始整理，处理过程在任务页查看；需要授权时会提示你确认。",
+              "深度助理首页前台约每分钟检查已保存内容，对话完成后也会同步。点击刷新图标，会让 Hermes 结合最近聊天核对进展并更新首页，页面显示处理状态；手机保留加密副本供断网时查看。"
+            ],
+            "en": [
+              "After connecting, choose Personal assistant in the Home settings gear, then tap Get started on Home.",
+              "The app starts a briefing task with the workspace contract. Follow it in Tasks; required approvals remain explicit.",
+              "Personal assistant Home checks saved content about once a minute and after completed turns. Tap the refresh icon to ask Hermes to reconcile recent chat progress and update the overview, with status shown on Home. Encrypted saved content remains visible offline."
+            ]
+          },
+          "tip": {
+            "zh": "首页整理可选。不配置也可以正常聊天、读写文件和使用任务；新用户可从首页齿轮查看配置指引。",
+            "en": "Home briefings are optional. Chat, files and tasks work without setup; new users can open the Home settings gear for guidance."
+          }
+        },
+        {
+          "id": "today-cards",
+          "title": {
+            "zh": "讨论事项和更新进展",
+            "en": "Discuss a card or update progress"
+          },
+          "steps": {
+            "zh": [
+              "点击卡片先看问题、关键事实和选项；长背景及来源需要时再展开。",
+              "选择“聊聊这件事”或“补充进展”，背景会随草稿带入对话。",
+              "补充实际进展并发送，再点首页刷新图标，让 Hermes 核对最近对话并更新对应卡片。若显示“结果待核对”，点开处理详情；“继续未完成部分”会先核对已有结果，再处理缺少的部分。"
+            ],
+            "en": [
+              "Open a card for its question, key facts and options. Expand background or sources when needed.",
+              "Choose Discuss or Update. The card context is attached to a chat draft.",
+              "Send the actual progress, then tap the Home refresh icon to reconcile recent conversations and update the cards. Open an unconfirmed result for processing details; Continue unfinished work checks existing results before proceeding."
+            ]
+          },
+          "tip": {
+            "zh": "打开卡片、生成方案不等于完成整个事项。",
+            "en": "Opening a card or generating a plan does not complete the underlying work."
+          }
+        },
+        {
+          "id": "today-storage",
+          "title": {
+            "zh": "收纳首页相关文件",
+            "en": "Organize overview files"
+          },
+          "steps": {
+            "zh": [
+              "首页右上角“齿轮 → 收纳首页文件”。这项操作只需一次。",
+              "Hermes 在任务页核对旧文件、匹配的概览 Cron 和正在进行的写入，再迁移到 .hermes-app/today，并同步规范、writer 命令和对应的 Cron 提示词。",
+              "成功后“首页设置”显示“首页文件已收纳，无需重复操作”。需要确认早晚任务时，进入“早晚整理”核对。",
+              "概览位置为 .hermes-app/today/hermes-today.json，锁为 .hermes-app/today/.hermes-today.lock，概览快照为 .hermes-app/today/snapshots/。业务文件不搬动。"
+            ],
+            "en": [
+              "Open Home → Settings gear → Organize overview files. This is a one-time operation.",
+              "Hermes checks legacy files, matching overview jobs and active writers in Tasks, then migrates files under .hermes-app/today and updates the contract, writer commands and matching Cron prompts.",
+              "Home settings shows that the overview files are organized after verification. Check daily jobs under Daily schedule.",
+              "The overview, lock and overview snapshots are stored under .hermes-app/today. Source documents stay in place."
+            ]
+          },
+          "tip": {
+            "zh": "安装新版不会自动搬动服务器文件。冲突或仍在写入时会停止并说明原因；无需手工删除锁或移动其他程序的快照。",
+            "en": "Installing the update does not move server files automatically. Conflicts or active writers stop migration with an explanation; do not manually delete locks or move unrelated snapshots."
+          }
+        },
+        {
+          "id": "today-scenes",
+          "title": {
+            "zh": "从场景开始一项工作",
+            "en": "Start with a scene"
+          },
+          "steps": {
+            "zh": [
+              "点击“帮我做…”，选择工作、学习、生活等类别。",
+              "选择具体场景，补充本次目标、要求或背景。",
+              "点击“带入对话”检查草稿，可在对话中添加附件后发送。"
+            ],
+            "en": [
+              "Tap Help me… and choose Work, Learning, Life or another category.",
+              "Choose a scene and add your goal, requirements or background.",
+              "Tap Continue in chat, review the draft, add any attachments and send."
+            ]
+          },
+          "tip": {
+            "zh": "场景用于提供起点，不会根据你的职业给你固定身份。",
+            "en": "Scenes provide starting points; they do not assign you a fixed identity based on your job."
+          }
+        },
+        {
+          "id": "today-memory-grid-372",
+          "title": {
+            "zh": "使用卡片与资料目录",
+            "en": "Use cards and memory folders"
+          },
+          "steps": {
+            "zh": [
+              "首页先展示四件重点事项；点击“查看其余”展开，或用分类切换范围。",
+              "首页先显示事项及完整的简短背景；决定卡打开详情后再选择。详情有固定操作区，顶部“关闭”返回首页。",
+              "资料统一从底部“文件”进入，继续浏览真实工作区目录。",
+              "“聊聊这件事”进入普通聊天；快捷回应需明确提交后才作为任务处理。卡片状态以服务器写回结果为准。"
+            ],
+            "en": [
+              "Home shows four focus items. Expand the remainder or filter by topic.",
+              "Home explains each item before asking for a response. Open decision details to choose; actions remain fixed and Close returns Home.",
+              "Open the Files tab to browse the real workspace directories.",
+              "Discuss opens a user conversation. A quick response starts a task only after explicit submission; card state follows verified server results."
+            ]
+          },
+          "tip": {
+            "zh": "右上角“修正卡片与整理规则”会请求 Hermes 修正服务器内容；仅安装新版不会自行改动已有 JSON 或 Cron。",
+            "en": "Improve cards and briefing rules asks Hermes to update server content. Installing an app update alone does not rewrite JSON or Cron jobs."
           }
         }
       ]
@@ -442,19 +647,21 @@
           },
           "steps": {
             "zh": [
-              "在“任务”的定时列表中点开目标任务。",
-              "查看最近运行状态和结果；需要立即验证时使用立即运行。",
-              "暂时不用时关闭或暂停任务，之后可重新启用。"
+              "打开“任务 → 当前”查看处理进展和待确认事项。",
+              "“记录”收纳自动刷新、整理、配置、卡片处理和定时执行记录。点开查看详情、结果或补充要求。",
+              "主动发起的聊天保留在会话列表。自动任务不会在会话列表、对话搜索或分享目标中出现，也不会自动删除。",
+              "在“定时”中打开安排，可调整或暂停后续执行。"
             ],
             "en": [
-              "Select a task in the scheduled list on Tasks.",
-              "Review the latest run status and output. Use Run now when you want to test it immediately.",
-              "Disable or pause a task you do not currently need, and enable it again later."
+              "Open Tasks → Current for progress and pending requests.",
+              "History includes automated refreshes, briefings, setup, card processing and scheduled runs. Open an item for details.",
+              "User conversations stay in the conversation list. Automated tasks are excluded from conversation browsing, search and share targets, and are not automatically deleted.",
+              "Open Scheduled to adjust or pause a schedule."
             ]
           },
           "tip": {
-            "zh": "",
-            "en": ""
+            "zh": "自动整理和卡片处理记录归入手机“任务”，不挤占聊天列表。这里只做手机端分类，服务器记录仍保留，所以 PC 端仍可能看到；不会自动删除真实对话。",
+            "en": "Automatic briefings and card processing appear in mobile Tasks. This is a mobile-only classification: server records remain and may still appear on PC. Conversations are not automatically deleted."
           }
         },
         {
@@ -465,19 +672,23 @@
           },
           "steps": {
             "zh": [
-              "在“任务”的待处理项或对话中的审批卡片里打开请求。",
-              "阅读将执行的操作和涉及内容，确认是否符合你的意图。",
-              "选择允许或拒绝，再回到对话查看助理是否继续执行。"
+              "首页或任务页出现“等你决定”时，点“查看并确认”。授权窗口位置固定，完整命令、说明和选项可上下滚动。",
+              "选择允许范围或拒绝，再点“确认并继续”。没有选择前不会提交授权。",
+              "如果已经在电脑处理，可点“已在其他端处理？核对状态”。窗口内直接显示进度和结果；服务器确认结束后提醒自动消失。",
+              "关闭窗口只是暂时收起；尚未处理的请求仍可从首页或任务页打开。",
+              "旧服务器无法核对时，若你已确认在其他端处理，可点击“已处理，移除此提醒”，再明确确认移除。只移除手机提醒，不会授权、拒绝或重跑服务器操作。"
             ],
             "en": [
-              "Open the request from pending items in Tasks or from its approval card in the chat.",
-              "Read the proposed action and affected material, and check it matches your intent.",
-              "Allow or reject it, then return to the conversation to see the result."
+              "Tap Review and confirm on Home or Tasks. Read the full command, explanation and choices in the fixed, scrollable window.",
+              "Choose an available approval scope or denial, then confirm. Nothing is approved before your explicit choice.",
+              "If handled on your computer, tap Check status. Progress and results appear inside the window; confirmed resolved requests disappear.",
+              "Closing the window only defers it; pending requests remain available on Home and Tasks.",
+              "If an older server cannot verify the state and you have confirmed it was handled elsewhere, choose Remove reminder and confirm. This only removes the local reminder; it does not approve, deny or rerun server work."
             ]
           },
           "tip": {
-            "zh": "",
-            "en": ""
+            "zh": "网络不通或旧网关未提供明确状态时会保留请求；不会把核对状态当作同意授权。",
+            "en": "Requests are preserved when offline or when an older gateway provides no authoritative status. Checking status never approves an operation."
           }
         }
       ]
