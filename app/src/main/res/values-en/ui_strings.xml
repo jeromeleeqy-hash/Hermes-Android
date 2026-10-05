@@ -971,7 +971,7 @@
     <string name="ui_0976" formatted="false">"Parent folder"</string>
     <string name="ui_0977" formatted="false">"No subfolders here. You can select this folder."</string>
     <string name="ui_0978" formatted="false">"Create"</string>
-    <string name="ui_0979" formatted="false">"Rename with AI"</string>
+    <string name="ui_0979" formatted="false">"Rename"</string>
     <string name="ui_0980" formatted="false">"Unpin"</string>
     <string name="ui_0981" formatted="false">"Move to project"</string>
     <string name="ui_0982" formatted="false">"No projects available. Switch to Projects in History to create one."</string>
