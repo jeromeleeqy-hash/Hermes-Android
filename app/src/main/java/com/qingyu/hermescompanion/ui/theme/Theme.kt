@@ -124,13 +124,15 @@ object HermesColors {
 }
 
 object HermesSpacing {
+    val floatingInset = 16.dp
     val xxs = 4.dp
     val xs = 8.dp
     val sm = 12.dp
     val md = 16.dp
     val lg = 24.dp
     val xl = 32.dp
-    val page = 16.dp
+    // Shared outer gutter for all five primary pages and their settings.
+    val page = 20.dp
     val densePage = 12.dp
     val minTouchTarget = 48.dp
 }
