@@ -23,7 +23,7 @@
 
 ## 验证范围
 
-模拟网关验证客户端的协议发送与事件分发，ViewModel 测试使用替代的网络与本机存储服务。没有连接真实部署的 Hermes Gateway，没有在 Android 真机上完成目录执行、网络切换或界面验收。真机验收步骤见 `Hermes-v3.0.4-release-notes.md`。
+模拟网关验证客户端的协议发送与事件分发，ViewModel 测试使用替代的网络与本机存储服务。没有连接真实部署的 Hermes Gateway，没有在 Android 真机上完成目录执行、网络切换或界面验收。真机验收步骤见 `docs/archive/release-notes/Hermes-v3.0.4-release-notes.md`。
 
 ## 发布签名
 

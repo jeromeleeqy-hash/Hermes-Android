@@ -2,6 +2,37 @@
 
 All releases documented by the available release notes, newest first. Unknown early dates and undocumented version numbers are not invented. Historical entries describe behavior at that time; see the latest entry for current behavior.
 
+## 3.8.8 · 2026-10-05
+
+- Personal assistant Home uses a close-up portrait for clearer expressions in the compact greeting.
+- Six transparent clips rotate through shuffled calm actions and occasional accents, with a 1–3 second pause between clips.
+- Tap the portrait for a wink, then resume the carousel. Repeated taps do not restart the wink.
+- Playback stops offscreen and in the background. Reduced motion uses the static portrait.
+
+## 3.8.7 · 2026-10-05
+
+- Card conversations automatically check recent progress and update Home after each completed turn.
+- Card actions and recovered turns read results automatically. Consecutive updates are coalesced; discussion alone never means task completion.
+- Card discussions use a natural, concise tone, expand when needed and distinguish facts, hypotheses and suggestions.
+- Rename conversations by typing a name. Long names and punctuation are preserved without AI title generation.
+- A clearer Home header groups the count, update time and refresh action. Successful processing notices disappear; ongoing and incomplete work remains accessible.
+
+## 3.8.6 · 2026-10-05
+
+- Choose Simple Home or Personal assistant from the Home settings gear; the choice is saved on this device.
+- Simple Home restores the GitHub 3.6.6 companion, greeting, daily conversation and recent chats in all three skins.
+- New users start with Simple Home; upgrades retain Personal assistant when local briefing content or App task records exist.
+- Simple Home skips periodic overview reads. Switching retains data, running work and existing daily schedules.
+- Recent chats on Simple Home exclude automatic App and Cron conversations, while approvals and Tasks remain available.
+
+## 3.8.5 · 2026-10-05
+
+- Fix hidden request-check feedback and stale reminders when the server omits empty request lists.
+- Show check progress and results in the request window; explicitly remove a local reminder when an older server cannot verify its state.
+- Replace Home More with a settings gear, including daily schedules and optional setup guidance.
+- Align content actions with body text using leading icons across Home, card details, connection and task pages.
+- Load saved schedule times and timezone. Automatic work remains in mobile Tasks; server and PC records are retained.
+
 ## 3.8.4 · 2026-10-05
 
 - Use a fixed authorization window with scrolling content and full-width review buttons.
