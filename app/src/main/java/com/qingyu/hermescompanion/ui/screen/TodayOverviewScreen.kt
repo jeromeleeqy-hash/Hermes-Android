@@ -25,9 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.qingyu.hermescompanion.model.*
 import com.qingyu.hermescompanion.today.*
 import com.qingyu.hermescompanion.ui.AppUiState
@@ -73,7 +70,6 @@ fun TodayOverviewScreen(
     val filtered = focusCards(board?.cards.orEmpty(), showClosed).filter { group == null || it.attentionGroup == group }
     val visible = if (expanded) filtered else filtered.take(4)
     val searchLabel = todayText("搜索对话", "Search conversations")
-    val refreshLabel = todayText("核对最新进展并更新首页", "Check recent progress and update overview")
     val canPrepare = today.rootVerified && !today.loading && !state.isBusy && !state.isProfileSwitching
 
     fun handleCardAction(id: String, value: String) {
@@ -103,32 +99,7 @@ fun TodayOverviewScreen(
         }
         if (state.pendingAgentRequests.isNotEmpty()) item(key = "approval") { DecisionCard(state.pendingAgentRequests.first(), onRespond) }
         item(key = "briefing") {
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(todayText("为你留意", "On your radar") + if (board != null) " · ${filtered.size}" else "",
-                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (board != null) Text(
-                        if (board.date == localDate) todayText("${board.generatedAt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))} 更新", "Updated ${board.generatedAt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}")
-                        else todayText("上次更新 · ${board.date}", "Last updated · ${board.date}"),
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (today.loading || state.todayRefresh.busy) CircularProgressIndicator(Modifier.padding(14.dp).size(20.dp).testTag("today-loading"), strokeWidth = 2.dp)
-                else IconButton(onClick = onUpdate, enabled = !state.isProfileSwitching && !state.isBusy,
-                    modifier = Modifier.semantics { contentDescription = refreshLabel }) { AssistantGlyph("refresh", Modifier.size(20.dp), MaterialTheme.colorScheme.primary) }
-            }
-            if (today.error != null || today.cacheError != null) HermesContentAction(onClick = { showSummary = true }) {
-                Text(if (board == null) todayText("暂时无法同步 · 查看详情", "Sync unavailable · Details")
-                    else todayText("显示已保存内容 · 查看详情", "Showing saved content · Details"), style = MaterialTheme.typography.labelMedium)
-            }
-        }
-        if (state.todayRefresh.message.isNotBlank()) item(key = "overview-update-status") {
-            Column(Modifier.fillMaxWidth().testTag("overview-update-status"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(state.todayRefresh.message, style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (state.todayRefresh.sessionId.isNotBlank()) HermesContentAction(onClick = onOpenRefresh) {
-                    Text(todayText("查看处理", "View processing"))
-                }
-            }
+            TodayBriefingHeader(state, filtered.size, localDate, onUpdate, onOpenRefresh, { showSummary = true })
         }
         if (board == null && !today.loading) item(key = "empty") {
             TodaySurface {
@@ -191,6 +162,76 @@ fun TodayOverviewScreen(
 }
 
 @Composable
+internal fun TodayBriefingHeader(state: AppUiState, count: Int, localDate: LocalDate,
+    onUpdate: () -> Unit, onOpenRefresh: () -> Unit, onDetails: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val board = state.today.board
+    val refresh = state.todayRefresh
+    val updating = state.today.loading || refresh.busy
+    val needsConfirmation = state.pendingAgentRequests.any { it.conversationId == refresh.sessionId &&
+        (it.profile.isBlank() || it.profile == refresh.profile) }
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp).testTag("today-briefing-header"),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(todayText("为你留意", "On your radar"), Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (board != null) Surface(shape = RoundedCornerShape(8.dp), color = colors.onSurface.copy(alpha = .055f)) {
+                        Text(count.toString(), Modifier.padding(horizontal = 7.dp, vertical = 2.dp), style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSurfaceVariant, maxLines = 1)
+                    }
+                }
+                if (board != null) {
+                    val updated = board.generatedAt.atZoneSameInstant(java.time.ZoneId.systemDefault())
+                    val time = updated.format(DateTimeFormatter.ofPattern(if (updated.toLocalDate() == localDate) "HH:mm" else "M/d HH:mm"))
+                    Text(todayText("更新于 $time", "Updated $time"), style = MaterialTheme.typography.labelMedium,
+                        color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Row(Modifier.heightIn(min = 48.dp).testTag("today-refresh-button")
+                .clip(RoundedCornerShape(14.dp)).background(colors.primaryContainer.copy(alpha = .65f))
+                .clickable(enabled = !updating && !state.isProfileSwitching && !state.isBusy, role = Role.Button, onClick = onUpdate)
+                .semantics { contentDescription = todayText("核对最新进展并更新首页", "Check recent progress and update overview") }
+                .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (updating) CircularProgressIndicator(Modifier.size(16.dp).testTag("today-loading"), strokeWidth = 1.7.dp, color = colors.primary)
+                else AssistantGlyph("refresh", Modifier.size(17.dp), colors.primary)
+                Spacer(Modifier.width(6.dp))
+                Text(if (updating) todayText("更新中", "Updating") else todayText("刷新", "Refresh"),
+                    style = MaterialTheme.typography.labelLarge, color = colors.primary, maxLines = 1, softWrap = false)
+            }
+        }
+        if (refresh.busy || refresh.message.isNotBlank()) {
+            val canOpen = refresh.sessionId.isNotBlank()
+            val status = when {
+                needsConfirmation -> todayText("需要你确认", "Your confirmation is needed")
+                refresh.busy -> todayText("正在更新首页", "Updating your overview")
+                else -> refresh.message
+            }
+            Surface(shape = RoundedCornerShape(14.dp), color = colors.onSurface.copy(alpha = .04f),
+                modifier = Modifier.fillMaxWidth().testTag("overview-update-status")
+                    .then(if (canOpen) Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onOpenRefresh) else Modifier)) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    AssistantGlyph(if (needsConfirmation) "check" else "history", Modifier.size(17.dp), colors.onSurfaceVariant)
+                    Text(status, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (canOpen) {
+                        Text(todayText("查看处理", "Details"), style = MaterialTheme.typography.labelMedium, color = colors.primary,
+                            maxLines = 1, softWrap = false)
+                        AssistantGlyph("chevron", Modifier.size(14.dp), colors.primary)
+                    }
+                }
+            }
+        }
+        if (state.today.error != null || state.today.cacheError != null) HermesContentAction(onClick = onDetails) {
+            Text(if (board == null) todayText("暂时无法同步 · 查看详情", "Sync unavailable · Details")
+                else todayText("显示已保存内容 · 查看详情", "Showing saved content · Details"), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+@Composable
 private fun TodayCategory(label: String, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.heightIn(min = 44.dp).selectable(selected, role = Role.Tab, onClick = onClick)
@@ -246,15 +287,6 @@ private fun TodayFocusCard(card: TodayCard, onDetails: () -> Unit, onAction: (St
 
 @Composable
 private fun CompactTodayHero(state: AppUiState, active: Boolean, hour: Int, onDaily: () -> Unit, onScenes: () -> Unit, onWelcomed: () -> Unit) {
-    val motion = remember { MascotInteraction() }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val enabled = active && !state.reduceMotion && !LocalReduceMotion.current && android.animation.ValueAnimator.areAnimatorsEnabled()
-    DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) motion.finish() }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); motion.finish() }
-    }
-    LaunchedEffect(enabled) { if (!enabled) motion.finish() }
     val greeting = when (hour) { in 5..10 -> todayText("早上好", "Good morning"); in 11..16 -> todayText("下午好", "Good afternoon"); else -> todayText("晚上好", "Good evening") }
     Column {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -262,8 +294,8 @@ private fun CompactTodayHero(state: AppUiState, active: Boolean, hour: Int, onDa
                 Text(greeting + "，" + state.userProfile.displayName.ifBlank { state.username }.ifBlank { todayText("朋友", "friend") },
                     fontSize = 25.sp, lineHeight = 32.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            HermesMascot(motion.motion ?: MascotMotion.IDLE_HALF, Modifier.size(76.dp, 82.dp).clickable(enabled = enabled) { motion.tap(true); onWelcomed() },
-                active = enabled, waistUp = true, onFinished = { motion.finish() })
+            HomePortraitCarousel(Modifier.size(76.dp, 82.dp), active = active,
+                reduceMotion = state.reduceMotion, onTap = onWelcomed)
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = onDaily, modifier = Modifier.weight(1.35f).heightIn(min = 48.dp).testTag("daily_conversation_entry"), enabled = !state.isDailyOpening && !state.isProfileSwitching) {

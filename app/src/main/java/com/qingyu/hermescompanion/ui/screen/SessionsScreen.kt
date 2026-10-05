@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -121,7 +122,7 @@ fun SessionsScreen(
     onSearch: () -> Unit,
     onOpenSession: (HermesSession) -> Unit,
     onDeleteSession: (HermesSession) -> Unit,
-    onAiRenameSession: (HermesSession) -> Unit,
+    onRenameSession: (HermesSession, String) -> Unit,
     onTogglePinned: (HermesSession) -> Unit,
     onArchiveSession: (HermesSession) -> Unit,
     onMoveToProject: (HermesSession, HermesProject) -> Unit,
@@ -137,6 +138,7 @@ fun SessionsScreen(
     var showProjectPicker by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<HermesSession?>(null) }
     var archiveTarget by remember { mutableStateOf<HermesSession?>(null) }
+    var renameTarget by remember(state.baseUrl, state.activeProfile) { mutableStateOf<HermesSession?>(null) }
     var showCreateProject by remember { mutableStateOf(false) }
     val selectedProjectId = state.selectedProjectId
     var timeFilter by remember(state.activeProfile) { mutableStateOf(SessionTimeFilter.ALL) }
@@ -336,7 +338,7 @@ fun SessionsScreen(
                 SessionActions(
                     session = session,
                     busy = state.sessionActionId == session.id,
-                    onAiRename = { actionTarget = null; onAiRenameSession(session) },
+                    onRename = { actionTarget = null; renameTarget = session },
                     onTogglePinned = { actionTarget = null; onTogglePinned(session) },
                     onArchive = { actionTarget = null; archiveTarget = session },
                     onMove = {
@@ -345,6 +347,35 @@ fun SessionsScreen(
                     },
                     onDelete = { actionTarget = null; deleteTarget = session },
                 )
+            }
+        }
+    }
+
+    renameTarget?.let { session ->
+        var name by androidx.compose.runtime.saveable.rememberSaveable(session.scopedId) { mutableStateOf(session.title) }
+        val valid = name.trim().isNotEmpty() && name.trim().length <= 120
+        // Explicit width keeps the text field out of AlertDialog's intrinsic-size feedback loop.
+        androidx.compose.ui.window.Dialog(onDismissRequest = { renameTarget = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
+                Surface(Modifier.widthIn(max = 440.dp).fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface) {
+                    Column(Modifier.padding(22.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(uiText(R.string.ui_0979, "重命名"), style = MaterialTheme.typography.titleLarge)
+                        OutlinedTextField(name, { name = it.replace("\n", "").replace("\r", "") },
+                            modifier = Modifier.fillMaxWidth().testTag("session-name-input"), singleLine = true,
+                            label = { Text(com.qingyu.hermescompanion.today.todayText("对话名", "Conversation name")) },
+                            isError = name.trim().length > 120,
+                            supportingText = if (name.trim().length > 120) ({ Text(com.qingyu.hermescompanion.today.todayText("最多 120 个字符", "Up to 120 characters")) }) else null)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { renameTarget = null }) { Text(uiText(R.string.ui_0553, "取消"), maxLines = 1) }
+                            TextButton(enabled = valid && state.sessionActionId == null, modifier = Modifier.testTag("session-name-save"),
+                                onClick = { onRenameSession(session, name.trim()); renameTarget = null }) {
+                                Text(com.qingyu.hermescompanion.today.todayText("保存", "Save"), maxLines = 1)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1004,7 +1035,7 @@ private fun DirectoryChoice(name: String, path: String, onClick: () -> Unit) {
 private fun SessionActions(
     session: HermesSession,
     busy: Boolean,
-    onAiRename: () -> Unit,
+    onRename: () -> Unit,
     onTogglePinned: () -> Unit,
     onArchive: () -> Unit,
     onMove: () -> Unit,
@@ -1017,7 +1048,7 @@ private fun SessionActions(
                 CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
             }
         } else {
-            SessionActionRow(HermesIconKind.RENAME, uiText(R.string.ui_0979, "AI 重命名"), onAiRename)
+            SessionActionRow(HermesIconKind.RENAME, uiText(R.string.ui_0979, "重命名"), onRename)
             SessionPinActionRow(if (session.isPinned) uiText(R.string.ui_0980, "取消置顶") else uiText(R.string.ui_0475, "置顶"), onTogglePinned)
             SessionActionRow(HermesIconKind.ARCHIVE, uiText(R.string.ui_0962, "归档"), onArchive)
             SessionActionRow(HermesIconKind.MOVE, uiText(R.string.ui_0981, "移至项目"), onMove)
