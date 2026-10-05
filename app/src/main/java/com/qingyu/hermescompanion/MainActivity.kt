@@ -109,6 +109,11 @@ open class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        hermesViewModel.onAppForegrounded()
+    }
+
     override fun onStop() {
         if (!isChangingConfigurations) hermesViewModel.onAppBackgrounded()
         super.onStop()
