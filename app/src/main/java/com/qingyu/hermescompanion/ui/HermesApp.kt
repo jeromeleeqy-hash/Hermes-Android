@@ -248,7 +248,7 @@ fun HermesApp(viewModel: HermesViewModel, state: AppUiState) {
                 onSearch = viewModel::showSessionSearch,
                 onOpenSession = viewModel::openSession,
                 onDeleteSession = viewModel::deleteSession,
-                onAiRenameSession = viewModel::aiRenameSession,
+                onRenameSession = viewModel::renameSession,
                 onTogglePinned = viewModel::toggleSessionPinned,
                 onArchiveSession = viewModel::archiveSession,
                 onMoveToProject = viewModel::moveSessionToProject,
