@@ -1,0 +1,51 @@
+Hermes Android 3.8.3 · 安装、文件收纳与 OSS 上传
+
+一、覆盖安装
+下载 Hermes-Android-3.8.3-release.apk，直接覆盖原版，不需要卸载。
+本版为 3.8.3 / 383，沿用原包名和签名。原连接与本地设置应保留。
+
+二、把首页相关文件收纳到 .hermes-app
+安装 APK 不会自动移动服务器文件。连接成功后：
+1. 首页右上角“⋯ → 收纳首页文件”。
+2. Hermes 会打开处理对话，读取现有配置，核对匹配的概览 Cron，等待相关写入结束，再迁移和更新配置。
+3. 完成后回到首页，用“⋯ → 仅同步已保存的概览”核对卡片；在“早晚整理”中核对已有任务。
+
+新位置：
+.hermes-app/today/hermes-today.json
+.hermes-app/today/.hermes-today.lock
+.hermes-app/today/snapshots/
+
+提示词、writer 命令和已有概览 Cron 也需要同步修改，本版已随附对应材料，收纳流程会处理它们。原任务 ID、早晚时间、时区和原启用状态保持不变。业务 Markdown 不搬动，其他程序的快照不搬动。旧文件会先备份并核验再清理。
+遇到正在写入、任务匹配不唯一或新旧文件内容冲突时，按处理对话中的具体提示核对，保留两份资料，不手工强删锁或覆盖文件。尚未迁移时仍可兼容原路径。
+
+三、使用修复后的按钮
+“结果待核对”：打开处理进展，可重新核对结果、处理审批或查看原对话。
+“继续未完成部分”：先核对已完成内容；原对话失效时核对业务记录和原回执。证据不足会明确询问，不直接重做旧任务。
+首页刷新图标：结合最近聊天中的新进展更新概览，页面会显示处理状态，需要时点“查看处理”。例如你已在聊天中明确说两件事完成，刷新后应核对并更新对应卡片；不确定的事项会保留待核对。
+只想读取服务器现有文件：用“⋯ → 仅同步已保存的概览”。
+底部圆角提示条已与液态玻璃导航栏等宽。
+
+四、上传到 OSS
+Bucket：hermes-app-releases-jerome
+目录：releases/
+
+1. 先上传 Hermes-Android-3.8.3-release.apk，保留文件名。
+2. 确认可下载：https://download.leaier.com/releases/Hermes-Android-3.8.3-release.apk
+3. 然后上传并覆盖 android-latest.json，确认其中 versionName=3.8.3、versionCode=383。
+4. 元数据地址：https://download.leaier.com/releases/android-latest.json
+5. 手机“我的 → 设置 → 软件更新 → 检查更新”。已安装 3.8.3 时应显示最新版本；3.8.2 可从这里更新。
+
+android-latest.json 建议 HTTP 元信息：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+
+APK 建议 HTTP 元信息：
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=31536000, immutable
+
+只上传 APK 和 android-latest.json，不上传源码、签名密钥或服务器资料。使用现有 releases/* 匿名 HTTPS 只读策略，不开放公共写。JSON 中的字节数和 SHA-256 已按本次实际 APK 生成，不要手工套用旧值。
+若 APK 地址出现 403 或 404，先解决访问问题，再发布 JSON。保留旧版 APK；同一版本的文件名不要替换成其他内容。
+
+五、安装后验收
+先确认首页与原设置正常，再执行一次收纳。核对原卡片、已完成状态和早晚任务；打开“结果待核对”和“继续未完成部分”，确认界面给出实际进度或具体原因。最后用你刚在聊天中更新的事项试一次首页刷新。
+构建环境测试通过不等于已在你的手机、网关与 OSS 上验收；若服务器处理失败，可从“查看处理”取得具体原因。

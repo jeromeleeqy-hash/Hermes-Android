@@ -1,0 +1,50 @@
+Hermes Android 3.8.4 · 安装与使用
+
+一、安装
+直接覆盖安装 Hermes-Android-3.8.4-release.apk，不用卸载。
+版本 3.8.4 / 384，沿用原包名和签名，保留原连接与本地设置。
+
+二、这次的使用变化
+1. 授权窗口固定位置，长内容在里面滚动。首页只显示一个“查看并确认”按钮；选择后再点“确认并继续”。
+2. 在 PC 处理过的授权，手机回到前台会核对，有待确认请求时每 10 秒再次核对。也可手动点“已在其他端处理？核对状态”。服务器确认已结束后会移除。关闭窗口只是暂时收起，不代表同意或拒绝。
+3. 首页“⋯”只有“早晚整理”和“首页设置”。日常更新用首页刷新图标；早晚时间设置一次后会自动执行，想改时间时再打开。
+4. 刷新、整理、配置、文件收纳和卡片处理都去“任务”查看。当前页看进行中的工作和授权，记录页看处理详情。只有主动聊天留在会话列表。已有 App 任务会在读取旧记录后逐步归类，不会删除聊天。
+5. “结果待核对”仍可核对回执；“继续未完成部分”先检查原记录，保留原操作编号，不直接重复执行已完成内容。
+
+如果网络不通或旧网关不提供明确授权状态，请求会保留，并在手动核对时说明无法确认。不会用手机本地猜测代替服务器结果。
+
+三、首页文件收纳（尚未做过时，只需一次）
+首页 → ⋯ → 首页设置 → 收纳首页文件。
+处理过程在任务页查看。Hermes 会核对旧文件、正在进行的写入和匹配的概览 Cron，迁移后同步提示词、writer 命令及对应 Cron 配置。
+
+新位置：
+.hermes-app/today/hermes-today.json
+.hermes-app/today/.hermes-today.lock
+.hermes-app/today/snapshots/
+
+业务 Markdown 与其他程序的快照留在原处。先备份、复制和校验，再清理旧文件；新旧内容冲突时保留资料。原任务 ID、早晚时间、时区和原启用状态保持不变。安装 APK 本身不操作服务器文件，尚未迁移仍兼容旧路径。
+
+从新位置成功读取概览后，“首页设置”会显示已收纳，无需重复操作。早晚任务可在“早晚整理”核对。只读同步与读取详情位于“首页设置 → 维护工具”，平时不用管；“更新整理规则”也在这里，按需使用。
+
+四、上传 OSS
+Bucket：hermes-app-releases-jerome
+目录：releases/
+
+1. 先上传 Hermes-Android-3.8.4-release.apk，保留文件名。
+2. 确认可下载：https://download.leaier.com/releases/Hermes-Android-3.8.4-release.apk
+3. 再上传并覆盖 android-latest.json（versionName=3.8.4，versionCode=384）。
+4. 元数据地址：https://download.leaier.com/releases/android-latest.json
+5. 手机“我的 → 设置 → 软件更新 → 检查更新”。
+
+android-latest.json：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+
+APK：
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=31536000, immutable
+
+JSON 的大小和 SHA-256 按本次实际 APK 生成。只上传 APK 和 JSON，不上传源码、密钥或服务器资料。沿用现有 HTTPS 只读访问方式，保留旧版 APK；若新 APK 地址不可下载，先解决访问问题再更新 JSON。
+
+五、安装后核对
+打开一次长授权，滚动到最后并检查按钮；在 PC 处理一项授权后回到手机，确认提示消失。执行一次首页刷新，检查任务页有进展，而会话列表不增加自动任务；主动新建聊天仍应正常出现。构建测试通过不等于已在你的真机和网关验收。

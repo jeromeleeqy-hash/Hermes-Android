@@ -1,0 +1,59 @@
+Hermes Android 3.8.6 · 安装与使用
+
+一、安装
+直接覆盖安装 Hermes-Android-3.8.6-release.apk，不用卸载。
+版本 3.8.6 / 386，沿用原包名和签名，保留连接与本地设置。
+
+二、切换首页
+首页右上角齿轮 → 首页模式 → 简洁首页 / 深度助理。
+点击后立即切换，下次打开仍记住选择。两种首页右上角都有齿轮，可以随时切回来。
+
+简洁首页：原版人物、问候、“跟我说”和最近主动聊天。无需配置整理功能，就能使用聊天、文件、任务、搜索和授权。
+深度助理：事项卡片、进展和主动刷新；需要时再配置首次整理或早晚整理。
+三套皮肤均支持两种首页，选择首页模式不会改变外观。
+
+新用户默认简洁首页。升级时，若手机保存过深度首页内容或整理任务记录，则保留深度助理；已有模式选择始终优先。换手机或清除 App 数据后，需要重新选择。
+
+切换不删除资料，不删除服务器对话，也不停止已经配置的早晚任务。需要暂停早晚任务时，到“任务”里操作。正在运行的任务继续完成，结果仍可在任务页查看。
+简洁模式不会定时读取深度首页数据；切换到深度助理只读取已有内容，不会自动发起整理任务。
+自动整理与 Cron 对话不会出现在手机最近聊天，PC 端原有记录仍保留。
+
+三、已有首页配置
+早晚整理和文件收纳不必重做。本版沿用 3.8.4 的写入规范、提示词、writer 和 Cron 命令。
+需要配置或修改时，先选择“深度助理”，再打开首页齿轮；早晚整理只需设置一次。
+“首次整理”和“收纳首页文件”只在需要操作时显示；已经完成时显示说明。
+
+.hermes-app/today/hermes-today.json
+.hermes-app/today/.hermes-today.lock
+.hermes-app/today/snapshots/
+
+四、上传 OSS
+Bucket：hermes-app-releases-jerome
+目录：releases/
+
+1. 先上传 Hermes-Android-3.8.6-release.apk，保留文件名。
+2. 确认可下载：https://download.leaier.com/releases/Hermes-Android-3.8.6-release.apk
+3. 再上传并覆盖 android-latest.json（versionName=3.8.6，versionCode=386）。
+如果下载的 JSON 文件名带数字后缀，请上传时改回 android-latest.json。
+4. 元数据地址：https://download.leaier.com/releases/android-latest.json
+5. 手机“我的 → 设置 → 软件更新 → 检查更新”。
+
+android-latest.json：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+
+APK：
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=31536000, immutable
+
+JSON 的大小和 SHA-256 来自实际 APK。只上传 APK 和 JSON，不上传源码或密钥。保留旧 APK；若新 APK 地址不能下载，先解决访问问题再覆盖 JSON。
+
+五、安装后核对
+1. 你已经使用过深度首页，覆盖安装后应保留该模式；从齿轮切到“简洁首页”。
+2. 看到原版人物、问候、“跟我说”和最近主动聊天；自动任务不应出现在最近聊天。
+3. 关闭再打开 App，仍为简洁首页；切换三套皮肤，模式不变。
+4. 在简洁首页点击齿轮，切回深度助理，原有卡片应继续显示。
+5. 任务页仍可查看运行结果及早晚任务；授权提醒仍可正常核对。
+6. 新设备未配置首页时，应默认简洁首页；不做任何整理配置也能正常聊天。
+
+已完成构建环境与模拟网关验证；手机厂商系统及你的实际服务器行为仍请安装后核对。

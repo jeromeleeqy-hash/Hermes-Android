@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "packageName": "com.qingyu.hermescompanion.preview",
+  "versionCode": 383,
+  "versionName": "3.8.3",
+  "apkUrl": "https://download.leaier.com/releases/Hermes-Android-3.8.3-release.apk",
+  "sha256": "7b498db357242069b791b901ef6a5b7ea33b1cb07feb7bb48cfcb3b698748de9",
+  "sizeBytes": 64956570,
+  "minSdk": 26,
+  "notes": [
+    "底部圆角提示条与液态玻璃导航栏等宽。",
+    "首页刷新会结合最近聊天中的实际进展更新概览，并显示处理状态。",
+    "修复结果待核对和继续未完成部分；原对话失效时先核对记录与回执。",
+    "新增收纳首页文件：将概览、锁和快照迁入 .hermes-app/today，并同步对应规范、命令及已有概览 Cron。"
+  ]
+}

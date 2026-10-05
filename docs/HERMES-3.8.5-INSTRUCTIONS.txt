@@ -1,0 +1,55 @@
+Hermes Android 3.8.5 · 安装与使用
+
+一、安装
+直接覆盖安装 Hermes-Android-3.8.5-release.apk，不用卸载。
+版本 3.8.5 / 385，沿用原包名和签名，保留原连接与本地设置。
+
+二、这次的使用变化
+1. 在电脑处理授权后，手机点“已在其他端处理？核对状态”，进度和结果直接显示在授权窗口。服务器确认结束后，窗口与任务页提醒一起消失。
+2. 网络或旧服务器无法核对时，提醒会保留并说明原因。若你确认已在其他端处理，可点击“已处理，移除此提醒”并再次确认。只移除手机提醒，不会替你授权、拒绝或重跑任务。
+3. 首页右上角改为齿轮，直接打开首页设置。新用户按里面的说明配置；不配置也能把 App 当作通用 Hermes 移动终端，正常使用聊天、文件和任务。
+4. “早晚整理”已经放进首页设置。只需配置一次；再次打开会核对服务器已有设置，日后想改时间时再保存，暂停或恢复到任务页处理。配置过程仍在任务页查看。
+5. 蓝字内容操作统一增加靠左图标，与正文边线保持一致，点击区域保持足够大小。
+6. 临时任务在手机的任务页查看，不出现在手机聊天列表。这是手机端分类；服务器上的对话仍保留，所以 PC 端仍可能看到。没有自动删除服务器对话。
+
+三、首页文件与整理规则
+如果首页设置已显示“首页文件已收纳”，不用再收纳。
+旧版尚未收纳时：首页 → 齿轮 → 文件收纳 → 收纳首页文件。新用户无需收纳。
+
+.hermes-app/today/hermes-today.json
+.hermes-app/today/.hermes-today.lock
+.hermes-app/today/snapshots/
+
+本版保留 3.8.4 首页写入规范、提示词、writer 和 Cron 命令，不需要为了本次界面修复重新配置。
+日常：和 Agent 聊过最新进展后，点首页刷新图标。
+故障排查：首页 → 齿轮 → 维护工具 → 同步与读取详情。
+
+四、上传 OSS
+Bucket：hermes-app-releases-jerome
+目录：releases/
+
+1. 先上传 Hermes-Android-3.8.5-release.apk，保留文件名。
+2. 确认可下载：https://download.leaier.com/releases/Hermes-Android-3.8.5-release.apk
+3. 再上传并覆盖 android-latest.json（versionName=3.8.5，versionCode=385）。
+如下载的 JSON 文件名带数字后缀，请在上传时改回 android-latest.json。
+4. 元数据地址：https://download.leaier.com/releases/android-latest.json
+5. 手机“我的 → 设置 → 软件更新 → 检查更新”。
+
+android-latest.json：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+
+APK：
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=31536000, immutable
+
+JSON 的大小和 SHA-256 按本次实际 APK 生成。只上传 APK 和 JSON，不上传源码、密钥或服务器资料。沿用现有 HTTPS 只读访问方式，保留旧版 APK；若新 APK 地址不可下载，先解决访问问题再更新 JSON。
+
+五、安装后核对
+1. 打开图 3 那条旧授权，点“已在其他端处理？核对状态”，确认窗口内有进度与结果。服务器确认结束后，手机待确认卡片应消失。
+2. 如果仍显示无法核对，请先确认 PC 已处理，再使用“已处理，移除此提醒”；这不会批准任何命令。
+3. 打开卡片详情，查看背景、来源等蓝字前的图标应与正文左边线对齐。
+4. 首页右上角点齿轮，在设置中找到早晚整理。已有配置会读取原时间和时区；无需再次提交。
+5. 自动任务继续在手机“任务”中查看；PC 对话记录仍保留。主动新建聊天应正常显示。
+
+构建和模拟网关测试通过；实际手机与服务器的跨端行为仍需安装后核对。

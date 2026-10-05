@@ -1,0 +1,48 @@
+Hermes Android 3.8.2 · 安装与 OSS 上传
+
+一、先在手机安装新版
+下载 Hermes-Android-3.8.2-release.apk，直接覆盖安装，不卸载旧版。原连接和本地设置应继续保留。
+首次从 3.8.1 升级需要这次手动安装，因为旧版还没有软件更新入口。
+安装后进入“我的 → 设置 → 软件更新”。以后新版可以在这里下载并打开系统安装界面。
+
+二、把更新文件放到 OSS
+Bucket：hermes-app-releases-jerome
+已绑定的下载域名：download.leaier.com
+
+1. 进入“文件管理 → 文件列表 → releases/”。
+2. 先上传 Hermes-Android-3.8.2-release.apk，保留原文件名。对象读写权限选继承 Bucket，不设公共写。
+3. 用浏览器访问：
+   https://download.leaier.com/releases/Hermes-Android-3.8.2-release.apk
+   应能开始下载。如果 403 或 404，先解决访问问题，不上传版本信息。
+4. 安装包能下载后，再上传 android-latest.json，保留原文件名。将来每次发布新版，最后覆盖这个文件。
+5. 访问：
+   https://download.leaier.com/releases/android-latest.json
+   应能显示或下载 JSON，里面的 versionName 是 3.8.2，versionCode 是 382。
+6. 手机中打开“软件更新 → 检查更新”。已经安装 3.8.2 时显示“已是最新版本”即正常。
+
+建议在对象的 HTTP 元信息中为 android-latest.json 设置：
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, max-age=0, must-revalidate
+APK 的 Content-Type: application/vnd.android.package-archive
+APK 可设置 Cache-Control: public, max-age=31536000, immutable，因为每版用独立文件名。
+
+只上传上述 APK 与 JSON。源码压缩包、签名密钥、证书私钥、个人资料和服务器登录文件都不用上传。
+已有权限方案：仅 releases/* 允许匿名 HTTPS 读取，不允许列出或写入其他对象；保持其他路径私有。
+原先证书控制台显示的到期时间是 2027-01-01 23:59。到期前要更新 OSS 托管证书；当前个人测试证书仅用于个人开发测试，正式发行前需确定适用证书与续期安排。
+
+三、后续发布
+每次新版递增 versionCode，沿用原签名与包名；安装包使用带版本的独立名称。
+发布时先上传并验证 APK，再覆盖 android-latest.json。JSON 中的文件大小、SHA-256 必须对应这份 APK。
+不要修改 versionCode 来伪装同一 APK 为新版，App 会检查 APK 内实际版本。
+如果发布错误，暂时恢复上一份 JSON；不要覆盖旧版本 APK。已安装较高版本不能靠减小版本号降级，修复后用更高版本发布。
+
+四、下载或安装遇到问题
+- 403：检查 releases/* 的只读策略、HTTPS 条件与 Bucket/账号级阻止公共访问设置，不要开放公共写。
+- 404：检查 releases/ 路径和两个文件名是否完全一致。
+- 等待网络：默认仅 Wi-Fi；取消下载后可关闭“仅通过 Wi-Fi 下载”再重新下载。
+- 校验失败：重新下载；如果仍失败，确认 JSON 与 APK 是同一版。
+- 签名不一致：不要卸载旧 App。联系发布者提供原签名的安装包。
+- 第一次点“安装更新”会提示前往系统设置，允许来自 Hermes 的应用后，返回并再次点“安装更新”。
+- 安装由 Android 系统确认，若取消可稍后回来再安装。不同厂商可能还有额外安全检查。
+
+这次无需改变 Hermes 服务器、记忆、workspace 或早晚 Cron。
