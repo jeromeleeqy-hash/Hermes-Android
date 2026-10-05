@@ -38,7 +38,7 @@ class ConcurrentGatewayTest {
                     }
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val frame = JSONObject(text)
-                        calls += frame
+                        if (frame.optString("method") != "client.capabilities") calls += frame
                         val params = frame.getJSONObject("params")
                         val method = frame.getString("method")
                         val id = params.optString("session_id")
